@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Admin</title>
+    <link rel="stylesheet" href="admin.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        /* Estilos exclusivos do Dashboard */
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
+        .stat-card h3 { font-size: 0.9rem; color: #666; margin-bottom: 10px; font-weight: normal; }
+        .stat-card .value { font-size: 1.8rem; font-weight: bold; color: #005fb9; }
+        .stat-card i { font-size: 2rem; margin-bottom: 10px; color: #005fb9; }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <aside class="sidebar">
+            <h3>Admin AutoPeças</h3>
+            <nav>
+                <a href="admin_dashboard.html" class="active"><i class="ph ph-gauge"></i> Dashboard</a>
+                <a href="admin_produtos.html"><i class="ph ph-package"></i> Produtos</a>
+                <a href="admin_pedidos.html"><i class="ph ph-shopping-cart-simple"></i> Pedidos</a>
+                <a href="admin_afiliados.html"><i class="ph ph-users"></i> Afiliados</a>
+                <a href="#" id="logout-button"><i class="ph ph-sign-out"></i> Sair</a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header>
+                <h1>Visão Geral</h1>
+                <p>Bem-vindo ao painel de controle.</p>
+            </header>
+
+            <section class="dashboard-grid">
+                <div class="stat-card">
+                    <i class="ph ph-currency-dollar"></i>
+                    <h3>Faturamento Total</h3>
+                    <span class="value" id="total-vendas">Carregando...</span>
+                </div>
+
+                <div class="stat-card">
+                    <i class="ph ph-shopping-cart"></i>
+                    <h3>Total de Pedidos</h3>
+                    <span class="value" id="total-pedidos">...</span>
+                </div>
+
+                <div class="stat-card">
+                    <i class="ph ph-package"></i>
+                    <h3>Produtos Cadastrados</h3>
+                    <span class="value" id="total-produtos">...</span>
+                </div>
+
+                <div class="stat-card">
+                    <i class="ph ph-warning-circle"></i>
+                    <h3>Estoque Baixo</h3>
+                    <span class="value" id="estoque-baixo" style="color: orange;">...</span>
+                </div>
+            </section>
+
+            <div class="card">
+                <h3>Últimos Pedidos</h3>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Cliente</th>
+                            <th>Valor</th>
+                            <th>Data</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ultimos-pedidos-list">
+                        <tr><td colspan="4">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

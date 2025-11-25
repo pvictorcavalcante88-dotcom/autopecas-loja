@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Afiliados</title>
+    <link rel="stylesheet" href="admin.css?v=2.0">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <aside class="sidebar">
+            <h3>Admin AutoPeças</h3>
+            <nav>
+                <a href="admin_dashboard.html"><i class="ph ph-gauge"></i> Dashboard</a>
+                <a href="admin_produtos.html"><i class="ph ph-package"></i> Produtos</a>
+                <a href="admin_pedidos.html"><i class="ph ph-shopping-cart-simple"></i> Pedidos</a>
+                <a href="admin_afiliados.html" class="active"><i class="ph ph-users"></i> Afiliados</a>
+                
+                <a href="#" id="logout-button"><i class="ph ph-sign-out"></i> Sair</a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header>
+                <h1>Gestão de Afiliados</h1>
+            </header>
+
+            <section class="card">
+                <h3>Parceiros Cadastrados</h3>
+                <div class="table-container">
+                    <table style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>Nome / Telefone</th>
+                                <th>Código</th>
+                                <th>Status</th>
+                                <th>Total Vendido</th>
+                                <th>Comissão a Pagar</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="afiliados-list">
+                            <tr><td colspan="6">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="admin.js"></script>
+</body>
+</html>

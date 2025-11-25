@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pedidos - Painel Admin</title>
+    <link rel="stylesheet" href="admin.css?v=1.1"> 
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+
+    <div class="admin-layout">
+        
+        <nav class="admin-sidebar">
+            <div class="logo">AutoPeças <span>Veloz</span></div>
+            <ul>
+                <li>
+                    <a href="admin_dashboard.html">
+                        <i class="ph ph-gauge"></i> Dashboard
+                    </a>
+                </li>
+                <li>
+                    <a href="admin_produtos.html">
+                        <i class="ph ph-package"></i> Produtos
+                    </a>
+                </li>
+                <li class="active">
+                    <a href="admin_pedidos.html">
+                        <i class="ph ph-shopping-cart-simple"></i> Pedidos
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <main class="admin-main">
+            <header class="admin-header">
+                <h2>Visualizar Pedidos</h2>
+                <div class="admin-user">
+                    <span id="admin-user-name">Carregando...</span>
+                    <button id="btn-logout">Sair <i class="ph ph-sign-out"></i></button>
+                </div>
+            </header>
+
+            <div class="admin-content">
+                <div class="order-list" id="order-list-container">
+                    <p>Carregando pedidos...</p>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <script src="admin.js"></script> 
+</body>
+</html>

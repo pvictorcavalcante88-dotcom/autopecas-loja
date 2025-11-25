@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Produtos</title>
+    <link rel="stylesheet" href="admin.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        /* Estilos do Modal de Edição */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal.active { display: flex; }
+        .modal-content { background-color: white; padding: 20px; border-radius: 8px; width: 500px; max-width: 90%; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <aside class="sidebar">
+            <h3>Admin AutoPeças</h3>
+            <nav>
+                <a href="admin_dashboard.html"><i class="ph ph-gauge"></i> Dashboard</a>
+                <a href="admin_produtos.html" class="active"><i class="ph ph-package"></i> Produtos</a>
+                <a href="admin_pedidos.html"><i class="ph ph-shopping-cart-simple"></i> Pedidos</a>
+                <a href="admin_afiliados.html"><i class="ph ph-users"></i> Afiliados</a>
+                <a href="#" id="logout-button"><i class="ph ph-sign-out"></i> Sair</a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header>
+                <h1>Gestão de Produtos</h1>
+                <button class="btn-add" onclick="abrirModalCriar()">+ Novo Produto</button>
+            </header>
+
+            <div class="card">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Produto</th>
+                            <th>Preço</th>
+                            <th>Estoque</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="produtos-list">
+                        <tr><td colspan="5">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <div id="modal-produto" class="modal">
+        <div class="modal-content">
+            <h2 id="modal-title">Editar Produto</h2>
+            <form id="form-produto">
+                <input type="hidden" id="edit-id">
+                
+                <div class="form-group">
+                    <label>Título</label>
+                    <input type="text" id="edit-titulo" required>
+                </div>
+                
+                <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label>Preço (R$)</label>
+                        <input type="number" id="edit-preco" step="0.01" required>
+                    </div>
+                    <div>
+                        <label>Estoque</label>
+                        <input type="number" id="edit-estoque" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>URL da Imagem</label>
+                    <input type="text" id="edit-imagem">
+                </div>
+
+                <div class="form-group">
+                    <label>Categoria</label>
+                    <input type="text" id="edit-categoria">
+                </div>
+
+                <div class="form-group">
+                    <label>Referência / Código</label>
+                    <input type="text" id="edit-referencia">
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" onclick="fecharModal()" style="padding: 10px; cursor: pointer;">Cancelar</button>
+                    <button type="submit" class="btn-add" style="border:none; cursor:pointer;">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

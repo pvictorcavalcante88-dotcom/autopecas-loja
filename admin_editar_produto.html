@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Editar Produto</title>
+    <link rel="stylesheet" href="admin.css?v=2.0">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <aside class="sidebar">
+            <h3>Admin AutoPeças</h3>
+            <nav>
+                <a href="admin_dashboard.html"><i class="ph ph-gauge"></i> Dashboard</a>
+                <a href="admin_produtos.html" class="active"><i class="ph ph-package"></i> Produtos</a>
+                <a href="admin_pedidos.html"><i class="ph ph-shopping-cart-simple"></i> Pedidos</a>
+		<a href="admin_afiliados.html" class="active"><i class="ph ph-users"></i> Afiliados</a>
+                <a href="#" id="logout-button"><i class="ph ph-sign-out"></i> Sair</a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header>
+                <h1>Editar Produto: <span id="edit-produto-id">#ID</span></h1>
+            </header>
+
+            <section class="card">
+                <h2>Detalhes do Produto</h2>
+                <form id="edit-produto-form" class="admin-form">
+                    
+                    <h3>📦 Dados Básicos</h3>
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 2;">
+                            <label>Título do Produto</label>
+                            <input type="text" id="edit-produto-titulo" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Categoria</label>
+                            <select id="edit-produto-categoria">
+                                <option value="">Selecione...</option>
+                                <option value="Motor">Motor</option>
+                                <option value="Freios">Freios</option>
+                                <option value="Suspensão">Suspensão</option>
+                                <option value="Elétrica">Elétrica</option>
+                                <option value="Câmbio">Câmbio</option>
+                                <option value="Acessórios">Acessórios</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Preço Novo</label>
+                            <input type="number" step="0.01" id="edit-produto-preco-novo" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Preço Antigo</label>
+                            <input type="number" step="0.01" id="edit-produto-preco-antigo">
+                        </div>
+                        <div class="form-group">
+                            <label>Estoque</label> <input type="number" id="edit-produto-estoque" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Tag Desconto</label>
+                            <input type="text" id="edit-produto-desconto">
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <h3>🛠️ Ficha Técnica</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Referência (SKU)</label>
+                            <input type="text" id="edit-produto-referencia">
+                        </div>
+                        <div class="form-group">
+                            <label>Fabricante</label>
+                            <input type="text" id="edit-produto-fabricante">
+                        </div>
+                        <div class="form-group">
+                            <label>URL Logo</label>
+                            <input type="text" id="edit-produto-imagem-fabricante">
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <h3>🚗 Compatibilidade</h3>
+                    <div class="form-group">
+                        <label>Carros Compatíveis</label>
+                        <input type="text" id="edit-produto-carros">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Ano</label>
+                            <input type="text" id="edit-produto-ano">
+                        </div>
+                        <div class="form-group">
+                            <label>Motor</label>
+                            <input type="text" id="edit-produto-motor">
+                        </div>
+                        <div class="form-group">
+                            <label>Qtd/Veículo</label>
+                            <input type="number" id="edit-produto-qtd-veiculo">
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <h3>🖼️ Imagens e Extras</h3>
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 2;">
+                            <label>URL Imagem Principal</label>
+                            <input type="text" id="edit-produto-imagem">
+                        </div>
+                        <div class="form-group">
+                            <label>Palavras-chave</label>
+                            <input type="text" id="edit-produto-pesquisa">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Outras Imagens (Separadas por vírgula)</label>
+                        <input type="text" id="edit-produto-imagens-extra">
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                    </div>
+                </form>
+            </section>
+        </main>
+    </div>
+    <script src="admin.js"></script>
+</body>
+</html>

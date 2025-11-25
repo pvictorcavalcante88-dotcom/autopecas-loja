@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resultados da Busca - AutoPeças Veloz</title>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="style.css?v=1.2">
+</head>
+<body>
+
+    <header class="main-header">
+    <div class="header-container">
+        <a href="index.html" class="logo">
+            <i class="ph ph-car-profile"></i>
+            AutoPeças <span>Veloz</span>
+        </a>
+
+        <div class="search-container">
+            <input type="text" id="search-input" placeholder="O que você está procurando?">
+            
+            <button class="search-button" id="search-button" aria-label="Buscar">
+                <i class="ph ph-magnifying-glass"></i>
+            </button>
+            
+            <div class="search-dropdown-toggle" id="search-category-toggle">
+                <span id="search-category-label" data-selected-category="">Categorias</span> 
+                <i class="ph ph-caret-down"></i>
+            </div>
+            <div class="search-dropdown-menu" id="search-dropdown-menu">
+                <a href="#" data-value="">Todas as Categorias</a>
+                <a href="#" data-value="Motor">Motor</a>
+                <a href="#" data-value="Freios">Freios</a>
+                <a href="#" data-value="Suspensão">Suspensão</a>
+                <a href="#" data-value="Elétrica">Elétrica</a>
+                <a href="#" data-value="Câmbio">Câmbio</a>
+                <a href="#" data-value="Acessórios">Acessórios</a>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <a href="#" class="action-button">
+                <i class="ph ph-user"></i>
+                <span>Entrar</span>
+            </a>
+            <a href="cart.html" class="action-button cart-button">
+                <i class="ph ph-shopping-cart"></i>
+                <span>Carrinho</span>
+                <span>0</span> 
+            </a>
+        </div>
+    </div>
+</header>
+
+    <main class="main-content">
+        <section class="promo-section"> <h2>Resultados para: "<span id="search-term-display">...</span>"</h2>
+            
+            <div id="search-track">
+                <p>Pesquisando...</p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="main-footer">
+        <p>© 2025 AutoPeças Veloz. Todos os direitos reservados.</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

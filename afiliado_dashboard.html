@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Afiliado</title>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7fa; margin: 0; color: #333; }
+        
+        .header { background: #005fb9; color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .container { max-width: 800px; margin: 30px auto; padding: 20px; }
+        .card { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #eee; }
+
+        .saldo-box { text-align: center; padding: 30px; background: linear-gradient(135deg, #27ae60, #2ecc71); color: white; border-radius: 10px; border: none; }
+        .saldo-valor { font-size: 3rem; font-weight: bold; margin: 10px 0; }
+
+        .link-box { background: #f8f9fa; padding: 15px; border: 1px dashed #ccc; border-radius: 5px; display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+        .link-box input { flex: 1; border: none; background: transparent; font-size: 1.1rem; color: #555; outline: none; }
+        
+        .btn-copy { background: #005fb9; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+        .btn-copy:hover { background: #004a94; }
+        .btn-danger { background: #c0392b; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+
+        .margem-input { width: 80px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 1.1rem; text-align: center; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
+        th { color: #666; font-size: 0.9rem; }
+        
+        .btn-logout { background: rgba(255,255,255,0.2); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; text-decoration: none; }
+
+        /* Estilos do Orçamento */
+        .orcamento-search { position: relative; margin-bottom: 15px; }
+        .orcamento-search input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 5px; }
+        .search-results { position: absolute; top: 100%; left: 0; width: 100%; background: white; border: 1px solid #ddd; max-height: 200px; overflow-y: auto; z-index: 10; display: none; }
+        .search-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+        .search-item:hover { background: #f0f0f0; }
+        .orcamento-footer { margin-top: 20px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h3>👋 Olá, <span id="afiliado-nome">Afiliado</span></h3>
+        <a href="#" id="logout-btn" class="btn-logout">Sair</a>
+    </div>
+
+    <div class="container">
+        
+        <div class="card">
+            <h3>📈 Sua Margem de Lucro</h3>
+            <p style="color: #666; margin-bottom: 15px;">Defina quanto você quer ganhar em cima do preço da loja. (Máx: 30%)</p>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <input type="number" id="afiliado-margem" class="margem-input" min="0" max="30" step="0.5" placeholder="0">
+                <span style="font-weight:bold; font-size: 1.2rem;">%</span>
+                <button onclick="salvarMargem()" class="btn-copy" style="background: #ff6b00;">Salvar</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📄 Criar Orçamento PDF</h3>
+            <p style="color:#666; margin-bottom: 15px;">Crie um orçamento personalizado para seu cliente com seus preços.</p>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <input type="text" id="cliente-nome" placeholder="Nome do Cliente" style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
+            </div>
+
+            <div class="orcamento-search">
+                <input type="text" id="search-orcamento" placeholder="Digite o nome da peça para adicionar..." autocomplete="off">
+                <div class="search-results" id="search-results"></div>
+            </div>
+
+            <table id="tabela-orcamento">
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Qtd</th>
+                        <th>Preço Unit. (Seu)</th>
+                        <th>Total</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="lista-orcamento">
+                    </tbody>
+            </table>
+
+            <div class="orcamento-footer">
+                <h3 style="margin:0;">Total: <span id="total-orcamento">R$ 0,00</span></h3>
+                <button onclick="gerarPDF()" class="btn-copy"><i class="ph ph-file-pdf"></i> Baixar PDF</button>
+            </div>
+        </div>
+
+        <div class="card saldo-box">
+            <span>Comissões Disponíveis</span>
+            <div class="saldo-valor" id="afiliado-saldo">R$ 0,00</div>
+            <small>Pagamentos via PIX na chave: <span id="afiliado-pix">...</span></small>
+        </div>
+
+        <div class="card">
+            <h3>🔗 Seu Link de Vendas</h3>
+            <div class="link-box">
+                <i class="ph ph-link"></i>
+                <input type="text" id="afiliado-link" readonly value="Carregando...">
+                <button class="btn-copy" onclick="copiarLink()">Copiar</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>💰 Vendas Indicadas</h3>
+            <table>
+                <thead>
+                    <tr><th>Data</th><th>Valor Venda</th><th>Sua Comissão</th></tr>
+                </thead>
+                <tbody id="vendas-list">
+                    <tr><td colspan="3">Carregando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="afiliado.js"></script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finalizar Compra - AutoPeças Veloz</title>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="style.css?v=2.1">
+</head>
+<body>
+
+    <header class="main-header">
+        <div class="header-container">
+            <a href="index.html" class="logo">
+                <i class="ph ph-car-profile"></i>
+                AutoPeças <span>Veloz</span>
+            </a>
+            <div class="header-actions">
+                <span style="font-weight: bold; color: #555;"><i class="ph ph-lock-key"></i> Ambiente Seguro</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="cart-page-container">
+        
+        <div class="checkout-form" style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <h2><i class="ph ph-map-pin"></i> Dados de Entrega</h2>
+            
+            <label for="email">Email</label>
+            <input type="email" id="email" placeholder="seu@email.com">
+
+            <label for="rua">Endereço Completo</label>
+            <input type="text" id="rua" placeholder="Rua, Número e Bairro">
+
+            <label for="numero">Complemento (Opcional)</label>
+            <input type="text" id="numero" placeholder="Apto, Bloco...">
+
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+
+            <h2><i class="ph ph-credit-card"></i> Pagamento</h2>
+            <p style="color: #666; font-size: 0.9rem; margin-bottom: 15px;">
+                O pagamento será processado na entrega ou via PIX após a confirmação.
+            </p>
+            
+            <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; border: 1px solid #ddd;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="radio" name="pagamento" checked> 
+                    <span>PIX / Boleto / Cartão (Pagar na Entrega)</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="order-summary-box">
+            <h3>Seu Pedido</h3>
+            
+            <div class="summary-item-list" style="max-height: 300px; overflow-y: auto; margin-bottom: 15px;">
+                <p>Carregando...</p>
+            </div>
+
+            <div class="summary-row total">
+                <span>Total a Pagar</span>
+                <span id="cart-total">R$ 0,00</span>
+            </div>
+            
+            <button class="btn-place-order">
+                Finalizar Pedido
+            </button>
+            
+            <a href="cart.html" style="display: block; text-align: center; margin-top: 15px; font-size: 0.9rem; color: #666;">
+                Voltar ao Carrinho
+            </a>
+        </div>
+
+    </main>
+
+    <footer class="main-footer">
+        <p>© 2025 AutoPeças Veloz. Todos os direitos reservados.</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

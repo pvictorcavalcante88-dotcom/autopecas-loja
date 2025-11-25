@@ -1,0 +1,4 @@
+PassengerEnabled on
+PassengerAppRoot /home/cable/apps_nodejs
+PassengerAppType node
+PassengerStartupFile server.js

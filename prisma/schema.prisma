@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Admin {
+  id    Int     @id @default(autoincrement())
+  email String  @unique
+  senha String
+}
+
+// MODELO AFILIADO (Login por Telefone)
+model Afiliado {
+  id        Int      @id @default(autoincrement())
+  nome      String
+  telefone  String   @unique
+  senha     String
+  codigo    String   @unique
+  chavePix  String?
+  saldo     Float    @default(0.0)
+  aprovado  Boolean  @default(false)
+  
+  // NOVO: A margem de lucro dele (em %)
+  margem    Float    @default(0.0) 
+
+  pedidos   Pedido[] 
+  createdAt DateTime @default(now())
+}
+
+model Produto {
+  id                  Int      @id @default(autoincrement())
+  titulo              String
+  pesquisa            String?
+  preco_novo          Float
+  preco_antigo        Float?
+  desconto            String?
+  estoque             Int      @default(0)
+  categoria           String?
+  referencia          String?
+  fabricante          String?
+  imagem_fabricante   String?
+  carros              String?
+  ano                 String?
+  motor               String?
+  quatidade_por_veiculo Int?
+  imagem              String?
+  imagens_extra       String?
+  produtos_relacionados String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model Pedido {
+  id              Int      @id @default(autoincrement())
+  clienteNome     String
+  clienteEmail    String
+  clienteEndereco String
+  valorTotal      Float
+  itens           String
+  
+  afiliadoId      Int?     
+  afiliado        Afiliado? @relation(fields: [afiliadoId], references: [id])
+  comissaoGerada  Float    @default(0.0)
+
+  createdAt       DateTime @default(now())
+}

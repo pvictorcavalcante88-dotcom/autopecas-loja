@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Afiliados - AutoPeças Veloz</title>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f7fa; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+        .logo { color: #005fb9; font-size: 1.5rem; font-weight: bold; margin-bottom: 20px; display: block; text-decoration: none; }
+        .tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid #eee; }
+        .tab { flex: 1; padding: 10px; cursor: pointer; color: #777; font-weight: bold; }
+        .tab.active { color: #005fb9; border-bottom: 2px solid #005fb9; }
+        form { display: none; flex-direction: column; gap: 15px; }
+        form.active { display: flex; }
+        input { padding: 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem; }
+        button { padding: 12px; background: #005fb9; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1rem; font-weight: bold; }
+        button:hover { background: #004a94; }
+        .note { font-size: 0.8rem; color: #666; text-align: left; margin-top: -10px; }
+    </style>
+</head>
+<body>
+
+    <div class="login-container">
+        <a href="index.html" class="logo"><i class="ph ph-handshake"></i> Afiliados Veloz</a>
+        
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('login')">Entrar</div>
+            <div class="tab" onclick="switchTab('register')">Criar Conta</div>
+        </div>
+
+        <form id="login-form" class="active">
+            <input type="tel" id="login-telefone" placeholder="Seu Celular (apenas números)" required>
+            <input type="password" id="login-senha" placeholder="Sua Senha" required>
+            <button type="submit">Acessar Painel</button>
+        </form>
+
+        <form id="register-form">
+            <input type="text" id="reg-nome" placeholder="Seu Nome Completo" required>
+            <input type="tel" id="reg-telefone" placeholder="Seu Celular (WhatsApp)" required>
+            <input type="text" id="reg-codigo" placeholder="Crie seu Código (Ex: joao10)" required>
+            <p class="note">Este será seu link: site.com/?ref=<b>joao10</b></p>
+            <input type="text" id="reg-pix" placeholder="Sua Chave PIX (para receber)">
+            <input type="password" id="reg-senha" placeholder="Crie uma Senha" required>
+            <button type="submit">Cadastrar e Começar</button>
+        </form>
+    </div>
+
+    <script>
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('form').forEach(f => f.classList.remove('active'));
+            
+            if(tab === 'login') {
+                document.querySelector('.tabs .tab:nth-child(1)').classList.add('active');
+                document.getElementById('login-form').classList.add('active');
+            } else {
+                document.querySelector('.tabs .tab:nth-child(2)').classList.add('active');
+                document.getElementById('register-form').classList.add('active');
+            }
+        }
+    </script>
+    <script src="afiliado.js"></script> 
+</body>
+</html>

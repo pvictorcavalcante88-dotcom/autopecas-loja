@@ -648,4 +648,65 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
     .search-bar select, .search-bar label { display: none !important; }
     
     .cart-button { bottom: 20px; right: 20px; }
+
+    /* CORREÇÃO DO CARRINHO (Adicionar no final do CSS Mobile) */
+@media (max-width: 768px) {
+    .cart-table-container, .table-responsive {
+        width: 100% !important;
+        overflow-x: auto !important; /* Permite rolar a tabela pro lado */
+        display: block !important;
+    }
+
+    table {
+        min-width: 600px !important; /* Força a tabela a ter tamanho real */
+    }
+}
+
+}
+
+/* =======================================================
+   🛒 RESGATE DA TABELA DO CARRINHO (Mobile)
+   ======================================================= */
+@media (max-width: 768px) {
+    
+    /* 1. Garante que o container da tabela tenha espaço e rolagem */
+    .cart-table-container, 
+    .table-responsive {
+        display: block !important; /* Remove flex que pode estar atrapalhando */
+        width: 100% !important;
+        overflow-x: auto !important; /* Permite rolar pro lado com o dedo */
+        background: #fff; /* Fundo branco pra garantir visibilidade */
+        margin-bottom: 20px;
+        min-height: 50px; /* Garante que não tenha altura zero */
+        border: 1px solid #eee; /* Borda pra você ver onde ela está */
+    }
+
+    /* 2. Força a tabela a agir como tabela (Reset Brutal) */
+    table {
+        width: 100% !important;
+        min-width: 600px !important; /* Força ela a ser larga (gera scroll) */
+        display: table !important;
+        border-collapse: collapse !important;
+    }
+
+    /* 3. Garante que as células apareçam */
+    thead, tbody, tr {
+        display: table-row-group !important;
+        width: 100% !important;
+    }
+    
+    th, td {
+        display: table-cell !important;
+        padding: 10px !important;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    /* 4. Ajuste da imagemzinha dentro do carrinho */
+    td img {
+        width: 50px !important;
+        height: 50px !important;
+        object-fit: cover;
+        border-radius: 4px;
+    }
 }

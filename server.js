@@ -202,4 +202,41 @@ app.get('/admin/stats', authMiddleware, async (req, res) => {
     }
 });
 
+/* =======================================================
+   🛒 ROTAS PÚBLICAS (API) - Adicione isto ao server.js
+   ======================================================= */
+
+// 1. Rota para listar TODOS os produtos (Usada na Home e Diagnóstico)
+app.get('/products', async (req, res) => {
+    try {
+        const products = await prisma.product.findMany();
+        res.json(products);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Erro ao buscar produtos' });
+    }
+});
+
+// 2. Rota para buscar UM produto pelo ID (Usada no Carrinho)
+app.get('/products/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        // Tenta achar o produto no banco
+        const product = await prisma.product.findUnique({
+            where: { id: parseInt(id) }
+        });
+
+        if (product) {
+            res.json(product); // Se achou, entrega os dados
+        } else {
+            res.status(404).json({ error: 'Produto não encontrado' });
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Erro ao buscar detalhes do produto' });
+    }
+});
+
+/* ======================================================= */
+
 app.listen(PORT, () => { console.log(`🚀 Servidor v5.0 (Markup) na porta ${PORT}`); });

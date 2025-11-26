@@ -331,3 +331,91 @@ function mudarSlide(n) {
     slideIndex = (slideIndex + n + slides.length) % slides.length;
     slides[slideIndex].classList.add('active');
 }
+
+/* =======================================================
+   🛒 LÓGICA DO CARRINHO (Adicionar ao final do script.js)
+   ======================================================= */
+
+// Função chamada automaticamente se estivermos na página do carrinho
+async function carregarPaginaCarrinho() {
+    const cartItemsContainer = document.getElementById('cart-items');
+    const cartTotalElement = document.getElementById('cart-total');
+
+    // Se não achar o tbody, significa que não estamos na página do carrinho. Para aqui.
+    if (!cartItemsContainer) return; 
+
+    // 1. Pega o carrinho salvo
+    let cart = JSON.parse(localStorage.getItem('cart')) || [];
+
+    // 2. Se vazio, mostra mensagem
+    if (cart.length === 0) {
+        cartItemsContainer.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">Seu carrinho está vazio.</td></tr>';
+        if (cartTotalElement) cartTotalElement.innerText = '0,00';
+        return;
+    }
+
+    // 3. Monta a tabela
+    cartItemsContainer.innerHTML = ''; 
+    let total = 0;
+    const API_URL = ''; // Garante que usa o mesmo domínio
+
+    for (const item of cart) {
+        try {
+            const response = await fetch(`${API_URL}/products/${item.id}`);
+            if (!response.ok) continue; 
+
+            const product = await response.json();
+            const subtotal = product.price * item.quantity;
+            total += subtotal;
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><img src="${product.image || 'https://via.placeholder.com/50'}" width="50" style="border-radius:4px;"></td>
+                <td>${product.name}</td>
+                <td>R$ ${Number(product.price).toFixed(2).replace('.', ',')}</td>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 5px; justify-content: center;">
+                        <button onclick="alterarQuantidade(${item.id}, -1)">-</button>
+                        <span>${item.quantity}</span>
+                        <button onclick="alterarQuantidade(${item.id}, 1)">+</button>
+                    </div>
+                </td>
+                <td>R$ ${subtotal.toFixed(2).replace('.', ',')}</td>
+                <td><button onclick="removerItem(${item.id})" style="color: red; border: none; background: none; cursor: pointer;">X</button></td>
+            `;
+            cartItemsContainer.appendChild(row);
+        } catch (error) {
+            console.error("Erro:", error);
+        }
+    }
+
+    if (cartTotalElement) cartTotalElement.innerText = total.toFixed(2).replace('.', ',');
+}
+
+// Funções de Ação (Precisam estar globais)
+function alterarQuantidade(id, delta) {
+    let cart = JSON.parse(localStorage.getItem('cart')) || [];
+    const item = cart.find(p => p.id === id);
+    if (item) {
+        item.quantity += delta;
+        if (item.quantity <= 0) cart = cart.filter(p => p.id !== id);
+        localStorage.setItem('cart', JSON.stringify(cart));
+        // Atualiza contador se existir a função, e recarrega a tabela
+        if(typeof atualizarContadorCarrinho === 'function') atualizarContadorCarrinho();
+        carregarPaginaCarrinho(); 
+    }
+}
+
+function removerItem(id) {
+    let cart = JSON.parse(localStorage.getItem('cart')) || [];
+    cart = cart.filter(p => p.id !== id);
+    localStorage.setItem('cart', JSON.stringify(cart));
+    if(typeof atualizarContadorCarrinho === 'function') atualizarContadorCarrinho();
+    carregarPaginaCarrinho();
+}
+
+// 4. GATILHO AUTOMÁTICO
+// Sempre que a página carregar, tenta rodar a função do carrinho
+document.addEventListener('DOMContentLoaded', () => {
+    carregarPaginaCarrinho();
+});

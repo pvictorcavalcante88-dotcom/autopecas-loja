@@ -569,3 +569,107 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
     .slide-content h2 { font-size: 2rem; }
     .slide-content p { font-size: 1rem; }
 }
+
+/* =======================================================
+   📱 MODO MOBILE (CELULAR)
+   ======================================================= */
+@media (max-width: 768px) {
+
+    /* 1. Ajuste Geral */
+    body {
+        padding-bottom: 20px;
+    }
+    .container {
+        width: 95%; /* Usa quase toda a tela */
+        padding: 0 10px;
+    }
+
+    /* 2. Cabeçalho (Header) */
+    header {
+        flex-direction: column; /* Empilha os itens */
+        gap: 15px;
+        padding: 15px 0;
+        text-align: center;
+    }
+
+    .logo {
+        font-size: 1.8rem; /* Logo um pouco menor */
+    }
+
+    /* Barra de Busca Grande e Fácil de Tocar */
+    .search-bar {
+        width: 100%;
+        display: flex;
+    }
+    .search-bar input {
+        width: 100%;
+        font-size: 16px; /* Evita zoom automático no iPhone */
+        padding: 12px;
+    }
+    .search-bar button {
+        padding: 12px 20px;
+    }
+
+    /* Botão do Carrinho no Topo */
+    .cart-button {
+        position: fixed; /* Fica flutuando no canto */
+        bottom: 20px;
+        right: 20px;
+        background: #2ecc71; /* Verde destaque */
+        color: white;
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        z-index: 1000; /* Fica por cima de tudo */
+        border: none;
+    }
+    .cart-button span:first-child { 
+        display: none; /* Esconde a palavra "Carrinho" pra virar só ícone */ 
+    }
+    .cart-button i {
+        font-size: 24px;
+    }
+
+    /* 3. Grade de Produtos (Estilo App) */
+    .product-grid {
+        grid-template-columns: repeat(2, 1fr); /* 2 por linha */
+        gap: 10px;
+    }
+
+    .product-card {
+        padding: 10px;
+    }
+
+    .product-card img {
+        height: 120px; /* Imagem menor para caber */
+    }
+
+    .product-card h3 {
+        font-size: 0.9rem; /* Texto do título menor */
+        height: 40px; /* Altura fixa para alinhar */
+        overflow: hidden;
+    }
+
+    .product-card button {
+        padding: 10px;
+        width: 100%;
+        font-weight: bold;
+    }
+
+    /* 4. Tabelas (Carrinho e Checkout) */
+    /* Faz a tabela ter barra de rolagem se não couber */
+    table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+    
+    /* 5. Banner / Slider */
+    .banner {
+        height: 150px; /* Banner mais baixo no celular */
+    }
+}

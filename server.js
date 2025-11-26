@@ -202,41 +202,61 @@ app.get('/admin/stats', authMiddleware, async (req, res) => {
     }
 });
 
+
 /* =======================================================
-   🛒 ROTAS PÚBLICAS (API) - Adicione isto ao server.js
+   🛒 ROTAS PÚBLICAS (CORRIGIDAS PARA SEU SCHEMA)
    ======================================================= */
 
-// 1. Rota para listar TODOS os produtos (Usada na Home e Diagnóstico)
+// 1. Rota para listar TODOS os produtos
 app.get('/products', async (req, res) => {
     try {
-        const products = await prisma.product.findMany();
+        // Atenção: Aqui usamos 'prisma.produto' (minúsculo) porque seu model é 'Produto'
+        const rawProducts = await prisma.produto.findMany();
+
+        // Vamos "traduzir" os campos do Português para o Inglês que o site espera
+        const products = rawProducts.map(p => ({
+            id: p.id,
+            name: p.titulo,           // titulo -> name
+            price: p.preco_novo,      // preco_novo -> price
+            image: p.imagem,          // imagem -> image
+            description: p.referencia || '', 
+            quantity: p.estoque       // estoque -> quantity
+        }));
+
         res.json(products);
     } catch (error) {
-        console.error(error);
+        console.error("Erro ao buscar produtos:", error);
         res.status(500).json({ error: 'Erro ao buscar produtos' });
     }
 });
 
-// 2. Rota para buscar UM produto pelo ID (Usada no Carrinho)
+// 2. Rota para buscar UM produto pelo ID
 app.get('/products/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        // Tenta achar o produto no banco
-        const product = await prisma.product.findUnique({
+        const p = await prisma.produto.findUnique({
             where: { id: parseInt(id) }
         });
 
-        if (product) {
-            res.json(product); // Se achou, entrega os dados
+        if (p) {
+            // Traduzindo um único produto
+            const product = {
+                id: p.id,
+                name: p.titulo,
+                price: p.preco_novo,
+                image: p.imagem,
+                description: p.referencia || '',
+                quantity: p.estoque
+            };
+            res.json(product);
         } else {
             res.status(404).json({ error: 'Produto não encontrado' });
         }
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Erro ao buscar detalhes do produto' });
+        console.error("Erro ao buscar produto:", error);
+        res.status(500).json({ error: 'Erro ao buscar detalhes' });
     }
 });
-
 /* ======================================================= */
 
 app.listen(PORT, () => { console.log(`🚀 Servidor v5.0 (Markup) na porta ${PORT}`); });

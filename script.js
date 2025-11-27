@@ -24,51 +24,50 @@ function getCarrinho() {
 document.addEventListener("DOMContentLoaded", async function() {
     console.log("🚀 Script Iniciado");
 
-    // 1. MODO PARCEIRO (AFILIADO LOGADO)
+    // 1. MODO PARCEIRO (Se for o Vendedor Logado)
     const afiliadoLogado = JSON.parse(localStorage.getItem('afiliadoLogado'));
     if (afiliadoLogado) {
         const margemSalva = parseFloat(localStorage.getItem('minhaMargem') || 0);
         FATOR_PRECO = 1 + (margemSalva / 100);
-        console.log(`🦊 Parceiro: ${afiliadoLogado.nome} (+${margemSalva}%)`);
+        console.log(`🦊 Parceiro Logado: ${afiliadoLogado.nome} (+${margemSalva}%)`);
         ativarModoParceiro(afiliadoLogado);
-    }
+    } 
+    else {
+        // 2. MODO CLIENTE (Verifica se veio por link de afiliado)
+        const paramsURL = new URLSearchParams(window.location.search);
+        // Tenta pegar o código da URL ou do que já ficou salvo antes
+        const refCode = paramsURL.get('ref') || localStorage.getItem('afiliadoCodigo');
 
-    // 2. RECUPERAÇÃO DE CARRINHO VIA LINK (A Mágica do PDF)
-    const paramsURL = new URLSearchParams(window.location.search);
-    const restoreData = paramsURL.get('restore'); 
-    const refCode = paramsURL.get('ref');
-
-    if (restoreData) {
-        try {
-            // Se o link veio do PDF, restaura o carrinho e o código do afiliado
-            const jsonLimpo = decodeURIComponent(restoreData);
-            const itensResgatados = JSON.parse(jsonLimpo);
-            
-            if (Array.isArray(itensResgatados)) {
-                localStorage.setItem('nossoCarrinho', JSON.stringify(itensResgatados));
-                console.log("✅ Carrinho restaurado do link!");
-            }
-            if (refCode) {
-                localStorage.setItem('afiliadoCodigo', refCode);
-                // Se estamos na página de checkout/index, forçamos o recarregamento 
-                // para garantir que a comissão seja aplicada visualmente se necessário
-            }
-            
-            // Limpa a URL para não ficar "suja"
-            window.history.replaceState({}, document.title, window.location.pathname);
-
-        } catch (e) {
-            console.error("Erro ao restaurar link:", e);
+        if (refCode) {
+            // Salva para não perder se ele atualizar a página
+            localStorage.setItem('afiliadoCodigo', refCode);
+            // BUSCA A MARGEM NO SERVIDOR ANTES DE CONTINUAR
+            await carregarMargemDoCodigo(refCode);
         }
     }
 
-    // 3. Roteamento e Inicialização de Páginas
+    // 3. RECUPERAÇÃO DE CARRINHO VIA LINK (PDF)
+    const paramsURL = new URLSearchParams(window.location.search);
+    const restoreData = paramsURL.get('restore'); 
+    
+    if (restoreData) {
+        try {
+            const jsonLimpo = decodeURIComponent(restoreData);
+            const itensResgatados = JSON.parse(jsonLimpo);
+            if (Array.isArray(itensResgatados)) {
+                localStorage.setItem('nossoCarrinho', JSON.stringify(itensResgatados));
+            }
+            // Limpa a URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } catch (e) { console.error("Erro link:", e); }
+    }
+
+    // 4. INICIALIZAÇÃO DAS PÁGINAS (Agora já com o preço certo!)
     atualizarIconeCarrinho();
     const path = window.location.pathname;
 
     if (path.includes('checkout.html')) {
         await carregarPaginaCheckout();
-        // Não precisa setupCheckoutEvents aqui, pois botões são criados dinamicamente
     } 
     else if (path.includes('cart.html')) {
         carregarPaginaCarrinho();
@@ -473,4 +472,22 @@ function ativarModoParceiro(afiliado) {
         alert('Atualizado!');
         window.location.reload();
     };
+}
+
+// --- Função para buscar a margem do afiliado pelo código (Para o Cliente) ---
+async function carregarMargemDoCodigo(codigo) {
+    try {
+        console.log(`🔍 Buscando comissão do parceiro: ${codigo}...`);
+        const res = await fetch(`${API_URL}/afiliado/check/${codigo}`); // Essa rota já existe no seu server.js
+        if (res.ok) {
+            const data = await res.json();
+            if (data.margem) {
+                // ATUALIZA O PREÇO GLOBAL
+                FATOR_PRECO = 1 + (data.margem / 100);
+                console.log(`✅ Preços atualizados! Margem de +${data.margem}% aplicada.`);
+            }
+        }
+    } catch (e) {
+        console.error("Erro ao carregar margem:", e);
+    }
 }

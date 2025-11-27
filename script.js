@@ -201,7 +201,8 @@ function removerItem(id) {
 
 
 /* ==============================================================
-   💳 LÓGICA DO CHECKOUT (CHECKOUT.HTML)
+   ATUALIZAÇÃO 1: Preparar os dados para o WhatsApp
+   Substitua a função carregarPaginaCheckout inteira por esta:
    ============================================================== */
 async function carregarPaginaCheckout() {
     const listaResumo = document.querySelector('.summary-item-list');
@@ -222,11 +223,11 @@ async function carregarPaginaCheckout() {
     
     let html = '';
     let subtotal = 0;
-    let itensValidos = [];
+    let itensValidos = []; // Essa lista vai pro WhatsApp e pro Banco
 
     for (const item of carrinho) {
         try {
-            const response = await fetch(`${API_URL}/products/${item.id}`); // Ajuste para rota correta
+            const response = await fetch(`${API_URL}/products/${item.id}`);
             if (!response.ok) continue;
 
             const p = await response.json();
@@ -241,7 +242,14 @@ async function carregarPaginaCheckout() {
             const totalItem = precoFinal * item.quantidade;
 
             subtotal += totalItem;
-            itensValidos.push({ id: p.id, quantidade: item.quantidade });
+
+            // [MUDANÇA AQUI] Guardamos o nome e o preço para usar no Zap
+            itensValidos.push({ 
+                id: p.id, 
+                quantidade: item.quantidade,
+                nome: titulo,           // Novo
+                precoUnit: precoFinal   // Novo
+            });
 
             html += `
             <div class="summary-item" style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #eee;">
@@ -259,9 +267,10 @@ async function carregarPaginaCheckout() {
     if(totalEl) totalEl.textContent = Number(subtotal).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 
     if(btnFinalizar) {
+        // Salva a lista completa no botão para usar depois
         btnFinalizar.dataset.itens = JSON.stringify(itensValidos);
         btnFinalizar.disabled = false;
-        btnFinalizar.textContent = "Finalizar Pedido";
+        btnFinalizar.textContent = "Finalizar Orçamento";
     }
 }
 
@@ -270,27 +279,34 @@ function setupCheckoutEvents() {
     if(btn) btn.addEventListener('click', finalizarPedido);
 }
 
+/* ==============================================================
+   ATUALIZAÇÃO 2: Gerar o Link do WhatsApp
+   Substitua a função finalizarPedido inteira por esta:
+   ============================================================== */
 async function finalizarPedido() {
     const btn = document.querySelector('.btn-place-order');
-    const email = document.getElementById('email').value;
+    const email = document.getElementById('email').value; // Usaremos como Nome do Cliente
     const rua = document.getElementById('rua').value;
     
-    if(!email || !rua) return alert("Preencha todos os campos!");
+    if(!email || !rua) return alert("Preencha todos os campos (Nome e Endereço)!");
 
-    // Se tiver parceiro logado, usa o código dele. Se não, usa o refCode da URL/Storage
+    // Pega dados do afiliado
     const afiliadoLogado = JSON.parse(localStorage.getItem('afiliadoLogado'));
     const afiliadoCodigo = afiliadoLogado ? afiliadoLogado.codigo : localStorage.getItem('afiliadoCodigo');
 
-    btn.textContent = "Enviando..."; 
+    btn.textContent = "Processando..."; 
     btn.disabled = true;
 
     try {
+        const itensCompra = JSON.parse(btn.dataset.itens);
+
         const body = {
             cliente: { nome: email, email: email, endereco: rua },
-            itens: JSON.parse(btn.dataset.itens),
+            itens: itensCompra,
             afiliadoCodigo: afiliadoCodigo
         };
 
+        // 1. Salva no Banco de Dados
         const res = await fetch(`${API_URL}/finalizar-pedido`, {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
@@ -299,6 +315,32 @@ async function finalizarPedido() {
 
         const data = await res.json();
         if(!res.ok) throw new Error(data.erro || 'Erro ao processar');
+
+        // === 2. A MÁGICA DO WHATSAPP (Só se for parceiro) ===
+        if (afiliadoLogado) {
+            let msg = `*🏎️ Orçamento - AutoPeças Veloz*\n`;
+            msg += `*Vendedor:* ${afiliadoLogado.nome}\n`;
+            msg += `*Cliente:* ${email}\n`;
+            msg += `----------------------------------\n`;
+            
+            let totalZap = 0;
+            itensCompra.forEach(item => {
+                const totalItem = item.precoUnit * item.quantidade;
+                totalZap += totalItem;
+                // Formata: "2x Motor Zetec - R$ 5.000,00"
+                msg += `✅ ${item.quantidade}x ${item.nome}\n`;
+                msg += `   R$ ${item.precoUnit.toFixed(2).replace('.',',')} un. = R$ ${totalItem.toFixed(2).replace('.',',')}\n`;
+            });
+            
+            msg += `----------------------------------\n`;
+            msg += `*TOTAL FINAL: R$ ${totalZap.toFixed(2).replace('.',',')}*\n`;
+            msg += `\n_Orçamento válido por 48h._`;
+
+            // Codifica para URL e Abre o WhatsApp
+            const linkZap = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+            window.open(linkZap, '_blank');
+        }
+        // ====================================================
 
         alert(`Pedido #${data.id} realizado com sucesso!`);
         localStorage.removeItem('nossoCarrinho');

@@ -333,76 +333,117 @@ function mudarSlide(n) {
 }
 
 /* =======================================================
-   🛒 LÓGICA DO CARRINHO (Adicionar ao final do script.js)
+   🛒 LÓGICA DO CARRINHO (Versão Universal PT/EN)
    ======================================================= */
 
-// Função chamada automaticamente se estivermos na página do carrinho
 async function carregarPaginaCarrinho() {
+    console.log("🏁 Iniciando carrinho...");
+    
     const cartItemsContainer = document.getElementById('cart-items');
     const cartTotalElement = document.getElementById('cart-total');
 
-    // Se não achar o tbody, significa que não estamos na página do carrinho. Para aqui.
-    if (!cartItemsContainer) return; 
+    // Se não achar o tbody, para o código (estamos em outra página)
+    if (!cartItemsContainer) return;
 
-    // 1. Pega o carrinho salvo
+    // 1. Pega os itens e garante que é uma lista
     let cart = JSON.parse(localStorage.getItem('cart')) || [];
+    
+    // 2. Limpa a tabela antes de começar
+    cartItemsContainer.innerHTML = ''; 
 
-    // 2. Se vazio, mostra mensagem
     if (cart.length === 0) {
         cartItemsContainer.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">Seu carrinho está vazio.</td></tr>';
         if (cartTotalElement) cartTotalElement.innerText = '0,00';
         return;
     }
 
-    // 3. Monta a tabela
-    cartItemsContainer.innerHTML = ''; 
     let total = 0;
-    const API_URL = ''; // Garante que usa o mesmo domínio
 
+    // 3. Loop item a item
     for (const item of cart) {
         try {
-            const response = await fetch(`${API_URL}/products/${item.id}`);
-            if (!response.ok) continue; 
+            // Tenta buscar o produto no servidor
+            const response = await fetch(`/products/${item.id}`);
+            
+            if (!response.ok) {
+                console.warn(`Produto ID ${item.id} não encontrado no banco.`);
+                continue; // Pula esse item se ele não existir mais
+            }
 
             const product = await response.json();
-            const subtotal = product.price * item.quantity;
+
+            // === O SEGREDO DO SUCESSO (TRADUTOR) ===
+            // Aqui aceitamos tanto os nomes em Inglês quanto Português
+            const nome = product.name || product.titulo || 'Produto Sem Nome';
+            const preco = parseFloat(product.price || product.preco_novo || 0);
+            const imagem = product.image || product.imagem || 'https://via.placeholder.com/50';
+            
+            // Corrige o problema do 'quantidade' vs 'quantity'
+            const qtd = item.quantity || item.quantidade || 1; 
+            // ========================================
+
+            const subtotal = preco * qtd;
             total += subtotal;
 
+            // Cria a linha HTML
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td><img src="${product.image || 'https://via.placeholder.com/50'}" width="50" style="border-radius:4px;"></td>
-                <td>${product.name}</td>
-                <td>R$ ${Number(product.price).toFixed(2).replace('.', ',')}</td>
                 <td>
-                    <div style="display: flex; align-items: center; gap: 5px; justify-content: center;">
-                        <button onclick="alterarQuantidade(${item.id}, -1)">-</button>
-                        <span>${item.quantity}</span>
-                        <button onclick="alterarQuantidade(${item.id}, 1)">+</button>
+                    <img src="${imagem}" alt="${nome}" width="60" style="border-radius:4px; object-fit: cover;">
+                </td>
+                <td>${nome}</td>
+                <td>R$ ${preco.toFixed(2).replace('.', ',')}</td>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 10px; justify-content: center;">
+                        <button onclick="alterarQuantidade(${item.id}, -1)" type="button" style="padding: 5px 10px; cursor: pointer;">-</button>
+                        <span style="font-weight: bold;">${qtd}</span>
+                        <button onclick="alterarQuantidade(${item.id}, 1)" type="button" style="padding: 5px 10px; cursor: pointer;">+</button>
                     </div>
                 </td>
-                <td>R$ ${subtotal.toFixed(2).replace('.', ',')}</td>
-                <td><button onclick="removerItem(${item.id})" style="color: red; border: none; background: none; cursor: pointer;">X</button></td>
+                <td style="font-weight: bold;">R$ ${subtotal.toFixed(2).replace('.', ',')}</td>
+                <td>
+                    <button onclick="removerItem(${item.id})" style="color: red; border: none; background: none; cursor: pointer; font-size: 1.2rem;">&times;</button>
+                </td>
             `;
             cartItemsContainer.appendChild(row);
+
         } catch (error) {
-            console.error("Erro:", error);
+            console.error("Erro ao processar item:", error);
         }
     }
 
-    if (cartTotalElement) cartTotalElement.innerText = total.toFixed(2).replace('.', ',');
+    // Atualiza o Total Geral
+    if (cartTotalElement) {
+        cartTotalElement.innerText = `R$ ${total.toFixed(2).replace('.', ',')}`;
+    }
 }
 
-// Funções de Ação (Precisam estar globais)
+// --- Funções Auxiliares Atualizadas ---
+
 function alterarQuantidade(id, delta) {
     let cart = JSON.parse(localStorage.getItem('cart')) || [];
     const item = cart.find(p => p.id === id);
+    
     if (item) {
-        item.quantity += delta;
-        if (item.quantity <= 0) cart = cart.filter(p => p.id !== id);
+        // Normaliza para usar sempre 'quantidade' ou 'quantity' (o que já existir)
+        let qtdAtual = item.quantity || item.quantidade || 1;
+        let novaQtd = qtdAtual + delta;
+
+        // Atualiza a propriedade certa
+        if (item.quantity !== undefined) item.quantity = novaQtd;
+        else item.quantidade = novaQtd;
+
+        // Se zerou, remove
+        if (novaQtd <= 0) {
+            cart = cart.filter(p => p.id !== id);
+        }
+
         localStorage.setItem('cart', JSON.stringify(cart));
-        // Atualiza contador se existir a função, e recarrega a tabela
-        if(typeof atualizarContadorCarrinho === 'function') atualizarContadorCarrinho();
-        carregarPaginaCarrinho(); 
+        
+        // Atualiza a tela
+        carregarPaginaCarrinho();
+        // Se tiver contador no topo, atualiza também
+        if (typeof atualizarContadorCarrinho === 'function') atualizarContadorCarrinho();
     }
 }
 
@@ -410,12 +451,10 @@ function removerItem(id) {
     let cart = JSON.parse(localStorage.getItem('cart')) || [];
     cart = cart.filter(p => p.id !== id);
     localStorage.setItem('cart', JSON.stringify(cart));
-    if(typeof atualizarContadorCarrinho === 'function') atualizarContadorCarrinho();
+    
     carregarPaginaCarrinho();
+    if (typeof atualizarContadorCarrinho === 'function') atualizarContadorCarrinho();
 }
 
-// 4. GATILHO AUTOMÁTICO
-// Sempre que a página carregar, tenta rodar a função do carrinho
-document.addEventListener('DOMContentLoaded', () => {
-    carregarPaginaCarrinho();
-});
+// Garante que roda ao carregar
+document.addEventListener('DOMContentLoaded', carregarPaginaCarrinho);

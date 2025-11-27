@@ -208,25 +208,37 @@ app.get('/admin/stats', authMiddleware, async (req, res) => {
    ======================================================= */
 
 // 1. Rota para listar TODOS os produtos
-app.get('/products', async (req, res) => {
+// ROTA PARA CRIAR PRODUTO (ATUALIZADA)
+app.post('/products', async (req, res) => {
     try {
-        // Atenção: Aqui usamos 'prisma.produto' (minúsculo) porque seu model é 'Produto'
-        const rawProducts = await prisma.produto.findMany();
+        // 1. Recebe TODOS os campos do formulário
+        const { 
+            titulo, preco_novo, estoque, imagem, categoria, 
+            referencia, fabricante, carros, ano, motor, desconto 
+        } = req.body;
 
-        // Vamos "traduzir" os campos do Português para o Inglês que o site espera
-        const products = rawProducts.map(p => ({
-            id: p.id,
-            name: p.titulo,           // titulo -> name
-            price: p.preco_novo,      // preco_novo -> price
-            image: p.imagem,          // imagem -> image
-            description: p.referencia || '', 
-            quantity: p.estoque       // estoque -> quantity
-        }));
+        // 2. Cria no Banco de Dados usando o modelo 'Produto'
+        const novoProduto = await prisma.produto.create({
+            data: {
+                titulo: titulo,
+                preco_novo: parseFloat(preco_novo), // Garante que é número
+                estoque: parseInt(estoque) || 0,    // Garante que é inteiro
+                imagem: imagem,
+                categoria: categoria,
+                referencia: referencia,
+                fabricante: fabricante,
+                carros: carros,
+                ano: ano,
+                motor: motor,
+                desconto: desconto
+                // Outros campos opcionais podem ficar null
+            }
+        });
 
-        res.json(products);
+        res.json(novoProduto);
     } catch (error) {
-        console.error("Erro ao buscar produtos:", error);
-        res.status(500).json({ error: 'Erro ao buscar produtos' });
+        console.error("Erro ao criar produto:", error);
+        res.status(500).json({ error: "Erro ao criar produto" });
     }
 });
 

@@ -665,48 +665,114 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
 }
 
 /* =======================================================
-   🛒 RESGATE DA TABELA DO CARRINHO (Mobile)
+   🛒 CARRINHO MOBILE: MODO CARTÕES (Estilo App Profissional)
    ======================================================= */
 @media (max-width: 768px) {
-    
-    /* 1. Garante que o container da tabela tenha espaço e rolagem */
-    .cart-table-container, 
-    .table-responsive {
-        display: block !important; /* Remove flex que pode estar atrapalhando */
-        width: 100% !important;
-        overflow-x: auto !important; /* Permite rolar pro lado com o dedo */
-        background: #fff; /* Fundo branco pra garantir visibilidade */
-        margin-bottom: 20px;
-        min-height: 50px; /* Garante que não tenha altura zero */
-        border: 1px solid #eee; /* Borda pra você ver onde ela está */
+
+    /* 1. Esconde o cabeçalho da tabela (Imagem, Preço, Qtd...) */
+    .cart-table-container thead {
+        display: none;
     }
 
-    /* 2. Força a tabela a agir como tabela (Reset Brutal) */
-    table {
-        width: 100% !important;
-        min-width: 600px !important; /* Força ela a ser larga (gera scroll) */
-        display: table !important;
-        border-collapse: collapse !important;
+    /* 2. Transforma cada LINHA (Produto) em um CARTÃO */
+    .cart-table-container tr {
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        margin-bottom: 20px; /* Espaço entre produtos */
+        padding: 15px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
     }
 
-    /* 3. Garante que as células apareçam */
-    thead, tbody, tr {
-        display: table-row-group !important;
+    /* 3. Ajusta as Células (TD) para ocuparem a linha toda */
+    .cart-table-container td {
+        display: flex;
+        justify-content: space-between; /* Texto na esquerda, valor na direita */
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid #f0f0f0;
         width: 100% !important;
+        box-sizing: border-box;
     }
-    
-    th, td {
-        display: table-cell !important;
-        padding: 10px !important;
+
+    /* Remove borda do último item */
+    .cart-table-container td:last-child {
+        border-bottom: none;
+    }
+
+    /* --- 🎨 ESTILIZANDO CADA PEDACINHO DO CARD --- */
+
+    /* [1] IMAGEM: Centralizada no topo */
+    .cart-table-container td:nth-of-type(1) {
+        justify-content: center;
+        border-bottom: none;
+        padding-bottom: 5px;
+    }
+    .cart-table-container td:nth-of-type(1) img {
+        width: 100px !important;
+        height: 100px !important;
+        object-fit: contain;
+    }
+
+    /* [2] NOME DO PRODUTO: Negrito e centralizado */
+    .cart-table-container td:nth-of-type(2) {
+        justify-content: center;
         text-align: center;
-        vertical-align: middle;
+        font-weight: bold;
+        font-size: 1.1rem;
+        color: #333;
+        margin-bottom: 10px;
     }
 
-    /* 4. Ajuste da imagemzinha dentro do carrinho */
-    td img {
-        width: 50px !important;
-        height: 50px !important;
-        object-fit: cover;
-        border-radius: 4px;
+    /* [3] PREÇO UNITÁRIO: Adiciona rótulo "Preço:" antes */
+    .cart-table-container td:nth-of-type(3)::before {
+        content: "Preço Unit.:";
+        font-weight: 600;
+        color: #666;
+    }
+
+    /* [4] QUANTIDADE: Centraliza os botões */
+    .cart-table-container td:nth-of-type(4) {
+        justify-content: center;
+        background-color: #f9f9f9; /* Destaque leve */
+        border-radius: 8px;
+        margin: 5px 0;
+    }
+
+    /* [5] TOTAL: Destaque Laranja e Rótulo "Subtotal:" */
+    .cart-table-container td:nth-of-type(5) {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #e67e22;
+    }
+    .cart-table-container td:nth-of-type(5)::before {
+        content: "Subtotal:";
+        color: #333;
+        font-size: 1rem;
+        font-weight: normal;
+    }
+
+    /* [6] BOTÃO REMOVER: Vira um botãozão vermelho */
+    .cart-table-container td:nth-of-type(6) {
+        justify-content: center;
+        padding-top: 15px;
+    }
+    .cart-table-container td:nth-of-type(6) button {
+        width: 100%;
+        background-color: #fff0f0;
+        color: #d9534f;
+        padding: 12px;
+        border-radius: 8px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    /* Adiciona texto "Remover Produto" ao lado do ícone X */
+    .cart-table-container td:nth-of-type(6) button::after {
+        content: " Remover Produto";
+        margin-left: 8px;
     }
 }

@@ -6,6 +6,100 @@
     <title>Pedidos - Painel Admin</title>
     <link rel="stylesheet" href="admin.css?v=1.1"> 
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <style>
+        /* Estilo dos Cards de Pedido */
+        .order-card { 
+            background: white; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05); 
+            margin-bottom: 20px; 
+            overflow: hidden; 
+            border-left: 5px solid #e67e22; /* Laranja Veloz */
+            transition: transform 0.2s;
+        }
+        .order-card:hover { transform: translateY(-2px); }
+        
+        .order-header { 
+            padding: 20px; 
+            background: #fff; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            cursor: pointer; 
+        }
+        .order-header:hover { background: #fcfcfc; }
+
+        .order-info h3 { margin: 0 0 5px 0; color: #2c3e50; font-size: 1.1rem; }
+        .order-info p { margin: 0; color: #7f8c8d; font-size: 0.9rem; }
+        .order-date { font-size: 0.8rem; color: #bdc3c7; margin-top: 5px; }
+
+        .order-values { text-align: right; }
+        .total-price { font-size: 1.3rem; font-weight: bold; color: #27ae60; display: block; }
+        
+        /* Tag do Afiliado */
+        .comissao-tag { 
+            font-size: 0.8rem; 
+            background: #e67e22; 
+            color: white; 
+            padding: 4px 10px; 
+            border-radius: 20px; 
+            display: inline-block; 
+            margin-top: 5px; 
+            font-weight: bold;
+        }
+
+        /* Detalhes (Escondido por padrão) */
+        .order-details { 
+            display: none; 
+            padding: 20px; 
+            background: #f8f9fa; 
+            border-top: 1px solid #eee; 
+        }
+        .order-details.open { display: block; animation: fadeIn 0.3s; }
+
+        .item-row { 
+            display: flex; 
+            justify-content: space-between; 
+            border-bottom: 1px dashed #ddd; 
+            padding: 10px 0; 
+            font-size: 0.95rem; 
+            color: #555;
+        }
+        
+        .address-box { 
+            margin-top: 20px; 
+            padding: 15px; 
+            background: #fff; 
+            border: 1px solid #eee; 
+            border-radius: 8px; 
+            color: #555; 
+        }
+        
+        .btn-whatsapp { 
+            display: inline-flex; 
+            align-items: center; 
+            justify-content: center;
+            gap: 8px; 
+            background: #25D366; 
+            color: white; 
+            text-decoration: none; 
+            padding: 12px; 
+            border-radius: 8px; 
+            margin-top: 20px; 
+            font-weight: bold; 
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .btn-whatsapp:hover { background: #20b858; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        @media (max-width: 768px) {
+            .order-header { flex-direction: column; align-items: flex-start; gap: 15px; }
+            .order-values { text-align: left; width: 100%; border-top: 1px solid #eee; padding-top: 10px; }
+        }
+    </style>
 </head>
 <body>
 
@@ -29,27 +123,147 @@
                         <i class="ph ph-shopping-cart-simple"></i> Pedidos
                     </a>
                 </li>
-            </ul>
+                </ul>
         </nav>
 
         <main class="admin-main">
             <header class="admin-header">
-                <h2>Visualizar Pedidos</h2>
+                <h2>Gerenciamento de Pedidos</h2>
                 <div class="admin-user">
-                    <span id="admin-user-name">Carregando...</span>
-                    <button id="btn-logout">Sair <i class="ph ph-sign-out"></i></button>
+                    <span id="admin-user-name">Admin</span>
+                    <button id="btn-logout" onclick="logout()">Sair <i class="ph ph-sign-out"></i></button>
                 </div>
             </header>
 
             <div class="admin-content">
                 <div class="order-list" id="order-list-container">
-                    <p>Carregando pedidos...</p>
+                    <p style="text-align:center; padding:20px; color:#666;">Carregando pedidos...</p>
                 </div>
             </div>
         </main>
 
     </div>
 
-    <script src="admin.js"></script> 
+    <script>
+        const API_URL = ''; // Se estiver no mesmo domínio, deixe vazio
+
+        async function carregarPedidos() {
+            // Pega o token salvo no login do admin
+            const token = localStorage.getItem('adminToken');
+            
+            if (!token) {
+                alert("Sessão expirada. Faça login novamente.");
+                window.location.href = 'admin_login.html';
+                return;
+            }
+
+            try {
+                // Chama a rota que atualizamos no server.js (que traz o afiliado)
+                const res = await fetch(`${API_URL}/admin/pedidos`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) throw new Error("Erro ao buscar pedidos");
+
+                const pedidos = await res.json();
+                renderizarPedidos(pedidos);
+
+            } catch (error) {
+                document.getElementById('order-list-container').innerHTML = `<p style="color:red; text-align:center;">Erro: ${error.message}</p>`;
+            }
+        }
+
+        function renderizarPedidos(pedidos) {
+            const container = document.getElementById('order-list-container');
+            container.innerHTML = '';
+
+            if (pedidos.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:#666; margin-top:20px;">Nenhum pedido encontrado.</p>';
+                return;
+            }
+
+            pedidos.forEach(pedido => {
+                // Formatação de Data e Valores
+                const dataObj = new Date(pedido.createdAt);
+                const dataFormatada = dataObj.toLocaleDateString('pt-BR') + ' às ' + dataObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+                const total = parseFloat(pedido.valorTotal).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+                const comissao = parseFloat(pedido.comissaoGerada).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+                
+                // Parse dos itens (vêm como texto JSON do banco)
+                let listaItensHtml = '';
+                try {
+                    const itens = JSON.parse(pedido.itens);
+                    itens.forEach(i => {
+                        const nome = i.nome || i.titulo || 'Produto ID ' + i.id;
+                        const sub = (i.unitario * i.qtd).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+                        listaItensHtml += `
+                            <div class="item-row">
+                                <span>${i.qtd}x ${nome}</span>
+                                <strong>${sub}</strong>
+                            </div>
+                        `;
+                    });
+                } catch(e) { listaItensHtml = '<p>Erro ao ler itens.</p>'; }
+
+                // Verifica se tem Afiliado
+                let htmlAfiliado = '';
+                if (pedido.afiliado) {
+                    htmlAfiliado = `<span class="comissao-tag">🦊 Venda: ${pedido.afiliado.nome} (Comissão: ${comissao})</span>`;
+                }
+
+                // Cria o Card HTML
+                const card = document.createElement('div');
+                card.className = 'order-card';
+                card.innerHTML = `
+                    <div class="order-header" onclick="toggleDetails(${pedido.id})">
+                        <div class="order-info">
+                            <h3>#${pedido.id} - ${pedido.clienteNome}</h3>
+                            <p>${pedido.clienteEmail}</p>
+                            <p class="order-date">${dataFormatada}</p>
+                        </div>
+                        <div class="order-values">
+                            <span class="total-price">${total}</span>
+                            ${htmlAfiliado}
+                            <small style="color:#aaa; display:block; margin-top:5px; font-size:0.8rem;">▼ Ver Detalhes</small>
+                        </div>
+                    </div>
+                    
+                    <div class="order-details" id="details-${pedido.id}">
+                        <h4 style="margin-top:0;">📦 Itens do Pedido:</h4>
+                        ${listaItensHtml}
+                        
+                        <div class="address-box">
+                            <strong>📍 Endereço de Entrega:</strong><br>
+                            ${pedido.clienteEndereco}
+                        </div>
+
+                        <a href="https://wa.me/?text=Olá ${pedido.clienteNome}, estou entrando em contato sobre seu pedido #${pedido.id} na AutoPeças Veloz..." target="_blank" class="btn-whatsapp">
+                            <i class="ph ph-whatsapp-logo"></i> Falar com Cliente no WhatsApp
+                        </a>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // Função para abrir/fechar o sanfona
+        function toggleDetails(id) {
+            const el = document.getElementById(`details-${id}`);
+            if (el.style.display === "block") {
+                el.style.display = "none";
+            } else {
+                el.style.display = "block";
+                el.classList.add('open');
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('adminToken');
+            window.location.href = 'admin_login.html';
+        }
+
+        // Inicia o carregamento
+        carregarPedidos();
+    </script>
 </body>
 </html>

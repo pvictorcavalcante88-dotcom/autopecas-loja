@@ -168,7 +168,23 @@ app.get('/admin/afiliados', authMiddleware, async (req, res) => { try{const a=aw
 app.put('/admin/afiliados/:id/aprovar', authMiddleware, async (req, res) => { try{await prisma.afiliado.update({where:{id:parseInt(req.params.id)},data:{aprovado:true}}); res.json({msg:"Aprovado"});}catch(e){res.status(500).json({erro:"Erro"});} });
 app.put('/admin/afiliados/:id/pagar', authMiddleware, async (req, res) => { try{await prisma.afiliado.update({where:{id:parseInt(req.params.id)},data:{saldo:0}}); res.json({msg:"Zerado"});}catch(e){res.status(500).json({erro:"Erro"});} });
 app.get('/admin/stats', authMiddleware, async (req, res) => { try{const v=await prisma.pedido.aggregate({_sum:{valorTotal:true}}); const tp=await prisma.pedido.count(); const tpr=await prisma.produto.count(); const eb=await prisma.produto.count({where:{estoque:{lt:5}}}); const up=await prisma.pedido.findMany({take:5,orderBy:{createdAt:'desc'}}); res.json({totalVendas:v._sum.valorTotal||0,totalPedidos:tp,totalProdutos:tpr,estoqueBaixo:eb,ultimosPedidos:up});}catch(e){res.status(500).json({erro:"Erro"});} });
-app.get('/admin/pedidos', authMiddleware, async (req, res) => { const p=await prisma.pedido.findMany({orderBy:{createdAt:'desc'}}); res.json(p); });
+// ATUALIZE ESTA ROTA (Para incluir dados do afiliado)
+app.get('/admin/pedidos', authMiddleware, async (req, res) => {
+    try {
+        const pedidos = await prisma.pedido.findMany({
+            orderBy: { createdAt: 'desc' }, // Mais recentes primeiro
+            include: { 
+                afiliado: { // <--- Traz os dados do parceiro junto
+                    select: { nome: true, codigo: true } 
+                } 
+            }
+        });
+        res.json(pedidos);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ erro: "Erro ao buscar pedidos" });
+    }
+});
 app.get('/admin/produtos', authMiddleware, async (req, res) => { const p=await prisma.produto.findMany({orderBy:{createdAt:'desc'}}); res.json(p); });
 app.post('/admin/produtos', authMiddleware, async(req,res)=>{ try{const n=await prisma.produto.create({data:{...req.body, preco_novo:parseFloat(req.body.preco_novo), estoque:parseInt(req.body.estoque)}}); res.status(201).json(n);}catch(e){res.status(500).json({erro:"Erro"});} });
 app.put('/admin/produtos/:id', authMiddleware, async(req,res)=>{ try{const a=await prisma.produto.update({where:{id:parseInt(req.params.id)}, data:{...req.body, preco_novo:parseFloat(req.body.preco_novo), estoque:parseInt(req.body.estoque)}}); res.json(a);}catch(e){res.status(500).json({erro:"Erro"});} });

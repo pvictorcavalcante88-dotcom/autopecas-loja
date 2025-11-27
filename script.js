@@ -1,21 +1,18 @@
 /* ==============================================================
-   🚀 SCRIPT GERAL DO SITE (Versão Final: Parceiro + Carrinho)
+   🚀 SCRIPT GERAL DO SITE (Versão Final: PDF + Link de Pagamento)
    ============================================================== */
 
 // CONFIGURAÇÕES GLOBAIS
 const API_URL = ''; // Vazio = usa o mesmo domínio
-let FATOR_PRECO = 1.0; // Padrão: 1.0 (Preço Original). Muda se o afiliado logar.
+let FATOR_PRECO = 1.0; // Padrão
 
 // --- FUNÇÕES UTILITÁRIAS ---
-
-// Formata R$ aplicando a margem do parceiro (se houver)
 function formatarMoeda(valorBase) {
     if (valorBase == null || isNaN(valorBase)) return 'R$ 0,00';
     const valorFinal = valorBase * FATOR_PRECO;
     return Number(valorFinal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-// Pega carrinho do Storage com segurança
 function getCarrinho() {
     try { return JSON.parse(localStorage.getItem('nossoCarrinho') || '[]'); } 
     catch (e) { return []; }
@@ -27,55 +24,51 @@ function getCarrinho() {
 document.addEventListener("DOMContentLoaded", async function() {
     console.log("🚀 Script Iniciado");
 
-    // [NOVO] 1. VERIFICAÇÃO DE AFILIADO LOGADO (MODO PARCEIRO)
+    // 1. MODO PARCEIRO (AFILIADO LOGADO)
     const afiliadoLogado = JSON.parse(localStorage.getItem('afiliadoLogado'));
-    
     if (afiliadoLogado) {
-        // Se tem parceiro logado, ele define o preço!
         const margemSalva = parseFloat(localStorage.getItem('minhaMargem') || 0);
-        
-        // Define o Fator Global de Preço (IMPORTANTE)
         FATOR_PRECO = 1 + (margemSalva / 100);
-        
-        console.log(`🦊 Modo Parceiro Ativado: ${afiliadoLogado.nome} (Margem: ${margemSalva}%)`);
-        
-        // Chama a função visual (que cria a barra preta)
+        console.log(`🦊 Parceiro: ${afiliadoLogado.nome} (+${margemSalva}%)`);
         ativarModoParceiro(afiliadoLogado);
     }
 
-    // 2. LÓGICA DE RESTAURAÇÃO (LINK DO PDF/ORÇAMENTO)
+    // 2. RECUPERAÇÃO DE CARRINHO VIA LINK (A Mágica do PDF)
     const paramsURL = new URLSearchParams(window.location.search);
     const restoreData = paramsURL.get('restore'); 
     const refCode = paramsURL.get('ref');
 
     if (restoreData) {
-        console.log("🔄 Tentando restaurar carrinho do link...");
         try {
+            // Se o link veio do PDF, restaura o carrinho e o código do afiliado
             const jsonLimpo = decodeURIComponent(restoreData);
             const itensResgatados = JSON.parse(jsonLimpo);
             
             if (Array.isArray(itensResgatados)) {
                 localStorage.setItem('nossoCarrinho', JSON.stringify(itensResgatados));
-                console.log("✅ Carrinho restaurado:", itensResgatados);
+                console.log("✅ Carrinho restaurado do link!");
             }
-            // Salva Afiliado do Link se existir
-            if (refCode) localStorage.setItem('afiliadoCodigo', refCode);
+            if (refCode) {
+                localStorage.setItem('afiliadoCodigo', refCode);
+                // Se estamos na página de checkout/index, forçamos o recarregamento 
+                // para garantir que a comissão seja aplicada visualmente se necessário
+            }
+            
+            // Limpa a URL para não ficar "suja"
+            window.history.replaceState({}, document.title, window.location.pathname);
 
         } catch (e) {
-            console.error("❌ Erro ao ler link:", e);
+            console.error("Erro ao restaurar link:", e);
         }
     }
 
-    // 3. Atualiza Ícone do Carrinho (Bolinha vermelha)
+    // 3. Roteamento e Inicialização de Páginas
     atualizarIconeCarrinho();
-
-    // 4. Roteamento Inteligente (Executa funções baseado na página atual)
     const path = window.location.pathname;
 
     if (path.includes('checkout.html')) {
-        console.log("💳 Página de Checkout detectada.");
         await carregarPaginaCheckout();
-        setupCheckoutEvents();
+        // Não precisa setupCheckoutEvents aqui, pois botões são criados dinamicamente
     } 
     else if (path.includes('cart.html')) {
         carregarPaginaCarrinho();
@@ -87,9 +80,7 @@ document.addEventListener("DOMContentLoaded", async function() {
         setupSearchPage();
     }
 
-    // 5. Eventos Globais (Busca no Topo e Slider)
     setupGlobalSearch();
-
     if (document.getElementById("promocoes-track")) buscarProdutosPromocao();
     if (typeof iniciarSlider === 'function') iniciarSlider();
 });
@@ -99,17 +90,11 @@ document.addEventListener("DOMContentLoaded", async function() {
    🛒 LÓGICA DO CARRINHO (CART.HTML)
    ============================================================== */
 async function carregarPaginaCarrinho() {
-    console.log("🏁 Carregando Carrinho...");
-    
     const cartItemsContainer = document.getElementById('cart-items');
     const cartTotalElement = document.getElementById('cart-total');
-
-    // Se não achar a tabela, para o código (estamos em outra página)
     if (!cartItemsContainer) return;
 
-    let cart = getCarrinho(); // Usa 'nossoCarrinho'
-    
-    // Limpa a tabela
+    let cart = getCarrinho();
     cartItemsContainer.innerHTML = ''; 
 
     if (cart.length === 0) {
@@ -120,242 +105,252 @@ async function carregarPaginaCarrinho() {
 
     let total = 0;
 
-    // Loop nos itens
     for (const item of cart) {
         try {
             const response = await fetch(`${API_URL}/products/${item.id}`);
-            
-            if (!response.ok) continue; // Pula se não achar o produto
+            if (!response.ok) continue;
+            const p = await response.json();
 
-            const product = await response.json();
-
-            // Dados Seguros (PT ou EN)
-            const nome = product.name || product.titulo || 'Produto';
-            const precoBase = parseFloat(product.price || product.preco_novo || 0);
-            const imagem = product.image || product.imagem || 'https://via.placeholder.com/50';
+            const nome = p.name || p.titulo;
+            const precoBase = parseFloat(p.price || p.preco_novo);
+            const imagem = p.image || p.imagem;
             const qtd = item.quantidade || item.quantity || 1; 
 
-            // Aplica a Margem do Parceiro (FATOR_PRECO já foi calculado lá no inicio)
             const precoFinal = precoBase * FATOR_PRECO;
             const subtotal = precoFinal * qtd;
             total += subtotal;
 
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>
-                    <img src="${imagem}" alt="${nome}" width="60" style="border-radius:4px; object-fit: cover;">
-                </td>
+                <td><img src="${imagem}" width="60" style="border-radius:4px;"></td>
                 <td>${nome}</td>
                 <td>${Number(precoFinal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                 <td>
                     <div style="display: flex; align-items: center; gap: 10px; justify-content: center;">
-                        <button onclick="alterarQuantidade(${item.id}, -1)" type="button" style="padding: 5px 10px; cursor: pointer;">-</button>
-                        <span style="font-weight: bold;">${qtd}</span>
-                        <button onclick="alterarQuantidade(${item.id}, 1)" type="button" style="padding: 5px 10px; cursor: pointer;">+</button>
+                        <button onclick="alterarQuantidade(${item.id}, -1)">-</button>
+                        <strong>${qtd}</strong>
+                        <button onclick="alterarQuantidade(${item.id}, 1)">+</button>
                     </div>
                 </td>
-                <td style="font-weight: bold;">${Number(subtotal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                <td>
-                    <button onclick="removerItem(${item.id})" style="color: red; border: none; background: none; cursor: pointer; font-size: 1.2rem;">&times;</button>
-                </td>
+                <td>${Number(subtotal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                <td><button onclick="removerItem(${item.id})" style="color:red; border:none; cursor:pointer;">&times;</button></td>
             `;
             cartItemsContainer.appendChild(row);
-
-        } catch (error) {
-            console.error("Erro item carrinho:", error);
-        }
+        } catch (e) {}
     }
-
-    // Atualiza Total Geral
-    if (cartTotalElement) {
-        cartTotalElement.innerText = Number(total).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    }
+    if (cartTotalElement) cartTotalElement.innerText = Number(total).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 function alterarQuantidade(id, delta) {
-    let cart = getCarrinho();
-    const item = cart.find(p => p.id === id);
-    
-    if (item) {
-        let qtdAtual = item.quantidade || item.quantity || 1;
-        item.quantidade = qtdAtual + delta;
-        delete item.quantity; // Limpa chave antiga se existir
-
-        if (item.quantidade <= 0) {
-            cart = cart.filter(p => p.id !== id);
-        }
-
-        localStorage.setItem('nossoCarrinho', JSON.stringify(cart));
+    let c = getCarrinho();
+    const i = c.find(p => p.id === id);
+    if (i) {
+        i.quantidade = (i.quantidade || 1) + delta;
+        delete i.quantity;
+        if (i.quantidade <= 0) c = c.filter(p => p.id !== id);
+        localStorage.setItem('nossoCarrinho', JSON.stringify(c));
         carregarPaginaCarrinho();
         atualizarIconeCarrinho();
     }
 }
-
 function removerItem(id) {
-    let cart = getCarrinho();
-    cart = cart.filter(p => p.id !== id);
-    localStorage.setItem('nossoCarrinho', JSON.stringify(cart));
+    let c = getCarrinho().filter(p => p.id !== id);
+    localStorage.setItem('nossoCarrinho', JSON.stringify(c));
     carregarPaginaCarrinho();
     atualizarIconeCarrinho();
 }
 
 
 /* ==============================================================
-   ATUALIZAÇÃO 1: Preparar os dados para o WhatsApp
-   Substitua a função carregarPaginaCheckout inteira por esta:
+   💳 CHECKOUT & PDF (AQUI ESTÁ A MÁGICA)
    ============================================================== */
 async function carregarPaginaCheckout() {
     const listaResumo = document.querySelector('.summary-item-list');
-    const btnFinalizar = document.querySelector('.btn-place-order');
+    const areaBotoes = document.querySelector('.order-summary-box'); // A caixa onde ficam os botões
     const totalEl = document.getElementById('cart-total');
 
     if (!listaResumo) return;
 
     const carrinho = getCarrinho();
-    
     if (carrinho.length === 0) {
-        listaResumo.innerHTML = '<p style="color:red;">Carrinho vazio.</p>';
-        if(btnFinalizar) btnFinalizar.disabled = true;
+        listaResumo.innerHTML = '<p>Carrinho vazio.</p>';
         return;
     }
 
-    listaResumo.innerHTML = '<p>Calculando...</p>';
+    listaResumo.innerHTML = '<p>Carregando itens...</p>';
     
     let html = '';
     let subtotal = 0;
-    let itensValidos = []; // Essa lista vai pro WhatsApp e pro Banco
+    let itensParaPDF = []; // Dados limpos para gerar o PDF
 
     for (const item of carrinho) {
         try {
             const response = await fetch(`${API_URL}/products/${item.id}`);
             if (!response.ok) continue;
-
             const p = await response.json();
             
-            // Dados seguros
             const titulo = p.name || p.titulo;
-            const imagem = p.image || p.imagem;
             const precoBase = parseFloat(p.price || p.preco_novo);
-            
-            // Aplica Margem
             const precoFinal = precoBase * FATOR_PRECO;
             const totalItem = precoFinal * item.quantidade;
 
             subtotal += totalItem;
-
-            // [MUDANÇA AQUI] Guardamos o nome e o preço para usar no Zap
-            itensValidos.push({ 
-                id: p.id, 
-                quantidade: item.quantidade,
-                nome: titulo,           // Novo
-                precoUnit: precoFinal   // Novo
+            
+            itensParaPDF.push({
+                nome: titulo,
+                qtd: item.quantidade,
+                unitario: precoFinal,
+                total: totalItem,
+                id: p.id // guardamos o ID para o link de restauração
             });
 
             html += `
             <div class="summary-item" style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #eee;">
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <img src="${imagem}" style="width:40px;">
-                    <span>(${item.quantidade}x) ${titulo}</span>
-                </div>
+                <span>(${item.quantidade}x) ${titulo}</span>
                 <strong>${Number(totalItem).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</strong>
             </div>`;
-
-        } catch (e) { console.error(e); }
+        } catch (e) {}
     }
 
     listaResumo.innerHTML = html;
     if(totalEl) totalEl.textContent = Number(subtotal).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 
-    if(btnFinalizar) {
-        // Salva a lista completa no botão para usar depois
-        btnFinalizar.dataset.itens = JSON.stringify(itensValidos);
-        btnFinalizar.disabled = false;
-        btnFinalizar.textContent = "Finalizar Orçamento";
-    }
-}
+    // === GERAÇÃO DOS BOTÕES DE AÇÃO ===
+    // Removemos botão antigo se existir para recriar
+    const btnContainerAntigo = document.getElementById('container-botoes-acao');
+    if(btnContainerAntigo) btnContainerAntigo.remove();
 
-function setupCheckoutEvents() {
-    const btn = document.querySelector('.btn-place-order');
-    if(btn) btn.addEventListener('click', finalizarPedido);
-}
+    const containerBotoes = document.createElement('div');
+    containerBotoes.id = "container-botoes-acao";
+    containerBotoes.style.marginTop = "20px";
+    containerBotoes.style.display = "flex";
+    containerBotoes.style.flexDirection = "column";
+    containerBotoes.style.gap = "10px";
 
-/* ==============================================================
-   ATUALIZAÇÃO 2: Gerar o Link do WhatsApp
-   Substitua a função finalizarPedido inteira por esta:
-   ============================================================== */
-async function finalizarPedido() {
-    const btn = document.querySelector('.btn-place-order');
-    const email = document.getElementById('email').value; // Usaremos como Nome do Cliente
-    const rua = document.getElementById('rua').value;
+    // 1. Botão PDF (Só aparece se tiver parceiro logado ou se você quiser deixar público)
+    const btnPDF = document.createElement('button');
+    btnPDF.className = "btn-place-order"; // Usa estilo padrão
+    btnPDF.style.background = "#34495e"; // Cor diferente (Azul escuro)
+    btnPDF.innerHTML = `<i class="ph ph-file-pdf"></i> Baixar Orçamento PDF`;
+    btnPDF.onclick = () => gerarOrcamentoPDF(itensParaPDF, subtotal);
+
+    // 2. Botão WhatsApp / Finalizar
+    const btnZap = document.createElement('button');
+    btnZap.className = "btn-place-order";
+    btnZap.style.background = "#27ae60"; // Verde Zap
+    btnZap.innerHTML = `<i class="ph ph-whatsapp-logo"></i> Finalizar no WhatsApp`;
+    btnZap.onclick = () => finalizarNoZap(itensParaPDF, subtotal);
+
+    containerBotoes.appendChild(btnZap);
+    containerBotoes.appendChild(btnPDF);
     
-    if(!email || !rua) return alert("Preencha todos os campos (Nome e Endereço)!");
+    // Insere os botões após o total
+    if(areaBotoes) areaBotoes.appendChild(containerBotoes);
+    
+    // Esconde o botão original do HTML se ele ainda existir
+    const btnOriginal = document.querySelector('.btn-place-order:not(#container-botoes-acao button)');
+    if(btnOriginal) btnOriginal.style.display = 'none';
+}
 
-    // Pega dados do afiliado
-    const afiliadoLogado = JSON.parse(localStorage.getItem('afiliadoLogado'));
-    const afiliadoCodigo = afiliadoLogado ? afiliadoLogado.codigo : localStorage.getItem('afiliadoCodigo');
+// --- FUNÇÃO PARA GERAR O PDF COM LINK ---
+function gerarOrcamentoPDF(itens, totalGeral) {
+    if (!window.jspdf) return alert("Erro: Biblioteca jsPDF não carregou. Verifique o HTML.");
+    
+    const doc = new window.jspdf.jsPDF();
+    const afiliado = JSON.parse(localStorage.getItem('afiliadoLogado'));
+    const nomeVendedor = afiliado ? afiliado.nome : "Vendas Online";
+    const codigoVendedor = afiliado ? afiliado.codigo : "";
 
-    btn.textContent = "Processando..."; 
-    btn.disabled = true;
+    // 1. Cabeçalho
+    doc.setFontSize(22);
+    doc.setTextColor(230, 126, 34); // Laranja
+    doc.text("AutoPeças Veloz", 20, 20);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text("Orçamento Oficial", 20, 30);
+    doc.text(`Vendedor: ${nomeVendedor}`, 20, 36);
+    doc.text(`Data: ${new Date().toLocaleDateString()}`, 20, 42);
 
-    try {
-        const itensCompra = JSON.parse(btn.dataset.itens);
+    doc.line(20, 45, 190, 45); // Linha separadora
 
-        const body = {
-            cliente: { nome: email, email: email, endereco: rua },
-            itens: itensCompra,
-            afiliadoCodigo: afiliadoCodigo
-        };
+    // 2. Lista de Itens
+    let y = 55;
+    doc.setFontSize(10);
+    doc.text("QTD   PRODUTO", 20, y);
+    doc.text("TOTAL", 170, y, { align: "right" });
+    y += 5;
 
-        // 1. Salva no Banco de Dados
-        const res = await fetch(`${API_URL}/finalizar-pedido`, {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify(body)
-        });
+    itens.forEach(item => {
+        const nomeCurto = item.nome.substring(0, 40);
+        const linha = `${item.qtd}x    ${nomeCurto}`;
+        const preco = item.total.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+        
+        doc.text(linha, 20, y);
+        doc.text(preco, 170, y, { align: "right" });
+        y += 7;
+    });
 
-        const data = await res.json();
-        if(!res.ok) throw new Error(data.erro || 'Erro ao processar');
+    doc.line(20, y, 190, y);
+    y += 10;
 
-        // === 2. A MÁGICA DO WHATSAPP (Só se for parceiro) ===
-        if (afiliadoLogado) {
-            let msg = `*🏎️ Orçamento - AutoPeças Veloz*\n`;
-            msg += `*Vendedor:* ${afiliadoLogado.nome}\n`;
-            msg += `*Cliente:* ${email}\n`;
-            msg += `----------------------------------\n`;
-            
-            let totalZap = 0;
-            itensCompra.forEach(item => {
-                const totalItem = item.precoUnit * item.quantidade;
-                totalZap += totalItem;
-                // Formata: "2x Motor Zetec - R$ 5.000,00"
-                msg += `✅ ${item.quantidade}x ${item.nome}\n`;
-                msg += `   R$ ${item.precoUnit.toFixed(2).replace('.',',')} un. = R$ ${totalItem.toFixed(2).replace('.',',')}\n`;
-            });
-            
-            msg += `----------------------------------\n`;
-            msg += `*TOTAL FINAL: R$ ${totalZap.toFixed(2).replace('.',',')}*\n`;
-            msg += `\n_Orçamento válido por 48h._`;
+    // 3. Total
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text(`TOTAL A PAGAR: ${totalGeral.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}`, 170, y, { align: "right" });
 
-            // Codifica para URL e Abre o WhatsApp
-            const linkZap = `https://wa.me/?text=${encodeURIComponent(msg)}`;
-            window.open(linkZap, '_blank');
-        }
-        // ====================================================
+    // 4. LINK MÁGICO DE PAGAMENTO
+    // Cria um link que restaura o carrinho e aplica o código do afiliado
+    // Link aponta para o checkout.html do seu site atual
+    const dadosCarrinho = encodeURIComponent(JSON.stringify(itens.map(i => ({id: i.id, quantidade: i.qtd}))));
+    const baseUrl = window.location.origin + window.location.pathname.replace('checkout.html', '').replace('cart.html', '') + 'checkout.html';
+    
+    // Monta a URL: meussite.com/checkout.html?restore=[JSON]&ref=[CODIGO]
+    let linkPagamento = `${baseUrl}?restore=${dadosCarrinho}`;
+    if (codigoVendedor) linkPagamento += `&ref=${codigoVendedor}`;
 
-        alert(`Pedido #${data.id} realizado com sucesso!`);
-        localStorage.removeItem('nossoCarrinho');
-        window.location.href = 'index.html';
+    y += 20;
+    doc.setTextColor(0, 0, 255); // Azul Link
+    doc.setFontSize(11);
+    doc.textWithLink("CLIQUE AQUI PARA PAGAR AGORA", 105, y, { url: linkPagamento, align: "center" });
+    
+    doc.setTextColor(100);
+    doc.setFontSize(9);
+    doc.text("(Ao clicar, você será direcionado para o pagamento seguro)", 105, y + 5, { align: "center" });
 
-    } catch (e) {
-        alert("Erro: " + e.message);
-        btn.textContent = "Tentar Novamente"; 
-        btn.disabled = false;
-    }
+    // Salva o arquivo
+    doc.save(`Orcamento_${new Date().getTime()}.pdf`);
+}
+
+function finalizarNoZap(itens, total) {
+    const afiliado = JSON.parse(localStorage.getItem('afiliadoLogado'));
+    if (!afiliado) return alert("Faça login como parceiro para usar essa função ou use o PDF.");
+
+    let msg = `*🏎️ Orçamento - AutoPeças Veloz*\n`;
+    msg += `*Vendedor:* ${afiliado.nome}\n`;
+    msg += `----------------------------------\n`;
+    
+    itens.forEach(item => {
+        msg += `✅ ${item.qtd}x ${item.nome}\n`;
+        msg += `   R$ ${item.total.toFixed(2).replace('.',',')}\n`;
+    });
+    
+    msg += `----------------------------------\n`;
+    msg += `*TOTAL: R$ ${total.toFixed(2).replace('.',',')}*\n`;
+    
+    // Adiciona o mesmo link do PDF no Zap para facilitar
+    const dadosCarrinho = encodeURIComponent(JSON.stringify(itens.map(i => ({id: i.id, quantidade: i.qtd}))));
+    const baseUrl = window.location.origin + window.location.pathname.replace('checkout.html', '') + 'checkout.html';
+    const link = `${baseUrl}?restore=${dadosCarrinho}&ref=${afiliado.codigo}`;
+    
+    msg += `\n🔗 *Link para pagamento:* \n${link}`;
+
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
 
 /* ==============================================================
-   📦 LÓGICA DE PRODUTOS E BUSCA
+   PRODUTOS, BUSCA E EXTRAS
    ============================================================== */
 function setupProductPage() {
     const pId = new URLSearchParams(window.location.search).get('id');
@@ -368,163 +363,84 @@ function setupProductPage() {
         });
     }
 }
-
 async function buscarProdutoPorId(id) {
     try {
         const res = await fetch(`${API_URL}/products/${id}`);
         const p = await res.json();
-        
-        // Atualiza HTML
         document.getElementById('product-title').textContent = p.name || p.titulo;
         document.getElementById('main-product-image').src = p.image || p.imagem || '';
-        
-        // Aplica Margem do Parceiro
-        const precoBase = parseFloat(p.price || p.preco_novo);
-        document.getElementById('product-price-new').textContent = formatarMoeda(precoBase);
-        
-        if((p.quantity || p.estoque) > 0) {
-            document.querySelector('.btn-add-cart').disabled = false;
-        }
+        document.getElementById('product-price-new').textContent = formatarMoeda(parseFloat(p.price || p.preco_novo));
+        if((p.quantity || p.estoque) > 0) document.querySelector('.btn-add-cart').disabled = false;
     } catch(e) {}
 }
-
 function adicionarAoCarrinho(id, qtd) {
     let c = getCarrinho();
-    let item = c.find(i => i.id == id);
-    
-    if(item) {
-        let q = item.quantidade || item.quantity || 0;
-        item.quantidade = q + qtd;
-        delete item.quantity;
-    } else {
-        c.push({ id: parseInt(id), quantidade: qtd });
-    }
-    
+    let i = c.find(p=>p.id==id);
+    if(i){ i.quantidade=(i.quantidade||1)+qtd; delete i.quantity; }
+    else c.push({id:parseInt(id), quantidade:qtd});
     localStorage.setItem('nossoCarrinho', JSON.stringify(c));
     atualizarIconeCarrinho();
 }
-
 function atualizarIconeCarrinho() {
-    const tot = getCarrinho().reduce((a,b) => a + (b.quantidade||b.quantity||0), 0);
-    const icon = document.querySelector('.cart-button span:last-child');
-    if(icon) { 
-        icon.textContent = tot; 
-        icon.style.display = tot > 0 ? 'grid' : 'none'; 
-    }
+    const tot=getCarrinho().reduce((a,b)=>a+(b.quantidade||1),0);
+    const i=document.querySelector('.cart-button span:last-child');
+    if(i){ i.textContent=tot; i.style.display=tot>0?'grid':'none'; }
 }
-
-// --- BUSCA ---
 function setupGlobalSearch() {
     const btn = document.getElementById('search-button');
     const input = document.getElementById('search-input');
     if(btn && input) {
-        btn.addEventListener('click', () => { if(input.value) window.location.href = `busca.html?q=${input.value}`; });
-        input.addEventListener('keypress', (e) => { if(e.key==='Enter' && input.value) window.location.href = `busca.html?q=${input.value}`; });
+        btn.onclick=()=>{if(input.value)window.location.href=`busca.html?q=${input.value}`};
     }
 }
-
 function setupSearchPage() {
-    const q = new URLSearchParams(window.location.search).get('q');
+    const q=new URLSearchParams(window.location.search).get('q');
     if(q) executarBusca(q);
 }
-
 async function executarBusca(q) {
     try {
-        const res = await fetch(`${API_URL}/search?q=${q}`); // Certifique-se que rota existe no server
-        const data = await res.json();
-        const track = document.getElementById("search-track");
-        
-        if(track) {
-            track.innerHTML = '';
-            data.forEach(p => {
-                const titulo = p.name || p.titulo;
-                const img = p.image || p.imagem;
-                const preco = parseFloat(p.price || p.preco_novo);
-                
-                track.innerHTML += `
-                <a href="product.html?id=${p.id}" class="product-card">
-                    <div class="product-image"><img src="${img}"></div>
-                    <h3>${titulo}</h3>
-                    <p class="price-new">${formatarMoeda(preco)}</p>
-                </a>`;
+        const res=await fetch(`${API_URL}/search?q=${q}`);
+        const d=await res.json();
+        const t=document.getElementById("search-track");
+        if(t){
+            t.innerHTML='';
+            d.forEach(p=>{
+                t.innerHTML+=`<a href="product.html?id=${p.id}" class="product-card">
+                <div class="product-image"><img src="${p.image||p.imagem}"></div>
+                <h3>${p.name||p.titulo}</h3>
+                <p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p></a>`;
             });
         }
-    } catch(e) {}
+    } catch(e){}
 }
 
-function iniciarSlider() { /* ...seu código de slider... */ }
-
-
-/* ==============================================================
-   🦊 FUNÇÕES DO MODO PARCEIRO (Barra Preta e Controle de Margem)
-   ============================================================== */
+// BARRA DO PARCEIRO
 function ativarModoParceiro(afiliado) {
-    // 1. Muda o botão "Entrar" para "Sair"
-    const btnLogin = document.getElementById('btn-login-header');
-    if (btnLogin) {
-        btnLogin.innerHTML = `<i class="ph ph-sign-out"></i><span>Sair</span>`;
-        btnLogin.href = "#";
-        btnLogin.style.color = "#e67e22"; 
-        btnLogin.onclick = (e) => {
+    const btn = document.getElementById('btn-login-header');
+    if(btn) {
+        btn.innerHTML = `<i class="ph ph-sign-out"></i> Sair`;
+        btn.href="#";
+        btn.onclick=(e)=>{
             e.preventDefault();
-            if(confirm(`Olá ${afiliado.nome}, deseja sair do modo parceiro?`)) {
+            if(confirm("Sair do modo parceiro?")){
                 localStorage.removeItem('afiliadoLogado');
-                localStorage.removeItem('minhaMargem'); 
+                localStorage.removeItem('minhaMargem');
                 window.location.reload();
             }
         };
     }
-
-    // 2. Cria a BARRA DE COMANDO
-    const margemAtual = localStorage.getItem('minhaMargem') || 0;
-    
-    const barra = document.createElement('div');
-    barra.id = "barra-parceiro";
-    barra.style.cssText = `
-        position: fixed; top: 0; left: 0; width: 100%; height: 50px;
-        background: #2c3e50; color: white; 
-        z-index: 99999; display: flex; justify-content: center; align-items: center; gap: 15px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3); font-family: sans-serif;
-    `;
-    
-    barra.innerHTML = `
-        <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-weight:bold; color:#f39c12;">🦊 ${afiliado.nome}</span>
-        </div>
-        <div style="height: 20px; width: 1px; background: #555;"></div>
-        <div style="display:flex; align-items:center; gap:5px; background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px;">
-            <label style="font-size: 0.85rem; color:#ddd;">Comissão:</label>
-            <input type="number" id="input-margem" value="${margemAtual}" min="0" max="100" 
-                style="width:50px; padding:4px; border-radius:4px; border:none; text-align:center; font-weight:bold; color:#2c3e50;">
-            <span style="font-weight:bold; font-size:0.9rem;">%</span>
-        </div>
-        <button id="btn-aplicar-margem" style="background:#27ae60; color:white; border:none; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold; font-size: 0.8rem;">
-            APLICAR
-        </button>
-    `;
-
-    document.body.prepend(barra); 
-    document.body.style.paddingTop = "50px"; 
-
-    // 3. Ação do Botão Aplicar
-    document.getElementById('btn-aplicar-margem').addEventListener('click', async () => {
-        const novaMargem = parseFloat(document.getElementById('input-margem').value);
-        if(isNaN(novaMargem) || novaMargem < 0) return alert("Valor inválido.");
-
-        localStorage.setItem('minhaMargem', novaMargem);
-        
-        // Tenta salvar no servidor para persistência (opcional)
-        try {
-            if(afiliado.token) {
-                await fetch('/afiliado/config', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${afiliado.token}` },
-                    body: JSON.stringify({ novaMargem })
-                });
-            }
-        } catch(e) {}
-        
-        alert(`Comissão atualizada para ${novaMargem}%!`);
-        window.location.reload(); 
-    });
+    const m = localStorage.getItem('minhaMargem')||0;
+    const b = document.createElement('div');
+    b.style.cssText = "position:fixed;top:0;left:0;width:100%;height:50px;background:#2c3e50;color:#fff;z-index:99999;display:flex;justify-content:center;align-items:center;gap:15px;";
+    b.innerHTML = `<span>🦊 ${afiliado.nome}</span>
+    <input type="number" id="imargem" value="${m}" style="width:50px;text-align:center;"> %
+    <button id="bap" style="background:#27ae60;border:none;color:#fff;padding:5px 10px;cursor:pointer;">APLICAR</button>`;
+    document.body.prepend(b);
+    document.body.style.marginTop="50px";
+    document.getElementById('bap').onclick=()=>{
+        const v=parseFloat(document.getElementById('imargem').value);
+        localStorage.setItem('minhaMargem',v);
+        alert('Atualizado!');
+        window.location.reload();
+    };
 }

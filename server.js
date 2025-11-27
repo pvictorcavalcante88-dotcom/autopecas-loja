@@ -108,15 +108,28 @@ app.post('/afiliado/register', async (req, res) => {
         res.status(201).json({ msg: "Aguarde aprovação." });
     } catch (e) { res.status(500).json({ erro: "Erro server" }); }
 });
+// ATUALIZE ESTA ROTA NO SEU SERVER.JS
 app.post('/afiliado/login', async (req, res) => {
     const { telefone, senha } = req.body;
     try {
         const afiliado = await prisma.afiliado.findUnique({ where: { telefone } });
-        if (!afiliado || afiliado.senha !== senha) return res.status(401).json({ erro: "Inválido" });
-        if (!afiliado.aprovado) return res.status(403).json({ erro: "Em análise." });
+        
+        if (!afiliado || afiliado.senha !== senha) return res.status(401).json({ erro: "Telefone ou senha incorretos." });
+        if (!afiliado.aprovado) return res.status(403).json({ erro: "Sua conta ainda está em análise." });
+
         const token = jwt.sign({ id: afiliado.id, role: 'afiliado' }, JWT_SECRET, { expiresIn: '30d' });
-        res.json({ token, nome: afiliado.nome, codigo: afiliado.codigo });
-    } catch (e) { res.status(500).json({ erro: "Erro server" }); }
+
+        // RESPOSTA ATUALIZADA (Devolve a margem para o site usar)
+        res.json({ 
+            token, 
+            nome: afiliado.nome, 
+            codigo: afiliado.codigo,
+            margemPadrao: afiliado.margem // <--- IMPORTANTE
+        });
+
+    } catch (e) { 
+        res.status(500).json({ erro: "Erro interno do servidor" }); 
+    }
 });
 
 // ===== NOVA ROTA: AFILIADO ATUALIZA MARGEM =====

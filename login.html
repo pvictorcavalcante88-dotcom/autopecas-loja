@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Área do Parceiro - Entrar</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { background: #f4f4f9; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; }
+        .login-box { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+        .login-box h2 { color: #e67e22; margin-bottom: 20px; }
+        .input-group { margin-bottom: 15px; text-align: left; }
+        .input-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        .input-group input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        .btn-login { width: 100%; padding: 15px; background: #e67e22; color: white; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-login:hover { background: #d35400; }
+        .back-link { display: block; margin-top: 20px; color: #777; text-decoration: none; }
+    </style>
+</head>
+<body>
+
+    <div class="login-box">
+        <h2>🦊 Área do Parceiro</h2>
+        <p style="margin-bottom: 20px; color: #666;">Entre para gerar orçamentos</p>
+        
+        <form id="login-form">
+            <div class="input-group">
+                <label>Telefone</label>
+                <input type="tel" id="telefone" placeholder="(00) 00000-0000" required>
+            </div>
+            <div class="input-group">
+                <label>Senha</label>
+                <input type="password" id="senha" placeholder="Sua senha secreta" required>
+            </div>
+            <button type="submit" class="btn-login">ACESSAR SISTEMA</button>
+        </form>
+
+        <a href="index.html" class="back-link">Voltar para a Loja</a>
+    </div>
+
+    <script>
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.querySelector('.btn-login');
+            btn.innerText = "Entrando...";
+            btn.disabled = true;
+
+            const telefone = document.getElementById('telefone').value;
+            const senha = document.getElementById('senha').value;
+
+            try {
+                const res = await fetch('/afiliado/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telefone, senha })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    // 1. Salva os dados do afiliado
+                    localStorage.setItem('afiliadoLogado', JSON.stringify(data));
+                    
+                    // 2. Salva a margem dele (ex: 20)
+                    if (data.margemPadrao) {
+                        localStorage.setItem('minhaMargem', data.margemPadrao);
+                    }
+
+                    alert(`Bem-vindo, ${data.nome}!`);
+                    window.location.href = 'index.html'; // Manda para a loja
+                } else {
+                    alert("Erro: " + data.erro);
+                    btn.innerText = "Tentar Novamente";
+                    btn.disabled = false;
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Erro de conexão.");
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

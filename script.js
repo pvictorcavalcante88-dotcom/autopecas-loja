@@ -162,18 +162,23 @@ function removerItem(id) {
 
 
 /* ==============================================================
-   💳 CHECKOUT & PDF (AQUI ESTÁ A MÁGICA)
+   💳 CHECKOUT INTELIGENTE (Separa Vendedor de Cliente)
    ============================================================== */
 async function carregarPaginaCheckout() {
     const listaResumo = document.querySelector('.summary-item-list');
-    const areaBotoes = document.querySelector('.order-summary-box'); // A caixa onde ficam os botões
+    const areaBotoes = document.querySelector('.order-summary-box');
     const totalEl = document.getElementById('cart-total');
 
     if (!listaResumo) return;
 
     const carrinho = getCarrinho();
+    
+    // Se carrinho vazio
     if (carrinho.length === 0) {
-        listaResumo.innerHTML = '<p>Carrinho vazio.</p>';
+        listaResumo.innerHTML = '<p>Seu carrinho está vazio.</p>';
+        // Esconde qualquer botão que existir
+        const btns = document.querySelectorAll('.btn-place-order');
+        btns.forEach(b => b.style.display = 'none');
         return;
     }
 
@@ -181,8 +186,9 @@ async function carregarPaginaCheckout() {
     
     let html = '';
     let subtotal = 0;
-    let itensParaPDF = []; // Dados limpos para gerar o PDF
+    let itensParaProcessar = []; 
 
+    // 1. Monta a lista visual e calcula totais
     for (const item of carrinho) {
         try {
             const response = await fetch(`${API_URL}/products/${item.id}`);
@@ -191,17 +197,18 @@ async function carregarPaginaCheckout() {
             
             const titulo = p.name || p.titulo;
             const precoBase = parseFloat(p.price || p.preco_novo);
+            // Aqui o FATOR_PRECO já foi definido no inicio do script (seja pelo login ou pelo link restaurado)
             const precoFinal = precoBase * FATOR_PRECO;
             const totalItem = precoFinal * item.quantidade;
 
             subtotal += totalItem;
             
-            itensParaPDF.push({
+            itensParaProcessar.push({
                 nome: titulo,
                 qtd: item.quantidade,
                 unitario: precoFinal,
                 total: totalItem,
-                id: p.id // guardamos o ID para o link de restauração
+                id: p.id
             });
 
             html += `
@@ -215,40 +222,63 @@ async function carregarPaginaCheckout() {
     listaResumo.innerHTML = html;
     if(totalEl) totalEl.textContent = Number(subtotal).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 
-    // === GERAÇÃO DOS BOTÕES DE AÇÃO ===
-    // Removemos botão antigo se existir para recriar
-    const btnContainerAntigo = document.getElementById('container-botoes-acao');
-    if(btnContainerAntigo) btnContainerAntigo.remove();
-
-    const containerBotoes = document.createElement('div');
-    containerBotoes.id = "container-botoes-acao";
-    containerBotoes.style.marginTop = "20px";
-    containerBotoes.style.display = "flex";
-    containerBotoes.style.flexDirection = "column";
-    containerBotoes.style.gap = "10px";
-
-    // 1. Botão PDF (Só aparece se tiver parceiro logado ou se você quiser deixar público)
-    const btnPDF = document.createElement('button');
-    btnPDF.className = "btn-place-order"; // Usa estilo padrão
-    btnPDF.style.background = "#34495e"; // Cor diferente (Azul escuro)
-    btnPDF.innerHTML = `<i class="ph ph-file-pdf"></i> Baixar Orçamento PDF`;
-    btnPDF.onclick = () => gerarOrcamentoPDF(itensParaPDF, subtotal);
-
-    // 2. Botão WhatsApp / Finalizar
-    const btnZap = document.createElement('button');
-    btnZap.className = "btn-place-order";
-    btnZap.style.background = "#27ae60"; // Verde Zap
-    btnZap.innerHTML = `<i class="ph ph-whatsapp-logo"></i> Finalizar no WhatsApp`;
-    btnZap.onclick = () => finalizarNoZap(itensParaPDF, subtotal);
-
-    containerBotoes.appendChild(btnZap);
-    containerBotoes.appendChild(btnPDF);
+    // === 2. DECISÃO: QUEM ESTÁ VENDO A TELA? ===
     
-    // Insere os botões após o total
-    if(areaBotoes) areaBotoes.appendChild(containerBotoes);
+    // Limpa botões antigos para não duplicar
+    const containerAntigo = document.getElementById('container-botoes-dinamicos');
+    if(containerAntigo) containerAntigo.remove();
+
+    // Cria container novo
+    const container = document.createElement('div');
+    container.id = "container-botoes-dinamicos";
+    container.style.marginTop = "20px";
+    container.style.display = "flex";
+    container.style.flexDirection = "column";
+    container.style.gap = "10px";
+
+    // Verifica se é AFILIADO (Vendedor) ou CLIENTE
+    const afiliadoLogado = JSON.parse(localStorage.getItem('afiliadoLogado'));
+
+    if (afiliadoLogado) {
+        // --- VISÃO DO VENDEDOR (Gera Link/PDF) ---
+        console.log("Modo Vendedor: Mostrando ferramentas de orçamento");
+
+        const btnZap = document.createElement('button');
+        btnZap.className = "btn-place-order";
+        btnZap.style.background = "#27ae60"; // Verde
+        btnZap.innerHTML = `<i class="ph ph-whatsapp-logo"></i> Finalizar no WhatsApp`;
+        btnZap.onclick = () => finalizarNoZap(itensParaProcessar, subtotal);
+
+        const btnPDF = document.createElement('button');
+        btnPDF.className = "btn-place-order";
+        btnPDF.style.background = "#34495e"; // Azul Escuro
+        btnPDF.innerHTML = `<i class="ph ph-file-pdf"></i> Baixar Orçamento PDF`;
+        btnPDF.onclick = () => gerarOrcamentoPDF(itensParaProcessar, subtotal);
+
+        container.appendChild(btnZap);
+        container.appendChild(btnPDF);
+
+    } else {
+        // --- VISÃO DO CLIENTE (Paga a conta) ---
+        console.log("Modo Cliente: Mostrando botão de pagamento");
+
+        const btnPagar = document.createElement('button');
+        btnPagar.className = "btn-place-order"; // Estilo padrão Laranja
+        btnPagar.innerHTML = `✅ Finalizar Pedido`;
+        
+        // Colocamos os dados no botão para a função finalizarPedido usar
+        btnPagar.dataset.itens = JSON.stringify(itensParaProcessar);
+        
+        btnPagar.onclick = finalizarPedido; // Chama a função que salva no banco
+
+        container.appendChild(btnPagar);
+    }
     
-    // Esconde o botão original do HTML se ele ainda existir
-    const btnOriginal = document.querySelector('.btn-place-order:not(#container-botoes-acao button)');
+    // Adiciona na tela
+    if(areaBotoes) areaBotoes.appendChild(container);
+    
+    // Esconde o botão original estático do HTML (aquele que vem no código base)
+    const btnOriginal = document.querySelector('.btn-place-order:not(#container-botoes-dinamicos button)');
     if(btnOriginal) btnOriginal.style.display = 'none';
 }
 

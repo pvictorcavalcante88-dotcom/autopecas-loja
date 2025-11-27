@@ -665,114 +665,139 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
 }
 
 /* =======================================================
-   🛒 CARRINHO MOBILE: MODO CARTÕES (Estilo App Profissional)
+   🛒 CARRINHO MOBILE: ESTILO APP (V2.0 - POLIDO)
    ======================================================= */
 @media (max-width: 768px) {
 
-    /* 1. Esconde o cabeçalho da tabela (Imagem, Preço, Qtd...) */
+    /* 1. Esconde o cabeçalho antigo */
     .cart-table-container thead {
-        display: none;
+        display: none !important;
     }
 
-    /* 2. Transforma cada LINHA (Produto) em um CARTÃO */
-    .cart-table-container tr {
-        display: flex;
-        flex-direction: column;
-        background: #fff;
-        border: 1px solid #e0e0e0;
-        border-radius: 12px;
-        margin-bottom: 20px; /* Espaço entre produtos */
-        padding: 15px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    /* 2. O Cartão do Produto */
+    .cart-table-container tbody tr {
+        display: flex !important;
+        flex-direction: column !important;
+        background: #ffffff;
+        border: 1px solid #e1e1e1;
+        border-radius: 15px; /* Bordas bem arredondadas */
+        margin-bottom: 20px;
+        padding: 20px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05); /* Sombra suave */
+        position: relative;
     }
 
-    /* 3. Ajusta as Células (TD) para ocuparem a linha toda */
+    /* 3. Configuração Padrão das Células (Linhas do card) */
     .cart-table-container td {
-        display: flex;
-        justify-content: space-between; /* Texto na esquerda, valor na direita */
+        display: flex !important;
+        justify-content: space-between; /* Texto na esquerda, Valor na direita */
         align-items: center;
         padding: 10px 0;
-        border-bottom: 1px solid #f0f0f0;
+        border-bottom: 1px dashed #eee; /* Linha pontilhada moderna */
         width: 100% !important;
-        box-sizing: border-box;
+        font-size: 1rem;
+        color: #333;
     }
-
-    /* Remove borda do último item */
+    
     .cart-table-container td:last-child {
         border-bottom: none;
     }
 
-    /* --- 🎨 ESTILIZANDO CADA PEDACINHO DO CARD --- */
+    /* --- 🎨 ESTILOS ESPECÍFICOS POR LINHA --- */
 
-    /* [1] IMAGEM: Centralizada no topo */
+    /* [1] IMAGEM (Topo Centralizado) */
     .cart-table-container td:nth-of-type(1) {
-        justify-content: center;
+        justify-content: center !important; /* FORÇA CENTRO */
         border-bottom: none;
-        padding-bottom: 5px;
+        padding-bottom: 10px;
     }
     .cart-table-container td:nth-of-type(1) img {
-        width: 100px !important;
-        height: 100px !important;
+        width: 120px !important;
+        height: 120px !important;
         object-fit: contain;
+        background: #fff; /* Garante fundo branco na img */
     }
 
-    /* [2] NOME DO PRODUTO: Negrito e centralizado */
+    /* [2] NOME DO PRODUTO (Título Grande) */
     .cart-table-container td:nth-of-type(2) {
-        justify-content: center;
+        justify-content: center !important; /* FORÇA CENTRO */
         text-align: center;
-        font-weight: bold;
-        font-size: 1.1rem;
-        color: #333;
-        margin-bottom: 10px;
-    }
-
-    /* [3] PREÇO UNITÁRIO: Adiciona rótulo "Preço:" antes */
-    .cart-table-container td:nth-of-type(3)::before {
-        content: "Preço Unit.:";
-        font-weight: 600;
-        color: #666;
-    }
-
-    /* [4] QUANTIDADE: Centraliza os botões */
-    .cart-table-container td:nth-of-type(4) {
-        justify-content: center;
-        background-color: #f9f9f9; /* Destaque leve */
-        border-radius: 8px;
-        margin: 5px 0;
-    }
-
-    /* [5] TOTAL: Destaque Laranja e Rótulo "Subtotal:" */
-    .cart-table-container td:nth-of-type(5) {
         font-size: 1.2rem;
-        font-weight: bold;
-        color: #e67e22;
-    }
-    .cart-table-container td:nth-of-type(5)::before {
-        content: "Subtotal:";
-        color: #333;
-        font-size: 1rem;
-        font-weight: normal;
+        font-weight: 800; /* Extra negrito */
+        color: #2c3e50;
+        margin-bottom: 15px;
+        border-bottom: 2px solid #f0f0f0; /* Divisória mais forte */
     }
 
-    /* [6] BOTÃO REMOVER: Vira um botãozão vermelho */
-    .cart-table-container td:nth-of-type(6) {
-        justify-content: center;
-        padding-top: 15px;
+    /* [3] PREÇO UNITÁRIO */
+    .cart-table-container td:nth-of-type(3)::before {
+        content: "Preço Unitário:";
+        font-size: 0.9rem;
+        color: #7f8c8d;
     }
-    .cart-table-container td:nth-of-type(6) button {
-        width: 100%;
-        background-color: #fff0f0;
-        color: #d9534f;
-        padding: 12px;
-        border-radius: 8px;
-        font-weight: bold;
+
+    /* [4] QUANTIDADE (Caixa Destacada) */
+    .cart-table-container td:nth-of-type(4) {
+        justify-content: center !important; /* Centraliza o bloco */
+        background: #f8f9fa;
+        border-radius: 10px;
+        margin: 10px 0;
+        padding: 15px 0;
+    }
+    /* Aumenta os botões de + e - gerados pelo JS */
+    .cart-table-container td:nth-of-type(4) button {
+        width: 40px !important;
+        height: 40px !important;
+        font-size: 1.2rem !important;
+        border-radius: 5px !important;
+        background: #e0e0e0 !important;
+        border: none !important;
         display: flex;
         align-items: center;
         justify-content: center;
+        margin: 0 10px; /* Espaço entre botões e número */
     }
-    /* Adiciona texto "Remover Produto" ao lado do ícone X */
+    .cart-table-container td:nth-of-type(4) span {
+        font-size: 1.2rem !important;
+        font-weight: bold;
+    }
+
+    /* [5] TOTAL (Destaque Laranja) */
+    .cart-table-container td:nth-of-type(5) {
+        font-size: 1.3rem;
+        font-weight: bold;
+        color: #e67e22; /* Laranja da marca */
+    }
+    .cart-table-container td:nth-of-type(5)::before {
+        content: "Subtotal:";
+        font-size: 1rem;
+        color: #333;
+        font-weight: normal;
+    }
+
+    /* [6] BOTÃO REMOVER (Botãozão Vermelho) */
+    .cart-table-container td:nth-of-type(6) {
+        padding-top: 15px;
+        border: none;
+        justify-content: center !important;
+    }
+    .cart-table-container td:nth-of-type(6) button {
+        width: 100% !important;
+        background-color: #fff5f5 !important;
+        color: #e74c3c !important; /* Vermelho */
+        border: 1px solid #ffcccc !important;
+        padding: 12px !important;
+        border-radius: 8px !important;
+        font-weight: bold !important;
+        font-size: 1rem !important;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px; /* Espaço ícone-texto */
+    }
+    /* Adiciona texto "Remover" via CSS */
     .cart-table-container td:nth-of-type(6) button::after {
-        content: " Remover Produto";
-        margin-left: 8px;
+        content: "Remover do Carrinho";
     }
 }

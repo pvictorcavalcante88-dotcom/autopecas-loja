@@ -333,66 +333,66 @@ function mudarSlide(n) {
 }
 
 /* =======================================================
-   🛒 LÓGICA DO CARRINHO (Versão Universal PT/EN)
+   🛒 LÓGICA DO CARRINHO (CORRIGIDA: USO DO 'nossoCarrinho')
    ======================================================= */
 
 async function carregarPaginaCarrinho() {
-    console.log("🏁 Iniciando carrinho...");
+    console.log("🏁 Iniciando carregamento do carrinho...");
     
     const cartItemsContainer = document.getElementById('cart-items');
     const cartTotalElement = document.getElementById('cart-total');
 
-    // Se não achar o tbody, para o código (estamos em outra página)
+    // Se não achar a tabela, para o código (estamos em outra página)
     if (!cartItemsContainer) return;
 
-    // 1. Pega os itens e garante que é uma lista
-    let cart = JSON.parse(localStorage.getItem('cart')) || [];
+    // 1. CORREÇÃO CRÍTICA: Usando 'nossoCarrinho' em vez de 'cart'
+    let cart = JSON.parse(localStorage.getItem('nossoCarrinho')) || [];
     
-    // 2. Limpa a tabela antes de começar
+    // 2. Limpa a tabela
     cartItemsContainer.innerHTML = ''; 
 
     if (cart.length === 0) {
         cartItemsContainer.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">Seu carrinho está vazio.</td></tr>';
-        if (cartTotalElement) cartTotalElement.innerText = '0,00';
+        if (cartTotalElement) cartTotalElement.innerText = 'R$ 0,00';
         return;
     }
 
     let total = 0;
 
-    // 3. Loop item a item
+    // 3. Loop nos itens
     for (const item of cart) {
         try {
-            // Tenta buscar o produto no servidor
-            const response = await fetch(`/products/${item.id}`);
+            const response = await fetch(`${API_URL}/products/${item.id}`);
             
             if (!response.ok) {
-                console.warn(`Produto ID ${item.id} não encontrado no banco.`);
-                continue; // Pula esse item se ele não existir mais
+                console.warn(`Produto ID ${item.id} não encontrado.`);
+                continue; 
             }
 
             const product = await response.json();
 
-            // === O SEGREDO DO SUCESSO (TRADUTOR) ===
-            // Aqui aceitamos tanto os nomes em Inglês quanto Português
-            const nome = product.name || product.titulo || 'Produto Sem Nome';
+            // Tradutor de campos (Português/Inglês)
+            const nome = product.name || product.titulo || 'Produto';
             const preco = parseFloat(product.price || product.preco_novo || 0);
             const imagem = product.image || product.imagem || 'https://via.placeholder.com/50';
             
-            // Corrige o problema do 'quantidade' vs 'quantity'
-            const qtd = item.quantity || item.quantidade || 1; 
-            // ========================================
+            // CORREÇÃO: Pega a quantidade certa
+            const qtd = item.quantidade || item.quantity || 1; 
 
-            const subtotal = preco * qtd;
+            // Aplica a margem do afiliado se tiver (usando sua função global)
+            // Se FATOR_PRECO não estiver definido, usa 1
+            const fator = (typeof FATOR_PRECO !== 'undefined') ? FATOR_PRECO : 1.0;
+            const precoFinal = preco * fator;
+            const subtotal = precoFinal * qtd;
             total += subtotal;
 
-            // Cria a linha HTML
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>
                     <img src="${imagem}" alt="${nome}" width="60" style="border-radius:4px; object-fit: cover;">
                 </td>
                 <td>${nome}</td>
-                <td>R$ ${preco.toFixed(2).replace('.', ',')}</td>
+                <td>${Number(precoFinal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                 <td>
                     <div style="display: flex; align-items: center; gap: 10px; justify-content: center;">
                         <button onclick="alterarQuantidade(${item.id}, -1)" type="button" style="padding: 5px 10px; cursor: pointer;">-</button>
@@ -400,7 +400,7 @@ async function carregarPaginaCarrinho() {
                         <button onclick="alterarQuantidade(${item.id}, 1)" type="button" style="padding: 5px 10px; cursor: pointer;">+</button>
                     </div>
                 </td>
-                <td style="font-weight: bold;">R$ ${subtotal.toFixed(2).replace('.', ',')}</td>
+                <td style="font-weight: bold;">${Number(subtotal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                 <td>
                     <button onclick="removerItem(${item.id})" style="color: red; border: none; background: none; cursor: pointer; font-size: 1.2rem;">&times;</button>
                 </td>
@@ -412,49 +412,46 @@ async function carregarPaginaCarrinho() {
         }
     }
 
-    // Atualiza o Total Geral
+    // Atualiza Total
     if (cartTotalElement) {
-        cartTotalElement.innerText = `R$ ${total.toFixed(2).replace('.', ',')}`;
+        cartTotalElement.innerText = Number(total).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
 }
 
-// --- Funções Auxiliares Atualizadas ---
+// --- Funções Auxiliares (Também corrigidas para 'nossoCarrinho') ---
 
 function alterarQuantidade(id, delta) {
-    let cart = JSON.parse(localStorage.getItem('cart')) || [];
+    let cart = JSON.parse(localStorage.getItem('nossoCarrinho')) || [];
     const item = cart.find(p => p.id === id);
     
     if (item) {
-        // Normaliza para usar sempre 'quantidade' ou 'quantity' (o que já existir)
-        let qtdAtual = item.quantity || item.quantidade || 1;
+        // Normaliza
+        let qtdAtual = item.quantidade || item.quantity || 1;
         let novaQtd = qtdAtual + delta;
 
-        // Atualiza a propriedade certa
-        if (item.quantity !== undefined) item.quantity = novaQtd;
-        else item.quantidade = novaQtd;
+        // Atualiza mantendo o padrão 'quantidade' (que seu checkout usa)
+        item.quantidade = novaQtd;
+        // Remove a chave antiga se existir pra não confundir
+        delete item.quantity; 
 
-        // Se zerou, remove
         if (novaQtd <= 0) {
             cart = cart.filter(p => p.id !== id);
         }
 
-        localStorage.setItem('cart', JSON.stringify(cart));
+        localStorage.setItem('nossoCarrinho', JSON.stringify(cart));
         
-        // Atualiza a tela
         carregarPaginaCarrinho();
-        // Se tiver contador no topo, atualiza também
-        if (typeof atualizarContadorCarrinho === 'function') atualizarContadorCarrinho();
+        if (typeof atualizarIconeCarrinho === 'function') atualizarIconeCarrinho();
     }
 }
 
 function removerItem(id) {
-    let cart = JSON.parse(localStorage.getItem('cart')) || [];
+    let cart = JSON.parse(localStorage.getItem('nossoCarrinho')) || [];
     cart = cart.filter(p => p.id !== id);
-    localStorage.setItem('cart', JSON.stringify(cart));
+    localStorage.setItem('nossoCarrinho', JSON.stringify(cart));
     
     carregarPaginaCarrinho();
-    if (typeof atualizarContadorCarrinho === 'function') atualizarContadorCarrinho();
+    if (typeof atualizarIconeCarrinho === 'function') atualizarIconeCarrinho();
 }
 
-// Garante que roda ao carregar
-document.addEventListener('DOMContentLoaded', carregarPaginaCarrinho);
+// O Event Listener já está no topo do seu script, não precisa repetir aqui.

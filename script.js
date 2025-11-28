@@ -1,5 +1,5 @@
 /* ==============================================================
-   🚀 SCRIPT GERAL DO SITE (Versão Final e Corrigida)
+   🚀 SCRIPT GERAL DO SITE (Versão Final: Com Adicionar ao Carrinho)
    ============================================================== */
 
 // CONFIGURAÇÕES GLOBAIS
@@ -31,6 +31,22 @@ function atualizarIconeCarrinho() {
     }
 }
 
+// --- FUNÇÃO QUE FALTAVA: ADICIONAR AO CARRINHO ---
+function adicionarAoCarrinho(id, qtd) {
+    let c = getCarrinho();
+    // Procura se já tem o item (converte id para numero para garantir)
+    let item = c.find(p => p.id == id);
+    
+    if (item) {
+        item.quantidade = (item.quantidade || 1) + qtd;
+    } else {
+        c.push({ id: parseInt(id), quantidade: qtd });
+    }
+    
+    localStorage.setItem('nossoCarrinho', JSON.stringify(c));
+    atualizarIconeCarrinho();
+}
+
 // ==============================================================
 // 🏁 INICIALIZAÇÃO (QUANDO A PÁGINA CARREGA)
 // ==============================================================
@@ -42,7 +58,6 @@ document.addEventListener("DOMContentLoaded", async function() {
     if (afiliadoLogado) {
         const margemSalva = parseFloat(localStorage.getItem('minhaMargem') || 0);
         FATOR_PRECO = 1 + (margemSalva / 100);
-        console.log(`🦊 Parceiro Logado: ${afiliadoLogado.nome} (+${margemSalva}%)`);
         ativarModoParceiro(afiliadoLogado);
     } 
     else {
@@ -89,17 +104,18 @@ document.addEventListener("DOMContentLoaded", async function() {
     }
 
     setupGlobalSearch(); // Configura busca e categorias
+    
     if (document.getElementById("promocoes-track")) buscarProdutosPromocao();
-    if (typeof iniciarSlider === 'function') iniciarSlider();
+    
+    // Inicia o Slider se existir
+    iniciarSlider();
 });
 
 
 /* ==============================================================
    🔎 BUSCA INTELIGENTE (TEXTO + CATEGORIA)
    ============================================================== */
-
 function setupGlobalSearch() {
-    console.log("🔍 Configurando busca...");
     const btn = document.getElementById('search-button');
     const input = document.getElementById('search-input');
     
@@ -121,22 +137,18 @@ function setupGlobalSearch() {
     const linksCategoria = document.querySelectorAll('.category-card'); 
     linksCategoria.forEach(link => {
         link.addEventListener('click', (e) => {
-            // Tenta pegar o nome da categoria do atributo ou do texto
             let categoriaNome = link.dataset.categoria;
             if(!categoriaNome) {
                 const span = link.querySelector('span');
                 categoriaNome = span ? span.innerText : '';
             }
 
-            // Verifica se tem texto digitado
             const textoDigitado = input ? input.value.trim() : '';
             
             if(textoDigitado !== '') {
-                // Se tem texto, cancela o link padrão e faz a busca combinada
                 e.preventDefault();
                 fazerPesquisa(textoDigitado, categoriaNome);
             }
-            // Se não tem texto, o link padrão funciona (vai para busca.html?categoria=X)
         });
     });
 }
@@ -396,7 +408,7 @@ function gerarOrcamentoPDF(itens, totalGeral) {
     
     doc.setFontSize(22); doc.setTextColor(230, 126, 34); doc.text("AutoPeças Veloz", 20, 20);
     doc.setFontSize(12); doc.setTextColor(0); doc.text("Orçamento Oficial", 20, 30);
-    doc.text(`Vendedor: ${afiliado.nome}`, 20, 36); 
+    doc.text(`Vendedor: ${afiliado ? afiliado.nome : 'Site'}`, 20, 36); 
     
     let y = 50;
     itens.forEach(item => {
@@ -404,11 +416,14 @@ function gerarOrcamentoPDF(itens, totalGeral) {
         y += 10;
     });
 
+    doc.text(`Total: R$ ${totalGeral.toFixed(2)}`, 20, y + 10);
+
     const dadosCarrinho = encodeURIComponent(JSON.stringify(itens.map(i => ({id: i.id, quantidade: i.qtd}))));
     const baseUrl = window.location.origin + window.location.pathname.replace('checkout.html', '').replace('cart.html', '') + 'checkout.html';
-    let linkPagamento = `${baseUrl}?restore=${dadosCarrinho}&ref=${afiliado.codigo}`;
+    let linkPagamento = `${baseUrl}?restore=${dadosCarrinho}`;
+    if(afiliado) linkPagamento += `&ref=${afiliado.codigo}`;
 
-    y += 10;
+    y += 30;
     doc.setTextColor(0, 0, 255);
     doc.textWithLink("CLIQUE AQUI PARA PAGAR", 20, y, { url: linkPagamento });
     doc.save(`Orcamento.pdf`);
@@ -416,15 +431,16 @@ function gerarOrcamentoPDF(itens, totalGeral) {
 
 function finalizarNoZap(itens, total) {
     const afiliado = JSON.parse(localStorage.getItem('afiliadoLogado'));
-    let msg = `*Orçamento - AutoPeças Veloz*\nVendedor: ${afiliado.nome}\n`;
+    let msg = `*Orçamento - AutoPeças Veloz*\n`;
     itens.forEach(i => msg += `${i.qtd}x ${i.nome} - R$ ${i.total.toFixed(2)}\n`);
     msg += `Total: R$ ${total.toFixed(2)}\n`;
     
     const dadosCarrinho = encodeURIComponent(JSON.stringify(itens.map(i => ({id: i.id, quantidade: i.qtd}))));
     const baseUrl = window.location.origin + window.location.pathname.replace('checkout.html', '') + 'checkout.html';
-    const link = `${baseUrl}?restore=${dadosCarrinho}&ref=${afiliado.codigo}`;
-    msg += `Link: ${link}`;
+    let link = `${baseUrl}?restore=${dadosCarrinho}`;
+    if(afiliado) link += `&ref=${afiliado.codigo}`;
     
+    msg += `Link: ${link}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
@@ -492,10 +508,19 @@ function setupProductPage() {
     if(pId) {
         buscarProdutoPorId(pId);
         const btn = document.querySelector('.btn-add-cart');
-        if(btn) btn.addEventListener('click', () => {
-            adicionarAoCarrinho(pId, parseInt(document.getElementById('quantity-input').value || 1));
-            alert('Adicionado!');
-        });
+        const qtdInput = document.getElementById('quantity-input');
+        
+        if(btn) {
+            // Remove listeners antigos (clone) para evitar duplicação
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            
+            newBtn.addEventListener('click', () => {
+                const qtd = qtdInput ? parseInt(qtdInput.value) : 1;
+                adicionarAoCarrinho(pId, qtd);
+                alert('Produto adicionado ao carrinho!');
+            });
+        }
     }
 }
 async function buscarProdutoPorId(id) {
@@ -526,7 +551,7 @@ async function buscarProdutosPromocao() {
 }
 
 /* ==============================================================
-   🖼️ SLIDER / CARROSSEL DA HOME
+   🖼️ SLIDER DA HOME
    ============================================================== */
 let slideIndex = 0;
 let slideInterval;
@@ -535,7 +560,6 @@ function iniciarSlider() {
     const slides = document.querySelectorAll('.slide');
     if(slides.length > 0) {
         mostrarSlide(slideIndex);
-        // Passar sozinho a cada 5 segundos
         slideInterval = setInterval(() => mudarSlide(1), 5000);
     }
 }
@@ -543,7 +567,6 @@ function iniciarSlider() {
 function mudarSlide(n) {
     slideIndex += n;
     mostrarSlide(slideIndex);
-    // Reseta o timer se o usuário clicar manualmente
     clearInterval(slideInterval);
     slideInterval = setInterval(() => mudarSlide(1), 5000);
 }
@@ -558,7 +581,5 @@ function mostrarSlide(n) {
     slides.forEach(slide => slide.classList.remove('active'));
     slides[slideIndex].classList.add('active');
 }
-
-// Expõe a função para o HTML poder usar no onclick="..."
 window.mudarSlide = mudarSlide;
 window.iniciarSlider = iniciarSlider;

@@ -515,17 +515,18 @@ async function buscarProdutosPromocao() {
 }
 
 // =======================================================
-// 🦊 FUNÇÕES DO PARCEIRO (ESTA É A QUE TINHA SUMIDO!)
+// 🦊 FUNÇÕES DO PARCEIRO (VISUAL LIMPO E MODERNO)
 // =======================================================
 function ativarModoParceiro(afiliado) {
+    // 1. Ajusta o botão de Login no Header principal para "Sair"
     const btnLogin = document.getElementById('btn-login-header');
     if (btnLogin) {
-        btnLogin.innerHTML = `<i class="ph ph-sign-out"></i><span>Sair (${afiliado.nome})</span>`;
+        btnLogin.innerHTML = `<i class="ph ph-sign-out"></i><span>Sair</span>`;
         btnLogin.href = "#";
-        btnLogin.style.color = "#e67e22"; 
+        btnLogin.style.color = "#e67e22"; // Laranja para destacar
         btnLogin.onclick = (e) => {
             e.preventDefault();
-            if(confirm(`Sair do modo parceiro?`)) {
+            if(confirm(`Tem certeza que deseja sair da conta de parceiro?`)) {
                 localStorage.removeItem('afiliadoLogado');
                 localStorage.removeItem('minhaMargem'); 
                 window.location.reload();
@@ -533,55 +534,64 @@ function ativarModoParceiro(afiliado) {
         };
     }
 
-    const margemAtual = localStorage.getItem('minhaMargem') || 0;
+    // 2. Remove barra antiga se existir para não duplicar
     const barraAntiga = document.getElementById('barra-parceiro');
     if (barraAntiga) barraAntiga.remove();
 
+    // 3. Cria a Nova Barra Superior (Layout Melhorado)
     const barra = document.createElement('div');
     barra.id = "barra-parceiro";
-    // Estilo fixo no topo
+    
+    // CSS Inline para garantir o visual sem mexer no style.css
     barra.style.cssText = `
-        position: fixed; top: 0; left: 0; width: 100%; height: 50px;
-        background: #2c3e50; color: white; 
-        z-index: 999999; display: flex; justify-content: center; align-items: center; gap: 15px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3); font-family: sans-serif;
+        position: fixed; 
+        top: 0; 
+        left: 0; 
+        width: 100%; 
+        height: 45px;
+        background: linear-gradient(90deg, #1a252f 0%, #2c3e50 100%); 
+        color: white; 
+        z-index: 999999; 
+        display: flex; 
+        justify-content: space-between; /* Espalha os itens (Esq/Dir) */
+        align-items: center; 
+        padding: 0 5%; /* Margem nas laterais */
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2); 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        box-sizing: border-box;
     `;
     
+    // Conteúdo da Barra (Sem o input de margem global)
     barra.innerHTML = `
-        <span style="font-weight:bold; color:#f39c12;">🦊 ${afiliado.nome}</span>
-        <div style="height: 20px; width: 1px; background: #555;"></div>
-        
-        <a href="afiliado_dashboard.html" style="text-decoration: none; color: white; background: rgba(255,255,255,0.15); padding: 5px 12px; border-radius: 4px; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.2);">
-            <i class="ph ph-gauge"></i> Meu Painel
-        </a>
-
-        <div style="height: 20px; width: 1px; background: #555;"></div>
-
-        <div style="display:flex; align-items:center; gap:5px; background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px;">
-            <label style="font-size: 0.85rem; color:#ddd;">Margem Global:</label>
-            <input type="number" id="input-margem" value="${margemAtual}" min="0" max="100" style="width:50px; padding:4px; border-radius:4px; border:none; text-align:center; font-weight:bold; color:#2c3e50;">
-            <span style="font-weight:bold; font-size:0.9rem;">%</span>
+        <div style="display:flex; align-items:center; gap: 10px;">
+            <div style="background:rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px; display:flex; align-items:center; gap:6px;">
+                <span style="font-size: 1.1rem;">🦊</span>
+                <span style="font-size: 0.9rem; color: #ecf0f1;">Olá, <strong>${afiliado.nome}</strong></span>
+            </div>
+            <span style="font-size: 0.75rem; background:#27ae60; padding:2px 6px; border-radius:4px; font-weight:bold; letter-spacing:0.5px;">PARCEIRO ATIVO</span>
         </div>
 
-        <button id="btn-aplicar-margem" style="background:#27ae60; color:white; border:none; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold; font-size: 0.8rem;">
-            APLICAR
-        </button>
+        <a href="afiliado_dashboard.html" style="
+            text-decoration: none; 
+            color: white; 
+            background: rgba(255,255,255,0.15); 
+            padding: 6px 15px; 
+            border-radius: 30px; 
+            font-size: 0.85rem; 
+            display: flex; 
+            align-items: center; 
+            gap: 8px; 
+            transition: 0.3s;
+            border: 1px solid rgba(255,255,255,0.1);
+        " onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+            <i class="ph ph-gauge" style="font-size:1.1rem;"></i> 
+            <span>Acessar Meu Painel</span>
+        </a>
     `;
 
+    // Adiciona ao corpo do site e empurra o site para baixo
     document.body.prepend(barra); 
-    document.body.style.paddingTop = "50px"; 
-
-    document.getElementById('btn-aplicar-margem').addEventListener('click', async () => {
-        const novaMargem = parseFloat(document.getElementById('input-margem').value);
-        if(isNaN(novaMargem) || novaMargem < 0) return alert("Margem inválida");
-        
-        localStorage.setItem('minhaMargem', novaMargem);
-        try {
-            if(afiliado.token) await fetch('/afiliado/config', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${afiliado.token}` }, body: JSON.stringify({ novaMargem }) });
-        } catch(e) {}
-        alert("Margem global atualizada!");
-        window.location.reload(); 
-    });
+    document.body.style.paddingTop = "45px"; 
 }
 
 async function carregarMargemDoCodigo(codigo) {

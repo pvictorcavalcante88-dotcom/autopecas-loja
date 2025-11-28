@@ -27,7 +27,10 @@ model Afiliado {
   // NOVO: A margem de lucro dele (em %)
   margem    Float    @default(0.0) 
 
+  
   pedidos   Pedido[] 
+  orcamentos Orcamento[]
+
   createdAt DateTime @default(now())
 }
 
@@ -66,5 +69,19 @@ model Pedido {
   afiliado        Afiliado? @relation(fields: [afiliadoId], references: [id])
   comissaoGerada  Float    @default(0.0)
 
+
   createdAt       DateTime @default(now())
+}
+
+model Orcamento {
+  id        Int      @id @default(autoincrement())
+  nome      String   // Ex: "Orçamento Gol do João"
+  itens     String   // Vamos salvar o JSON do carrinho aqui
+  total     Float
+  
+  afiliadoId Int
+  afiliado   Afiliado @relation(fields: [afiliadoId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

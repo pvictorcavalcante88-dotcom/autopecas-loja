@@ -209,8 +209,12 @@ function renderizarBotoesAfiliadoCarrinho() {
     div.style.flexDirection = 'column';
 
     div.innerHTML = `
-        <button onclick="irParaCheckoutAfiliado()" style="background:#34495e; color:white; padding:10px; border:none; border-radius:5px; cursor:pointer; width:100%;">
-            <i class="ph ph-share-network"></i> Gerar Link / PDF (Checkout)
+        <button onclick="irParaCheckoutAfiliado()" style="background:#34495e; color:white; padding:12px; border:none; border-radius:5px; cursor:pointer; width:100%; font-weight:bold;">
+            <i class="ph ph-share-network"></i> Gerar Link / PDF
+        </button>
+
+        <button onclick="salvarOrcamentoNoPainel()" style="background:#f39c12; color:white; padding:12px; border:none; border-radius:5px; cursor:pointer; width:100%; font-weight:bold;">
+            <i class="ph ph-floppy-disk"></i> Salvar Orçamento no Painel
         </button>
     `;
     areaTotal.appendChild(div);
@@ -604,6 +608,50 @@ async function carregarMargemDoCodigo(codigo) {
             }
         }
     } catch (e) {}
+}
+
+// --- FUNÇÃO PARA SALVAR (Coloque no final do script.js ou junto das outras) ---
+async function salvarOrcamentoNoPainel() {
+    const afiliado = JSON.parse(localStorage.getItem('afiliadoLogado'));
+    if(!afiliado || !afiliado.token) return alert("Você precisa estar logado.");
+
+    const nome = prompt("Dê um nome para este orçamento (Ex: Oficina do Pedro):");
+    if(!nome) return;
+
+    const carrinho = getCarrinho(); // Pega itens atuais
+    if(carrinho.length === 0) return alert("Carrinho vazio.");
+
+    // Calcula total rápido
+    let total = 0;
+    carrinho.forEach(item => {
+        // Recalcula preço com a margem customizada
+        // (Precisamos buscar o preço base ou confiar que vamos salvar e recalcular depois. 
+        //  Para simplificar, vamos salvar a estrutura do carrinho, o back recalcula se precisar, 
+        //  mas aqui vamos mandar uma estimativa ou 0 se não tivermos os preços cacheados).
+        //  O ideal é mandar o JSON do carrinho e pronto.
+    });
+
+    // Vamos salvar exatamente o que tem no carrinho (IDs, Qtds, Margens)
+    try {
+        const res = await fetch(`${API_URL}/orcamentos`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${afiliado.token}`
+            },
+            body: JSON.stringify({
+                nome: nome,
+                itens: carrinho, // Manda o array direto
+                total: 0 // Opcional, podemos calcular no back ou mandar 0 e deixar exibir na hora de restaurar
+            })
+        });
+
+        if(res.ok) {
+            alert("✅ Orçamento salvo com sucesso! Você pode acessá-lo no seu Dashboard.");
+        } else {
+            alert("Erro ao salvar.");
+        }
+    } catch(e) { console.error(e); alert("Erro de conexão."); }
 }
 
 // ==============================================================

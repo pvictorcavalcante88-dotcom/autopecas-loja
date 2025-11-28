@@ -360,4 +360,61 @@ app.get('/products/:id', async (req, res) => {
 });
 /* ======================================================= */
 
+// =================================================================
+// 📂 ROTAS DE ORÇAMENTOS (SALVAR E LISTAR)
+// =================================================================
+
+// 1. Salvar um novo orçamento
+app.post('/orcamentos', authenticateToken, async (req, res) => {
+    try {
+        const { nome, itens, total } = req.body;
+        const afiliadoId = req.user.id; // Pega do token
+
+        const novo = await prisma.orcamento.create({
+            data: {
+                nome,
+                itens: JSON.stringify(itens), // Converte array pra texto
+                total: parseFloat(total),
+                afiliadoId
+            }
+        });
+
+        res.json({ mensagem: "Orçamento salvo!", id: novo.id });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ erro: "Erro ao salvar orçamento." });
+    }
+});
+
+// 2. Listar orçamentos do afiliado logado
+app.get('/afiliado/orcamentos', authenticateToken, async (req, res) => {
+    try {
+        const afiliadoId = req.user.id;
+        const orcamentos = await prisma.orcamento.findMany({
+            where: { afiliadoId },
+            orderBy: { createdAt: 'desc' } // Mais recentes primeiro
+        });
+        res.json(orcamentos);
+    } catch (e) {
+        res.status(500).json({ erro: "Erro ao buscar orçamentos." });
+    }
+});
+
+// 3. Excluir orçamento (Opcional, mas útil)
+app.delete('/orcamentos/:id', authenticateToken, async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        const afiliadoId = req.user.id;
+        
+        // Só deleta se pertencer ao afiliado
+        await prisma.orcamento.deleteMany({
+            where: { id, afiliadoId }
+        });
+
+        res.json({ mensagem: "Deletado com sucesso" });
+    } catch (e) {
+        res.status(500).json({ erro: "Erro ao deletar." });
+    }
+});
+
 app.listen(PORT, () => { console.log(`🚀 Servidor v5.0 (Markup) na porta ${PORT}`); });

@@ -17,7 +17,43 @@ app.use(express.static(__dirname));
 // ... (ROTAS DE PRODUTOS MANTIDAS IGUAIS) ...
 app.get('/produtos', async (req, res) => { const p = await prisma.produto.findMany({ orderBy: { createdAt: 'desc' } }); res.json(p); });
 app.get('/produtos/:id', async (req, res) => { const p = await prisma.produto.findUnique({ where: { id: parseInt(req.params.id) } }); if(!p) return res.status(404).json({erro:"Não encontrado"}); res.json(p); });
-app.get('/search', async (req, res) => { const {q,categoria}=req.query; let w={}; if(categoria)w.categoria={equals:categoria}; if(q)w.OR=[{titulo:{contains:q}},{carros:{contains:q}},{referencia:{contains:q}}]; const p=await prisma.produto.findMany({where:w,orderBy:{createdAt:'desc'}}); res.json(p); });
+// ... (resto do código)
+
+app.get('/search', async (req, res) => {
+    try {
+        const { q, categoria } = req.query;
+        let whereClause = {};
+
+        // Filtro por Categoria (clique no card)
+        if (categoria) {
+            whereClause.categoria = { contains: categoria };
+        }
+
+        // Filtro por Texto (barra de pesquisa)
+        if (q) {
+            whereClause.OR = [
+                { titulo: { contains: q } },
+                { referencia: { contains: q } },
+                { carros: { contains: q } },     // Procura nos carros compatíveis
+                { pesquisa: { contains: q } },   // Procura nas tags
+                { fabricante: { contains: q } },
+                { categoria: { contains: q } }
+            ];
+        }
+
+        const produtos = await prisma.produto.findMany({
+            where: whereClause,
+            take: 50
+        });
+
+        res.json(produtos);
+    } catch (error) {
+        console.error("Erro busca:", error);
+        res.status(500).json({ erro: "Erro ao buscar" });
+    }
+});
+
+// ... (resto do código)
 
 // 1. Rota de Checagem de Margem (Mais segura)
 app.get('/afiliado/check/:codigo', async (req, res) => {

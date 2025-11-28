@@ -1,5 +1,5 @@
 /* ==============================================================
-   🚀 SCRIPT GERAL DO SITE (Versão Final: PDF + Link de Pagamento)
+   🚀 SCRIPT GERAL DO SITE (Versão Final: Busca Avançada + Parceiro)
    ============================================================== */
 
 // CONFIGURAÇÕES GLOBAIS
@@ -35,13 +35,10 @@ document.addEventListener("DOMContentLoaded", async function() {
     else {
         // 2. MODO CLIENTE (Verifica se veio por link de afiliado)
         const paramsURL = new URLSearchParams(window.location.search);
-        // Tenta pegar o código da URL ou do que já ficou salvo antes
         const refCode = paramsURL.get('ref') || localStorage.getItem('afiliadoCodigo');
 
         if (refCode) {
-            // Salva para não perder se ele atualizar a página
             localStorage.setItem('afiliadoCodigo', refCode);
-            // BUSCA A MARGEM NO SERVIDOR ANTES DE CONTINUAR
             await carregarMargemDoCodigo(refCode);
         }
     }
@@ -57,12 +54,11 @@ document.addEventListener("DOMContentLoaded", async function() {
             if (Array.isArray(itensResgatados)) {
                 localStorage.setItem('nossoCarrinho', JSON.stringify(itensResgatados));
             }
-            // Limpa a URL
             window.history.replaceState({}, document.title, window.location.pathname);
         } catch (e) { console.error("Erro link:", e); }
     }
 
-    // 4. INICIALIZAÇÃO DAS PÁGINAS (Agora já com o preço certo!)
+    // 4. INICIALIZAÇÃO DAS PÁGINAS
     atualizarIconeCarrinho();
     const path = window.location.pathname;
 
@@ -76,7 +72,7 @@ document.addEventListener("DOMContentLoaded", async function() {
         setupProductPage();
     }
     else if (path.includes('busca.html') || path.includes('search')) {
-        setupSearchPage();
+        setupSearchPage(); // <--- Essa função foi turbinada abaixo
     }
 
     setupGlobalSearch();
@@ -161,7 +157,7 @@ function removerItem(id) {
 
 
 /* ==============================================================
-   💳 CHECKOUT INTELIGENTE (Separa Vendedor de Cliente)
+   💳 CHECKOUT INTELIGENTE
    ============================================================== */
 async function carregarPaginaCheckout() {
     const listaResumo = document.querySelector('.summary-item-list');
@@ -172,10 +168,8 @@ async function carregarPaginaCheckout() {
 
     const carrinho = getCarrinho();
     
-    // Se carrinho vazio
     if (carrinho.length === 0) {
         listaResumo.innerHTML = '<p>Seu carrinho está vazio.</p>';
-        // Esconde qualquer botão que existir
         const btns = document.querySelectorAll('.btn-place-order');
         btns.forEach(b => b.style.display = 'none');
         return;
@@ -187,7 +181,6 @@ async function carregarPaginaCheckout() {
     let subtotal = 0;
     let itensParaProcessar = []; 
 
-    // 1. Monta a lista visual e calcula totais
     for (const item of carrinho) {
         try {
             const response = await fetch(`${API_URL}/products/${item.id}`);
@@ -196,7 +189,6 @@ async function carregarPaginaCheckout() {
             
             const titulo = p.name || p.titulo;
             const precoBase = parseFloat(p.price || p.preco_novo);
-            // Aqui o FATOR_PRECO já foi definido no inicio do script (seja pelo login ou pelo link restaurado)
             const precoFinal = precoBase * FATOR_PRECO;
             const totalItem = precoFinal * item.quantidade;
 
@@ -221,13 +213,10 @@ async function carregarPaginaCheckout() {
     listaResumo.innerHTML = html;
     if(totalEl) totalEl.textContent = Number(subtotal).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 
-    // === 2. DECISÃO: QUEM ESTÁ VENDO A TELA? ===
-    
-    // Limpa botões antigos para não duplicar
+    // BOTÕES (Vendedor vs Cliente)
     const containerAntigo = document.getElementById('container-botoes-dinamicos');
     if(containerAntigo) containerAntigo.remove();
 
-    // Cria container novo
     const container = document.createElement('div');
     container.id = "container-botoes-dinamicos";
     container.style.marginTop = "20px";
@@ -235,22 +224,18 @@ async function carregarPaginaCheckout() {
     container.style.flexDirection = "column";
     container.style.gap = "10px";
 
-    // Verifica se é AFILIADO (Vendedor) ou CLIENTE
     const afiliadoLogado = JSON.parse(localStorage.getItem('afiliadoLogado'));
 
     if (afiliadoLogado) {
-        // --- VISÃO DO VENDEDOR (Gera Link/PDF) ---
-        console.log("Modo Vendedor: Mostrando ferramentas de orçamento");
-
         const btnZap = document.createElement('button');
         btnZap.className = "btn-place-order";
-        btnZap.style.background = "#27ae60"; // Verde
+        btnZap.style.background = "#27ae60"; 
         btnZap.innerHTML = `<i class="ph ph-whatsapp-logo"></i> Finalizar no WhatsApp`;
         btnZap.onclick = () => finalizarNoZap(itensParaProcessar, subtotal);
 
         const btnPDF = document.createElement('button');
         btnPDF.className = "btn-place-order";
-        btnPDF.style.background = "#34495e"; // Azul Escuro
+        btnPDF.style.background = "#34495e"; 
         btnPDF.innerHTML = `<i class="ph ph-file-pdf"></i> Baixar Orçamento PDF`;
         btnPDF.onclick = () => gerarOrcamentoPDF(itensParaProcessar, subtotal);
 
@@ -258,128 +243,110 @@ async function carregarPaginaCheckout() {
         container.appendChild(btnPDF);
 
     } else {
-        // --- VISÃO DO CLIENTE (Paga a conta) ---
-        console.log("Modo Cliente: Mostrando botão de pagamento");
-
         const btnPagar = document.createElement('button');
-        btnPagar.className = "btn-place-order"; // Estilo padrão Laranja
+        btnPagar.className = "btn-place-order"; 
         btnPagar.innerHTML = `✅ Finalizar Pedido`;
-        
-        // Colocamos os dados no botão para a função finalizarPedido usar
         btnPagar.dataset.itens = JSON.stringify(itensParaProcessar);
-        
-        btnPagar.onclick = finalizarPedido; // Chama a função que salva no banco
-
+        btnPagar.onclick = finalizarPedido; 
         container.appendChild(btnPagar);
     }
     
-    // Adiciona na tela
     if(areaBotoes) areaBotoes.appendChild(container);
-    
-    // Esconde o botão original estático do HTML (aquele que vem no código base)
     const btnOriginal = document.querySelector('.btn-place-order:not(#container-botoes-dinamicos button)');
     if(btnOriginal) btnOriginal.style.display = 'none';
 }
 
-// --- FUNÇÃO PARA GERAR O PDF COM LINK ---
-function gerarOrcamentoPDF(itens, totalGeral) {
-    if (!window.jspdf) return alert("Erro: Biblioteca jsPDF não carregou. Verifique o HTML.");
+// --- FUNÇÃO DE PAGAMENTO ---
+async function finalizarPedido() {
+    const btn = document.querySelector('#container-botoes-dinamicos button');
+    const email = document.getElementById('email').value; // Usado como Nome
+    const rua = document.getElementById('rua').value;
     
+    if(!email || !rua) return alert("Preencha Nome e Endereço.");
+
+    const afiliadoCodigo = localStorage.getItem('afiliadoCodigo'); // Pega do link (ref)
+
+    btn.innerText = "Processando...";
+    btn.disabled = true;
+
+    try {
+        const body = {
+            cliente: { nome: email, email: email, endereco: rua }, // Email usado como ID
+            itens: JSON.parse(btn.dataset.itens),
+            afiliadoCodigo: afiliadoCodigo
+        };
+
+        const res = await fetch(`${API_URL}/finalizar-pedido`, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(body)
+        });
+
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.erro || 'Erro ao processar');
+
+        alert(`Sucesso! Pedido #${data.id} realizado.`);
+        localStorage.removeItem('nossoCarrinho');
+        window.location.href = 'index.html';
+
+    } catch (e) {
+        alert("Erro: " + e.message);
+        btn.innerText = "Tentar Novamente";
+        btn.disabled = false;
+    }
+}
+
+// --- PDF & ZAP (Mesmos de antes) ---
+function gerarOrcamentoPDF(itens, totalGeral) {
+    if (!window.jspdf) return alert("Erro: jsPDF não carregado.");
     const doc = new window.jspdf.jsPDF();
     const afiliado = JSON.parse(localStorage.getItem('afiliadoLogado'));
-    const nomeVendedor = afiliado ? afiliado.nome : "Vendas Online";
-    const codigoVendedor = afiliado ? afiliado.codigo : "";
-
-    // 1. Cabeçalho
-    doc.setFontSize(22);
-    doc.setTextColor(230, 126, 34); // Laranja
-    doc.text("AutoPeças Veloz", 20, 20);
     
-    doc.setFontSize(12);
-    doc.setTextColor(0, 0, 0);
-    doc.text("Orçamento Oficial", 20, 30);
-    doc.text(`Vendedor: ${nomeVendedor}`, 20, 36);
-    doc.text(`Data: ${new Date().toLocaleDateString()}`, 20, 42);
+    doc.setFontSize(22); doc.setTextColor(230, 126, 34); doc.text("AutoPeças Veloz", 20, 20);
+    doc.setFontSize(12); doc.setTextColor(0); doc.text("Orçamento Oficial", 20, 30);
+    doc.text(`Vendedor: ${afiliado.nome}`, 20, 36); doc.text(`Data: ${new Date().toLocaleDateString()}`, 20, 42);
+    doc.line(20, 45, 190, 45);
 
-    doc.line(20, 45, 190, 45); // Linha separadora
-
-    // 2. Lista de Itens
     let y = 55;
-    doc.setFontSize(10);
-    doc.text("QTD   PRODUTO", 20, y);
-    doc.text("TOTAL", 170, y, { align: "right" });
-    y += 5;
+    doc.setFontSize(10); doc.text("QTD   PRODUTO", 20, y); doc.text("TOTAL", 170, y, { align: "right" }); y += 5;
 
     itens.forEach(item => {
-        const nomeCurto = item.nome.substring(0, 40);
-        const linha = `${item.qtd}x    ${nomeCurto}`;
-        const preco = item.total.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-        
+        const linha = `${item.qtd}x    ${item.nome.substring(0, 40)}`;
         doc.text(linha, 20, y);
-        doc.text(preco, 170, y, { align: "right" });
+        doc.text(item.total.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}), 170, y, { align: "right" });
         y += 7;
     });
 
-    doc.line(20, y, 190, y);
-    y += 10;
+    doc.line(20, y, 190, y); y += 10;
+    doc.setFontSize(14); doc.setFont(undefined, 'bold');
+    doc.text(`TOTAL: ${totalGeral.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}`, 170, y, { align: "right" });
 
-    // 3. Total
-    doc.setFontSize(14);
-    doc.setFont(undefined, 'bold');
-    doc.text(`TOTAL A PAGAR: ${totalGeral.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}`, 170, y, { align: "right" });
-
-    // 4. LINK MÁGICO DE PAGAMENTO
-    // Cria um link que restaura o carrinho e aplica o código do afiliado
-    // Link aponta para o checkout.html do seu site atual
+    // Link Mágico
     const dadosCarrinho = encodeURIComponent(JSON.stringify(itens.map(i => ({id: i.id, quantidade: i.qtd}))));
     const baseUrl = window.location.origin + window.location.pathname.replace('checkout.html', '').replace('cart.html', '') + 'checkout.html';
-    
-    // Monta a URL: meussite.com/checkout.html?restore=[JSON]&ref=[CODIGO]
-    let linkPagamento = `${baseUrl}?restore=${dadosCarrinho}`;
-    if (codigoVendedor) linkPagamento += `&ref=${codigoVendedor}`;
+    let linkPagamento = `${baseUrl}?restore=${dadosCarrinho}&ref=${afiliado.codigo}`;
 
-    y += 20;
-    doc.setTextColor(0, 0, 255); // Azul Link
-    doc.setFontSize(11);
+    y += 20; doc.setTextColor(0, 0, 255); doc.setFontSize(11);
     doc.textWithLink("CLIQUE AQUI PARA PAGAR AGORA", 105, y, { url: linkPagamento, align: "center" });
-    
-    doc.setTextColor(100);
-    doc.setFontSize(9);
-    doc.text("(Ao clicar, você será direcionado para o pagamento seguro)", 105, y + 5, { align: "center" });
-
-    // Salva o arquivo
-    doc.save(`Orcamento_${new Date().getTime()}.pdf`);
+    doc.save(`Orcamento.pdf`);
 }
 
 function finalizarNoZap(itens, total) {
     const afiliado = JSON.parse(localStorage.getItem('afiliadoLogado'));
-    if (!afiliado) return alert("Faça login como parceiro para usar essa função ou use o PDF.");
-
-    let msg = `*🏎️ Orçamento - AutoPeças Veloz*\n`;
-    msg += `*Vendedor:* ${afiliado.nome}\n`;
-    msg += `----------------------------------\n`;
+    let msg = `*🏎️ Orçamento - AutoPeças Veloz*\n*Vendedor:* ${afiliado.nome}\n------------------\n`;
+    itens.forEach(i => msg += `✅ ${i.qtd}x ${i.nome}\n   R$ ${i.total.toFixed(2)}\n`);
+    msg += `------------------\n*TOTAL: R$ ${total.toFixed(2)}*\n`;
     
-    itens.forEach(item => {
-        msg += `✅ ${item.qtd}x ${item.nome}\n`;
-        msg += `   R$ ${item.total.toFixed(2).replace('.',',')}\n`;
-    });
-    
-    msg += `----------------------------------\n`;
-    msg += `*TOTAL: R$ ${total.toFixed(2).replace('.',',')}*\n`;
-    
-    // Adiciona o mesmo link do PDF no Zap para facilitar
     const dadosCarrinho = encodeURIComponent(JSON.stringify(itens.map(i => ({id: i.id, quantidade: i.qtd}))));
     const baseUrl = window.location.origin + window.location.pathname.replace('checkout.html', '') + 'checkout.html';
     const link = `${baseUrl}?restore=${dadosCarrinho}&ref=${afiliado.codigo}`;
-    
-    msg += `\n🔗 *Link para pagamento:* \n${link}`;
-
+    msg += `\n🔗 *Pagar:* \n${link}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
 
 /* ==============================================================
-   PRODUTOS, BUSCA E EXTRAS
+   🔎 PRODUTOS & BUSCA (CORRIGIDO PARA ACEITAR CATEGORIAS)
    ============================================================== */
 function setupProductPage() {
     const pId = new URLSearchParams(window.location.search).get('id');
@@ -402,52 +369,65 @@ async function buscarProdutoPorId(id) {
         if((p.quantity || p.estoque) > 0) document.querySelector('.btn-add-cart').disabled = false;
     } catch(e) {}
 }
-function adicionarAoCarrinho(id, qtd) {
-    let c = getCarrinho();
-    let i = c.find(p=>p.id==id);
-    if(i){ i.quantidade=(i.quantidade||1)+qtd; delete i.quantity; }
-    else c.push({id:parseInt(id), quantidade:qtd});
-    localStorage.setItem('nossoCarrinho', JSON.stringify(c));
-    atualizarIconeCarrinho();
-}
-function atualizarIconeCarrinho() {
-    const tot=getCarrinho().reduce((a,b)=>a+(b.quantidade||1),0);
-    const i=document.querySelector('.cart-button span:last-child');
-    if(i){ i.textContent=tot; i.style.display=tot>0?'grid':'none'; }
-}
+
 function setupGlobalSearch() {
     const btn = document.getElementById('search-button');
     const input = document.getElementById('search-input');
     if(btn && input) {
-        btn.onclick=()=>{if(input.value)window.location.href=`busca.html?q=${input.value}`};
+        btn.onclick = () => { if(input.value) window.location.href=`busca.html?q=${input.value}`; };
+        input.addEventListener('keypress', (e) => {
+            if(e.key === 'Enter' && input.value) window.location.href=`busca.html?q=${input.value}`; 
+        });
     }
 }
+
+// --- AQUI ESTÁ A CORREÇÃO DA BUSCA ---
 function setupSearchPage() {
-    const q=new URLSearchParams(window.location.search).get('q');
-    if(q) executarBusca(q);
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get('q');           // Texto (Gol, Oleo, etc)
+    const categoria = params.get('categoria'); // Categoria (Motor, Freio)
+    
+    // Se tiver qualquer um dos dois, executa a busca
+    if(q || categoria) executarBusca(q, categoria);
 }
-async function executarBusca(q) {
+
+async function executarBusca(q, categoria) {
     try {
-        const res=await fetch(`${API_URL}/search?q=${q}`);
-        const d=await res.json();
-        const t=document.getElementById("search-track");
-        if(t){
-            t.innerHTML='';
-            d.forEach(p=>{
-                t.innerHTML+=`<a href="product.html?id=${p.id}" class="product-card">
-                <div class="product-image"><img src="${p.image||p.imagem}"></div>
-                <h3>${p.name||p.titulo}</h3>
-                <p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p></a>`;
+        // Monta a URL correta para o servidor
+        let url = `${API_URL}/search?`;
+        if (q) url += `q=${encodeURIComponent(q)}&`;
+        if (categoria) url += `categoria=${encodeURIComponent(categoria)}`;
+
+        const res = await fetch(url);
+        const data = await res.json();
+        const track = document.getElementById("search-track");
+        
+        if(track) {
+            track.innerHTML = '';
+            
+            if (data.length === 0) {
+                track.innerHTML = '<p style="padding:20px;">Nenhum produto encontrado.</p>';
+                return;
+            }
+
+            data.forEach(p => {
+                track.innerHTML += `
+                <a href="product.html?id=${p.id}" class="product-card">
+                    <div class="product-image"><img src="${p.image||p.imagem}"></div>
+                    <h3>${p.name||p.titulo}</h3>
+                    <p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p>
+                </a>`;
             });
         }
-    } catch(e){}
+    } catch(e){
+        console.error("Erro busca:", e);
+    }
 }
 
 /* =======================================================
-   🦊 FUNÇÕES DO MODO PARCEIRO (AFILIADO LOGADO)
+   🦊 FUNÇÕES VISUAIS DO PARCEIRO
    ======================================================= */
 function ativarModoParceiro(afiliado) {
-    // 1. Muda o botão "Entrar" para "Sair" no cabeçalho
     const btnLogin = document.getElementById('btn-login-header');
     if (btnLogin) {
         btnLogin.innerHTML = `<i class="ph ph-sign-out"></i><span>Sair (${afiliado.nome})</span>`;
@@ -455,7 +435,7 @@ function ativarModoParceiro(afiliado) {
         btnLogin.style.color = "#e67e22"; 
         btnLogin.onclick = (e) => {
             e.preventDefault();
-            if(confirm(`Olá ${afiliado.nome}, deseja sair do modo parceiro?`)) {
+            if(confirm(`Sair do modo parceiro?`)) {
                 localStorage.removeItem('afiliadoLogado');
                 localStorage.removeItem('minhaMargem'); 
                 window.location.reload();
@@ -463,10 +443,8 @@ function ativarModoParceiro(afiliado) {
         };
     }
 
-    // 2. Cria a BARRA DE COMANDO
+    // BARRA PRETA NO TOPO
     const margemAtual = localStorage.getItem('minhaMargem') || 0;
-    
-    // Remove barra antiga se existir (pra não duplicar)
     const barraAntiga = document.getElementById('barra-parceiro');
     if (barraAntiga) barraAntiga.remove();
 
@@ -480,70 +458,41 @@ function ativarModoParceiro(afiliado) {
     `;
     
     barra.innerHTML = `
-        <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-weight:bold; color:#f39c12;">🦊 ${afiliado.nome}</span>
-        </div>
-
+        <span style="font-weight:bold; color:#f39c12;">🦊 ${afiliado.nome}</span>
         <div style="height: 20px; width: 1px; background: #555;"></div>
-
         <a href="afiliado_dashboard.html" style="text-decoration: none; color: white; background: rgba(255,255,255,0.15); padding: 5px 12px; border-radius: 4px; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.2);">
             <i class="ph ph-gauge"></i> Meu Painel
         </a>
-
         <div style="height: 20px; width: 1px; background: #555;"></div>
-
         <div style="display:flex; align-items:center; gap:5px; background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px;">
             <label style="font-size: 0.85rem; color:#ddd;">Comissão:</label>
-            <input type="number" id="input-margem" value="${margemAtual}" min="0" max="100" 
-                style="width:50px; padding:4px; border-radius:4px; border:none; text-align:center; font-weight:bold; color:#2c3e50;">
-            <span style="font-weight:bold; font-size:0.9rem;">%</span>
+            <input type="number" id="input-margem" value="${margemAtual}" min="0" max="100" style="width:50px; padding:4px; border-radius:4px; border:none; text-align:center;"> %
         </div>
-
-        <button id="btn-aplicar-margem" style="background:#27ae60; color:white; border:none; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold; font-size: 0.8rem;">
-            APLICAR
-        </button>
+        <button id="btn-aplicar-margem" style="background:#27ae60; color:white; border:none; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold;">APLICAR</button>
     `;
 
     document.body.prepend(barra); 
     document.body.style.paddingTop = "50px"; 
 
-    // 3. Ação do Botão Aplicar
     document.getElementById('btn-aplicar-margem').addEventListener('click', async () => {
         const novaMargem = parseFloat(document.getElementById('input-margem').value);
-        if(isNaN(novaMargem) || novaMargem < 0) return alert("Valor inválido.");
-
         localStorage.setItem('minhaMargem', novaMargem);
-        
-        // Tenta salvar no servidor
         try {
-            if(afiliado.token) {
-                await fetch('/afiliado/config', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${afiliado.token}` },
-                    body: JSON.stringify({ novaMargem })
-                });
-            }
+            if(afiliado.token) await fetch('/afiliado/config', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${afiliado.token}` }, body: JSON.stringify({ novaMargem }) });
         } catch(e) {}
-        
-        alert(`Comissão atualizada para ${novaMargem}%!`);
-        window.location.reload(); 
+        alert(`Comissão atualizada!`); window.location.reload(); 
     });
 }
 
-// --- Função para buscar a margem do afiliado pelo código (Para o Cliente) ---
+// Checagem de Margem para Cliente (Ref)
 async function carregarMargemDoCodigo(codigo) {
     try {
-        console.log(`🔍 Buscando comissão do parceiro: ${codigo}...`);
-        const res = await fetch(`${API_URL}/afiliado/check/${codigo}`); // Essa rota já existe no seu server.js
+        const res = await fetch(`${API_URL}/afiliado/check/${codigo}`);
         if (res.ok) {
             const data = await res.json();
             if (data.margem) {
-                // ATUALIZA O PREÇO GLOBAL
                 FATOR_PRECO = 1 + (data.margem / 100);
-                console.log(`✅ Preços atualizados! Margem de +${data.margem}% aplicada.`);
             }
         }
-    } catch (e) {
-        console.error("Erro ao carregar margem:", e);
-    }
+    } catch (e) {}
 }

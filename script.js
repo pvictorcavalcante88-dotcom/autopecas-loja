@@ -1,5 +1,5 @@
 /* ==============================================================
-   🚀 SCRIPT GERAL DO SITE (Versão Final: Debug + Carrinho + Parceiro)
+   🚀 SCRIPT GERAL DO SITE (Versão Final e Corrigida)
    ============================================================== */
 
 // CONFIGURAÇÕES GLOBAIS
@@ -8,33 +8,26 @@ let FATOR_PRECO = 1.0; // Padrão
 
 // --- FUNÇÕES UTILITÁRIAS ---
 
-// Formata valor para Real
 function formatarMoeda(valorBase) {
     if (valorBase == null || isNaN(valorBase)) return 'R$ 0,00';
     const valorFinal = valorBase * FATOR_PRECO;
     return Number(valorFinal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-// Pega carrinho do Storage
 function getCarrinho() {
     try { return JSON.parse(localStorage.getItem('nossoCarrinho') || '[]'); } 
     catch (e) { return []; }
 }
 
-// Atualiza a bolinha vermelha do carrinho (A FUNÇÃO QUE ESTAVA FALTANDO)
+// Atualiza a bolinha vermelha do carrinho
 function atualizarIconeCarrinho() {
     const carrinho = getCarrinho();
     const totalItens = carrinho.reduce((acc, item) => acc + (item.quantidade || 1), 0);
-    
-    // Procura o span dentro do botão do carrinho no header do seu HTML
     const icon = document.querySelector('.cart-button span:last-child');
     
     if(icon) {
         icon.textContent = totalItens;
-        // Só mostra se tiver item
-        icon.style.display = totalItens > 0 ? 'flex' : 'none'; 
-        // Garante que o display seja flex ou grid para centralizar o numero
-        if(totalItens > 0) icon.style.display = 'grid';
+        icon.style.display = totalItens > 0 ? 'grid' : 'none';
     }
 }
 
@@ -44,7 +37,7 @@ function atualizarIconeCarrinho() {
 document.addEventListener("DOMContentLoaded", async function() {
     console.log("🚀 Script Iniciado");
 
-    // 1. MODO PARCEIRO (Se for o Vendedor Logado)
+    // 1. MODO PARCEIRO
     const afiliadoLogado = JSON.parse(localStorage.getItem('afiliadoLogado'));
     if (afiliadoLogado) {
         const margemSalva = parseFloat(localStorage.getItem('minhaMargem') || 0);
@@ -53,7 +46,7 @@ document.addEventListener("DOMContentLoaded", async function() {
         ativarModoParceiro(afiliadoLogado);
     } 
     else {
-        // 2. MODO CLIENTE (Verifica se veio por link de afiliado)
+        // 2. MODO CLIENTE
         const paramsURL = new URLSearchParams(window.location.search);
         const refCode = paramsURL.get('ref') || localStorage.getItem('afiliadoCodigo');
 
@@ -63,7 +56,7 @@ document.addEventListener("DOMContentLoaded", async function() {
         }
     }
 
-    // 3. RECUPERAÇÃO DE CARRINHO VIA LINK (PDF)
+    // 3. RECUPERAÇÃO DE CARRINHO VIA LINK
     const paramsURL = new URLSearchParams(window.location.search);
     const restoreData = paramsURL.get('restore'); 
     
@@ -79,8 +72,7 @@ document.addEventListener("DOMContentLoaded", async function() {
     }
 
     // 4. INICIALIZAÇÃO DAS PÁGINAS
-    atualizarIconeCarrinho(); // <--- Agora ela existe e vai funcionar!
-    
+    atualizarIconeCarrinho();
     const path = window.location.pathname;
 
     if (path.includes('checkout.html')) {
@@ -93,43 +85,32 @@ document.addEventListener("DOMContentLoaded", async function() {
         setupProductPage();
     }
     else if (path.includes('busca.html') || path.includes('search')) {
-        setupSearchPage(); // Função com DEBUG
+        setupSearchPage(); 
     }
 
-    // Configura a busca global (Lupa e Categorias)
-    setupGlobalSearch(); // Função com DEBUG
-
+    setupGlobalSearch(); // Configura busca e categorias
     if (document.getElementById("promocoes-track")) buscarProdutosPromocao();
     if (typeof iniciarSlider === 'function') iniciarSlider();
 });
 
 
 /* ==============================================================
-   🕵️‍♂️ BUSCA COM DEBUG (ESPIÃO ATIVADO)
+   🔎 BUSCA INTELIGENTE (TEXTO + CATEGORIA)
    ============================================================== */
 
-// 1. Configura a Lupa e chama o rastreador de categorias
 function setupGlobalSearch() {
-    console.log("🔍 [DEBUG] Iniciando configuração da busca...");
-    
+    console.log("🔍 Configurando busca...");
     const btn = document.getElementById('search-button');
     const input = document.getElementById('search-input');
     
-    if (!input) console.error("❌ [DEBUG] ERRO: Input 'search-input' não encontrado!");
-    if (!btn) console.error("❌ [DEBUG] ERRO: Botão 'search-button' não encontrado!");
-
     if(btn && input) {
-        // Clique na Lupa
         btn.onclick = (e) => { 
-            console.log("🖱️ [DEBUG] Clique na Lupa detectado.");
             e.preventDefault(); 
             fazerPesquisa(input.value, ''); 
         };
 
-        // Apertar Enter
         input.addEventListener('keypress', (e) => {
             if(e.key === 'Enter') {
-                console.log("⌨️ [DEBUG] Enter pressionado.");
                 e.preventDefault();
                 fazerPesquisa(input.value, '');
             }
@@ -137,76 +118,44 @@ function setupGlobalSearch() {
     }
 
     // Configura os cards de categoria
-    setupCategoryLinks();
-}
-
-// 2. O Espião nos Cards de Categoria
-function setupCategoryLinks() {
-    // Procura todos os elementos com a classe .category-card
     const linksCategoria = document.querySelectorAll('.category-card'); 
-    
-    console.log(`📊 [DEBUG] Encontrei ${linksCategoria.length} cards de categoria.`);
-
-    if (linksCategoria.length === 0) {
-        console.warn("⚠️ [DEBUG] ALERTA: Nenhum card de categoria encontrado.");
-        return;
-    }
-
-    const input = document.getElementById('search-input');
-
-    linksCategoria.forEach((link, index) => {
+    linksCategoria.forEach(link => {
         link.addEventListener('click', (e) => {
+            // Tenta pegar o nome da categoria do atributo ou do texto
+            let categoriaNome = link.dataset.categoria;
+            if(!categoriaNome) {
+                const span = link.querySelector('span');
+                categoriaNome = span ? span.innerText : '';
+            }
+
+            // Verifica se tem texto digitado
             const textoDigitado = input ? input.value.trim() : '';
             
-            // Pega o nome da categoria (do data-categoria ou do texto dentro do span)
-            let categoriaNome = link.dataset.categoria;
-            if (!categoriaNome) {
-                const span = link.querySelector('span');
-                categoriaNome = span ? span.innerText : "";
-            }
-
-            console.log(`🖱️ [DEBUG] Clique no Card #${index+1}: Categoria="${categoriaNome}"`);
-            console.log(`📝 [DEBUG] Texto atual no input: "${textoDigitado}"`);
-
-            // SE tiver texto digitado, nós INTERROMPEMOS o link normal
             if(textoDigitado !== '') {
-                console.log("🛑 [DEBUG] Texto detectado! Bloqueando link padrão e combinando busca...");
-                e.preventDefault(); 
+                // Se tem texto, cancela o link padrão e faz a busca combinada
+                e.preventDefault();
                 fazerPesquisa(textoDigitado, categoriaNome);
-            } else {
-                console.log("🟢 [DEBUG] Input vazio. Deixando o link funcionar normalmente (mas via JS para garantir)...");
-                e.preventDefault(); 
-                fazerPesquisa('', categoriaNome);
             }
+            // Se não tem texto, o link padrão funciona (vai para busca.html?categoria=X)
         });
     });
 }
 
-// 3. Função Central que redireciona
 function fazerPesquisa(texto, categoria) {
-    console.log(`🚀 [DEBUG] Processando redirecionamento... Texto: "${texto}", Categoria: "${categoria}"`);
-
-    if(!texto && !categoria) {
-        console.warn("⚠️ [DEBUG] Busca cancelada: Nada digitado e nenhuma categoria.");
-        return;
-    }
+    if(!texto && !categoria) return;
 
     let url = `busca.html?`;
     if(texto) url += `q=${encodeURIComponent(texto)}&`;
     if(categoria) url += `categoria=${encodeURIComponent(categoria)}`;
 
-    console.log(`🌐 [DEBUG] Indo para URL: ${url}`);
     window.location.href = url;
 }
 
-// 4. Executa a busca na página busca.html
 function setupSearchPage() {
     const params = new URLSearchParams(window.location.search);
     const q = params.get('q');           
     const categoria = params.get('categoria'); 
     
-    console.log(`📥 [DEBUG] Página de Busca carregada. Params -> q: "${q}", categoria: "${categoria}"`);
-
     if(q || categoria) executarBusca(q, categoria);
 }
 
@@ -216,45 +165,33 @@ async function executarBusca(q, categoria) {
         if (q) url += `q=${encodeURIComponent(q)}&`;
         if (categoria) url += `categoria=${encodeURIComponent(categoria)}`;
 
-        console.log(`📡 [DEBUG] Chamando API: ${url}`);
-
         const res = await fetch(url);
-        
-        if (!res.ok) {
-            console.error(`❌ [DEBUG] Erro na API: ${res.status}`);
-            return;
-        }
-
         const data = await res.json();
-        console.log(`📦 [DEBUG] API respondeu. Produtos encontrados: ${data.length}`);
-
         const track = document.getElementById("search-track");
         
         if(track) {
             track.innerHTML = '';
-            
             if (data.length === 0) {
                 track.innerHTML = '<p style="padding:20px; width:100%; text-align:center;">Nenhum produto encontrado.</p>';
                 return;
             }
-
             data.forEach(p => {
                 track.innerHTML += `
                 <a href="product.html?id=${p.id}" class="product-card">
-                    <div class="product-image"><img src="${p.image||p.imagem}" onerror="this.src='https://via.placeholder.com/150'"></div>
+                    <div class="product-image"><img src="${p.image||p.imagem}" onerror="this.src='https://placehold.co/150'"></div>
                     <h3>${p.name||p.titulo}</h3>
                     <p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p>
                 </a>`;
             });
         }
     } catch(e){
-        console.error("❌ [DEBUG] Erro fatal na busca:", e);
+        console.error("Erro busca:", e);
     }
 }
 
 
 /* ==============================================================
-   🛒 LÓGICA DO CARRINHO (CART.HTML)
+   🛒 CARRINHO & CHECKOUT
    ============================================================== */
 async function carregarPaginaCarrinho() {
     const cartItemsContainer = document.getElementById('cart-items');
@@ -265,7 +202,7 @@ async function carregarPaginaCarrinho() {
     cartItemsContainer.innerHTML = ''; 
 
     if (cart.length === 0) {
-        cartItemsContainer.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">Seu carrinho está vazio.</td></tr>';
+        cartItemsContainer.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">Carrinho vazio.</td></tr>';
         if (cartTotalElement) cartTotalElement.innerText = 'R$ 0,00';
         return;
     }
@@ -281,7 +218,7 @@ async function carregarPaginaCarrinho() {
             const nome = p.name || p.titulo;
             const precoBase = parseFloat(p.price || p.preco_novo);
             const imagem = p.image || p.imagem;
-            const qtd = item.quantidade || item.quantity || 1; 
+            const qtd = item.quantidade || 1; 
 
             const precoFinal = precoBase * FATOR_PRECO;
             const subtotal = precoFinal * qtd;
@@ -313,7 +250,6 @@ function alterarQuantidade(id, delta) {
     const i = c.find(p => p.id === id);
     if (i) {
         i.quantidade = (i.quantidade || 1) + delta;
-        delete i.quantity;
         if (i.quantidade <= 0) c = c.filter(p => p.id !== id);
         localStorage.setItem('nossoCarrinho', JSON.stringify(c));
         carregarPaginaCarrinho();
@@ -327,10 +263,6 @@ function removerItem(id) {
     atualizarIconeCarrinho();
 }
 
-
-/* ==============================================================
-   💳 CHECKOUT & FINALIZAR PEDIDO
-   ============================================================== */
 async function carregarPaginaCheckout() {
     const listaResumo = document.querySelector('.summary-item-list');
     const areaBotoes = document.querySelector('.order-summary-box');
@@ -339,19 +271,14 @@ async function carregarPaginaCheckout() {
     if (!listaResumo) return;
 
     const carrinho = getCarrinho();
-    
     if (carrinho.length === 0) {
-        listaResumo.innerHTML = '<p>Seu carrinho está vazio.</p>';
-        const btns = document.querySelectorAll('.btn-place-order');
-        btns.forEach(b => b.style.display = 'none');
+        listaResumo.innerHTML = '<p>Carrinho vazio.</p>';
         return;
     }
 
-    listaResumo.innerHTML = '<p>Carregando itens...</p>';
-    
-    let html = '';
     let subtotal = 0;
     let itensParaProcessar = []; 
+    let html = '';
 
     for (const item of carrinho) {
         try {
@@ -374,8 +301,7 @@ async function carregarPaginaCheckout() {
                 id: p.id
             });
 
-            html += `
-            <div class="summary-item" style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #eee;">
+            html += `<div class="summary-item" style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #eee;">
                 <span>(${item.quantidade}x) ${titulo}</span>
                 <strong>${Number(totalItem).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</strong>
             </div>`;
@@ -385,7 +311,6 @@ async function carregarPaginaCheckout() {
     listaResumo.innerHTML = html;
     if(totalEl) totalEl.textContent = Number(subtotal).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 
-    // BOTÕES (Vendedor vs Cliente)
     const containerAntigo = document.getElementById('container-botoes-dinamicos');
     if(containerAntigo) containerAntigo.remove();
 
@@ -413,7 +338,189 @@ async function carregarPaginaCheckout() {
 
         container.appendChild(btnZap);
         container.appendChild(btnPDF);
-
     } else {
         const btnPagar = document.createElement('button');
-        btnPagar.className = "btn-place-order";
+        btnPagar.className = "btn-place-order"; 
+        btnPagar.innerHTML = `✅ Finalizar Pedido`;
+        btnPagar.dataset.itens = JSON.stringify(itensParaProcessar);
+        btnPagar.onclick = finalizarPedido; 
+        container.appendChild(btnPagar);
+    }
+    
+    if(areaBotoes) areaBotoes.appendChild(container);
+    const btnOriginal = document.querySelector('.btn-place-order:not(#container-botoes-dinamicos button)');
+    if(btnOriginal) btnOriginal.style.display = 'none';
+}
+
+async function finalizarPedido() {
+    const btn = document.querySelector('#container-botoes-dinamicos button');
+    const email = document.getElementById('email').value; 
+    const rua = document.getElementById('rua').value;
+    
+    if(!email || !rua) return alert("Preencha Nome e Endereço.");
+
+    const afiliadoCodigo = localStorage.getItem('afiliadoCodigo');
+    btn.innerText = "Processando...";
+    btn.disabled = true;
+
+    try {
+        const body = {
+            cliente: { nome: email, email: email, endereco: rua },
+            itens: JSON.parse(btn.dataset.itens),
+            afiliadoCodigo: afiliadoCodigo
+        };
+
+        const res = await fetch(`${API_URL}/finalizar-pedido`, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(body)
+        });
+
+        const data = await res.json();
+        if(!res.ok) throw new Error(data.erro || 'Erro ao processar');
+
+        alert(`Sucesso! Pedido #${data.id} realizado.`);
+        localStorage.removeItem('nossoCarrinho');
+        window.location.href = 'index.html';
+    } catch (e) {
+        alert("Erro: " + e.message);
+        btn.innerText = "Tentar Novamente";
+        btn.disabled = false;
+    }
+}
+
+function gerarOrcamentoPDF(itens, totalGeral) {
+    if (!window.jspdf) return alert("Erro: jsPDF não carregado.");
+    const doc = new window.jspdf.jsPDF();
+    const afiliado = JSON.parse(localStorage.getItem('afiliadoLogado'));
+    
+    doc.setFontSize(22); doc.setTextColor(230, 126, 34); doc.text("AutoPeças Veloz", 20, 20);
+    doc.setFontSize(12); doc.setTextColor(0); doc.text("Orçamento Oficial", 20, 30);
+    doc.text(`Vendedor: ${afiliado.nome}`, 20, 36); 
+    
+    let y = 50;
+    itens.forEach(item => {
+        doc.text(`${item.qtd}x ${item.nome} - R$ ${item.total.toFixed(2)}`, 20, y);
+        y += 10;
+    });
+
+    const dadosCarrinho = encodeURIComponent(JSON.stringify(itens.map(i => ({id: i.id, quantidade: i.qtd}))));
+    const baseUrl = window.location.origin + window.location.pathname.replace('checkout.html', '').replace('cart.html', '') + 'checkout.html';
+    let linkPagamento = `${baseUrl}?restore=${dadosCarrinho}&ref=${afiliado.codigo}`;
+
+    y += 10;
+    doc.setTextColor(0, 0, 255);
+    doc.textWithLink("CLIQUE AQUI PARA PAGAR", 20, y, { url: linkPagamento });
+    doc.save(`Orcamento.pdf`);
+}
+
+function finalizarNoZap(itens, total) {
+    const afiliado = JSON.parse(localStorage.getItem('afiliadoLogado'));
+    let msg = `*Orçamento - AutoPeças Veloz*\nVendedor: ${afiliado.nome}\n`;
+    itens.forEach(i => msg += `${i.qtd}x ${i.nome} - R$ ${i.total.toFixed(2)}\n`);
+    msg += `Total: R$ ${total.toFixed(2)}\n`;
+    
+    const dadosCarrinho = encodeURIComponent(JSON.stringify(itens.map(i => ({id: i.id, quantidade: i.qtd}))));
+    const baseUrl = window.location.origin + window.location.pathname.replace('checkout.html', '') + 'checkout.html';
+    const link = `${baseUrl}?restore=${dadosCarrinho}&ref=${afiliado.codigo}`;
+    msg += `Link: ${link}`;
+    
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+// =======================================================
+// 🦊 FUNÇÕES DO PARCEIRO
+// =======================================================
+function ativarModoParceiro(afiliado) {
+    const btnLogin = document.getElementById('btn-login-header');
+    if (btnLogin) {
+        btnLogin.innerHTML = `<i class="ph ph-sign-out"></i><span>Sair (${afiliado.nome})</span>`;
+        btnLogin.href = "#";
+        btnLogin.style.color = "#e67e22"; 
+        btnLogin.onclick = (e) => {
+            e.preventDefault();
+            if(confirm(`Sair do modo parceiro?`)) {
+                localStorage.removeItem('afiliadoLogado');
+                localStorage.removeItem('minhaMargem'); 
+                window.location.reload();
+            }
+        };
+    }
+
+    const margemAtual = localStorage.getItem('minhaMargem') || 0;
+    const barraAntiga = document.getElementById('barra-parceiro');
+    if (barraAntiga) barraAntiga.remove();
+
+    const barra = document.createElement('div');
+    barra.id = "barra-parceiro";
+    barra.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 50px; background: #2c3e50; color: white; z-index: 999999; display: flex; justify-content: center; align-items: center; gap: 15px; font-family: sans-serif;`;
+    
+    barra.innerHTML = `
+        <span style="font-weight:bold; color:#f39c12;">🦊 ${afiliado.nome}</span>
+        <a href="afiliado_dashboard.html" style="color: white; border: 1px solid white; padding: 2px 10px; text-decoration: none; border-radius: 4px;">Meu Painel</a>
+        <input type="number" id="input-margem" value="${margemAtual}" style="width:50px; text-align:center;"> %
+        <button id="btn-aplicar-margem">Aplicar</button>
+    `;
+
+    document.body.prepend(barra); 
+    document.body.style.paddingTop = "50px"; 
+
+    document.getElementById('btn-aplicar-margem').addEventListener('click', async () => {
+        const novaMargem = parseFloat(document.getElementById('input-margem').value);
+        localStorage.setItem('minhaMargem', novaMargem);
+        try {
+            if(afiliado.token) await fetch('/afiliado/config', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${afiliado.token}` }, body: JSON.stringify({ novaMargem }) });
+        } catch(e) {}
+        window.location.reload(); 
+    });
+}
+
+async function carregarMargemDoCodigo(codigo) {
+    try {
+        const res = await fetch(`${API_URL}/afiliado/check/${codigo}`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.margem) {
+                FATOR_PRECO = 1 + (data.margem / 100);
+            }
+        }
+    } catch (e) {}
+}
+
+function setupProductPage() {
+    const pId = new URLSearchParams(window.location.search).get('id');
+    if(pId) {
+        buscarProdutoPorId(pId);
+        const btn = document.querySelector('.btn-add-cart');
+        if(btn) btn.addEventListener('click', () => {
+            adicionarAoCarrinho(pId, parseInt(document.getElementById('quantity-input').value || 1));
+            alert('Adicionado!');
+        });
+    }
+}
+async function buscarProdutoPorId(id) {
+    try {
+        const res = await fetch(`${API_URL}/products/${id}`);
+        const p = await res.json();
+        document.getElementById('product-title').textContent = p.name || p.titulo;
+        document.getElementById('main-product-image').src = p.image || p.imagem;
+        document.getElementById('product-price-new').textContent = formatarMoeda(parseFloat(p.price || p.preco_novo));
+    } catch(e) {}
+}
+async function buscarProdutosPromocao() {
+    try {
+        const res = await fetch(`${API_URL}/search?q=`);
+        const data = await res.json();
+        const track = document.getElementById("promocoes-track");
+        if(track) {
+            track.innerHTML = '';
+            data.slice(0, 4).forEach(p => {
+                track.innerHTML += `<a href="product.html?id=${p.id}" class="product-card">
+                    <div class="product-image"><img src="${p.image||p.imagem}" onerror="this.src='https://placehold.co/150'"></div>
+                    <h3>${p.name||p.titulo}</h3>
+                    <p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p>
+                </a>`;
+            });
+        }
+    } catch(e) {}
+}

@@ -1,5 +1,6 @@
 /* ==============================================================
-   🚀 SCRIPT GERAL (Versão: Margens Individuais + Edição no Carrinho)
+   🚀 SCRIPT GERAL DO SITE 
+   (Versão Definitiva: Barra Afiliado + Carrinho Editável + Busca)
    ============================================================== */
 
 const API_URL = ''; 
@@ -8,6 +9,7 @@ let FATOR_GLOBAL = 1.0; // Margem padrão do perfil
 // --- FUNÇÕES UTILITÁRIAS ---
 
 function formatarMoeda(valor) {
+    if (valor == null || isNaN(valor)) return 'R$ 0,00';
     return Number(valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
@@ -29,6 +31,7 @@ function atualizarIconeCarrinho() {
 // Adiciona item (Respeita margem global inicialmente)
 function adicionarAoCarrinho(id, qtd) {
     let c = getCarrinho();
+    // Converte ID para garantir que seja número ou string igual
     let item = c.find(p => p.id == id);
     
     // Se for afiliado logado, pega a margem atual do perfil para iniciar
@@ -46,19 +49,22 @@ function adicionarAoCarrinho(id, qtd) {
     
     localStorage.setItem('nossoCarrinho', JSON.stringify(c));
     atualizarIconeCarrinho();
+    alert("Produto adicionado ao carrinho!"); // Feedback visual simples
 }
 
 // ==============================================================
 // 🏁 INICIALIZAÇÃO
 // ==============================================================
 document.addEventListener("DOMContentLoaded", async function() {
+    console.log("🚀 Script Iniciado");
     
     // 1. MODO PARCEIRO
     const afiliadoLogado = JSON.parse(localStorage.getItem('afiliadoLogado'));
     if (afiliadoLogado) {
         const margemSalva = parseFloat(localStorage.getItem('minhaMargem') || 0);
         FATOR_GLOBAL = 1 + (margemSalva / 100);
-        ativarModoParceiro(afiliadoLogado);
+        console.log(`🦊 Parceiro Logado: ${afiliadoLogado.nome}`);
+        ativarModoParceiro(afiliadoLogado); // <--- AQUI CHAMA A BARRA
     } 
     else {
         // 2. MODO CLIENTE (Via Link)
@@ -138,11 +144,11 @@ async function carregarPaginaCarrinho() {
             const subtotal = precoFinal * item.quantidade;
             total += subtotal;
 
-            // HTML DA MARGEM (Input se for afiliado, Texto invisível se for cliente)
+            // HTML DA MARGEM (Input se for afiliado, nada se for cliente)
             let htmlMargem = '';
             if(isAfiliado) {
                 htmlMargem = `
-                    <div style="display:flex; align-items:center; gap:5px; font-size:0.8rem;">
+                    <div style="display:flex; align-items:center; gap:5px; font-size:0.8rem; margin-top:5px;">
                         <span style="color:#e67e22; font-weight:bold;">Lucro:</span>
                         <input type="number" value="${margemAplicada}" 
                             onchange="atualizarMargemCarrinho(${item.id}, this.value)"
@@ -153,10 +159,11 @@ async function carregarPaginaCarrinho() {
 
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td><img src="${p.image||p.imagem}" width="60" style="border-radius:4px;"></td>
+                <td><img src="${p.image||p.imagem}" width="60" style="border-radius:4px;" onerror="this.src='https://placehold.co/100'"></td>
                 <td>
-                    ${p.name || p.titulo}
-                    ${htmlMargem} </td>
+                    <strong>${p.name || p.titulo}</strong>
+                    ${htmlMargem} 
+                </td>
                 <td>${formatarMoeda(precoFinal)}</td>
                 <td>
                     <div style="display: flex; align-items: center; gap: 10px; justify-content: center;">
@@ -177,22 +184,20 @@ async function carregarPaginaCarrinho() {
     if(isAfiliado) renderizarBotoesAfiliadoCarrinho();
 }
 
-// NOVA FUNÇÃO: Atualiza a margem de um item específico no LocalStorage
 function atualizarMargemCarrinho(id, novaMargem) {
     let c = getCarrinho();
     let item = c.find(p => p.id == id);
     if(item) {
         item.customMargin = parseFloat(novaMargem);
         localStorage.setItem('nossoCarrinho', JSON.stringify(c));
-        carregarPaginaCarrinho(); // Recarrega para atualizar totais
+        carregarPaginaCarrinho(); 
     }
 }
 
 function renderizarBotoesAfiliadoCarrinho() {
-    const areaTotal = document.querySelector('.cart-total-box'); // Precisa existir no HTML ou vamos criar
+    const areaTotal = document.querySelector('.cart-total-box'); 
     if(!areaTotal) return;
 
-    // Remove botões antigos
     const oldBtns = document.getElementById('afiliado-cart-actions');
     if(oldBtns) oldBtns.remove();
 
@@ -242,8 +247,6 @@ async function carregarPaginaCheckout() {
             const p = await response.json();
             
             const precoBase = parseFloat(p.price || p.preco_novo);
-            
-            // Usa margem customizada se existir, senão usa global
             let margem = (item.customMargin !== undefined) ? item.customMargin : ((FATOR_GLOBAL - 1) * 100);
             
             const precoFinal = precoBase * (1 + (margem / 100));
@@ -257,7 +260,7 @@ async function carregarPaginaCheckout() {
                 unitario: precoFinal,
                 total: totalItem,
                 id: p.id,
-                customMargin: margem // Importante para o PDF saber
+                customMargin: margem 
             });
 
             html += `<div class="summary-item" style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #eee;">
@@ -282,7 +285,6 @@ async function carregarPaginaCheckout() {
     const afiliadoLogado = JSON.parse(localStorage.getItem('afiliadoLogado'));
 
     if (afiliadoLogado) {
-        // MODO AFILIADO: Gera Link com as margens embutidas
         container.innerHTML = `
             <button onclick="gerarLinkZap('${afiliadoLogado.codigo}', ${subtotal})" class="btn-place-order" style="background:#27ae60;">
                 <i class="ph ph-whatsapp-logo"></i> Mandar no WhatsApp
@@ -291,10 +293,8 @@ async function carregarPaginaCheckout() {
                 <i class="ph ph-file-pdf"></i> Baixar PDF
             </button>
         `;
-        // Salvamos os itens no window para as funções usarem
         window.ITENS_CHECKOUT = itensParaProcessar;
     } else {
-        // MODO CLIENTE
         const btnPagar = document.createElement('button');
         btnPagar.className = "btn-place-order"; 
         btnPagar.innerHTML = `✅ Finalizar Pedido`;
@@ -303,15 +303,11 @@ async function carregarPaginaCheckout() {
     }
     if(areaBotoes) areaBotoes.appendChild(container);
     
-    // Esconde botão padrão
     const btnOriginal = document.querySelector('.btn-place-order:not(#container-botoes-dinamicos button)');
     if(btnOriginal) btnOriginal.style.display = 'none';
 }
 
-// --- NOVAS FUNÇÕES DE GERAÇÃO DE LINK (COM MARGEM NO URL) ---
-
 function gerarPayloadUrl() {
-    // Cria um JSON leve apenas com o necessário: [{id:1, qtd:2, customMargin:10}]
     const itens = window.ITENS_CHECKOUT || [];
     const payload = itens.map(i => ({
         id: i.id,
@@ -323,7 +319,7 @@ function gerarPayloadUrl() {
 
 function gerarLinkZap(codigo, total) {
     const payload = gerarPayloadUrl();
-    const baseUrl = window.location.origin + window.location.pathname; // Pega URL atual (checkout.html)
+    const baseUrl = window.location.origin + window.location.pathname.replace('checkout.html', '') + 'checkout.html';
     const link = `${baseUrl}?restore=${payload}&ref=${codigo}`;
     
     let msg = `*Orçamento AutoPeças Veloz*\n`;
@@ -354,9 +350,8 @@ function gerarPDFCustom() {
     });
     doc.text(`TOTAL: ${formatarMoeda(total)}`, 20, y+10);
     
-    // Link Mágico
     const payload = gerarPayloadUrl();
-    const baseUrl = window.location.origin + window.location.pathname;
+    const baseUrl = window.location.origin + window.location.pathname.replace('checkout.html', '') + 'checkout.html';
     const link = `${baseUrl}?restore=${payload}&ref=${afiliado.codigo}`;
     
     y += 30;
@@ -388,7 +383,6 @@ async function finalizarPedido(itens) {
     } catch(e) { alert("Erro conexão."); }
 }
 
-// Funções de Carrinho (Remover/Alterar)
 function alterarQuantidade(id, delta) {
     let c = getCarrinho();
     let i = c.find(p => p.id == id);
@@ -405,11 +399,231 @@ function removerItem(id) {
     carregarPaginaCarrinho(); atualizarIconeCarrinho();
 }
 
-// Resto das funções (Busca, Slider, etc - MANTIDAS IGUAIS, só vou abreviar pra caber)
-function setupGlobalSearch() { /* ... código da busca ... */ }
-function fazerPesquisa(t, c) { window.location.href = `busca.html?q=${t}&categoria=${c}`; }
-function setupSearchPage() { /* ... código da pagina busca ... */ }
-function setupProductPage() { /* ... código produto ... */ }
-async function carregarMargemDoCodigo(c) { /* ... check margem ... */ }
-function ativarModoParceiro(a) { /* ... barra preta ... */ }
-function iniciarSlider() { /* ... slider ... */ }
+// ==============================================================
+// 🔎 BUSCA E PRODUTOS (COM DEBUG MÍNIMO)
+// ==============================================================
+function setupGlobalSearch() {
+    const btn = document.getElementById('search-button');
+    const input = document.getElementById('search-input');
+    
+    if(btn && input) {
+        btn.onclick = (e) => { 
+            e.preventDefault(); 
+            fazerPesquisa(input.value, ''); 
+        };
+        input.addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') {
+                e.preventDefault();
+                fazerPesquisa(input.value, '');
+            }
+        });
+    }
+
+    const linksCategoria = document.querySelectorAll('.category-card'); 
+    linksCategoria.forEach(link => {
+        link.addEventListener('click', (e) => {
+            let categoriaNome = link.dataset.categoria;
+            if(!categoriaNome) {
+                const span = link.querySelector('span');
+                categoriaNome = span ? span.innerText : '';
+            }
+            const textoDigitado = input ? input.value.trim() : '';
+            if(textoDigitado !== '') {
+                e.preventDefault();
+                fazerPesquisa(textoDigitado, categoriaNome);
+            }
+        });
+    });
+}
+
+function fazerPesquisa(t, c) { window.location.href = `busca.html?q=${encodeURIComponent(t)}&categoria=${encodeURIComponent(c)}`; }
+function setupSearchPage() {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get('q');           
+    const categoria = params.get('categoria'); 
+    if(q || categoria) executarBusca(q, categoria);
+}
+
+async function executarBusca(q, categoria) {
+    try {
+        let url = `${API_URL}/search?`;
+        if (q) url += `q=${encodeURIComponent(q)}&`;
+        if (categoria) url += `categoria=${encodeURIComponent(categoria)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const track = document.getElementById("search-track");
+        if(track) {
+            track.innerHTML = '';
+            if (data.length === 0) {
+                track.innerHTML = '<p style="padding:20px; text-align:center;">Nenhum produto encontrado.</p>';
+                return;
+            }
+            data.forEach(p => {
+                track.innerHTML += `
+                <a href="product.html?id=${p.id}" class="product-card">
+                    <div class="product-image"><img src="${p.image||p.imagem}" onerror="this.src='https://placehold.co/150'"></div>
+                    <h3>${p.name||p.titulo}</h3>
+                    <p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p>
+                </a>`;
+            });
+        }
+    } catch(e) {}
+}
+
+function setupProductPage() {
+    const pId = new URLSearchParams(window.location.search).get('id');
+    if(pId) {
+        buscarProdutoPorId(pId);
+        const btn = document.querySelector('.btn-add-cart');
+        const qtdInput = document.getElementById('quantity-input');
+        if(btn) {
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            newBtn.addEventListener('click', () => {
+                const qtd = qtdInput ? parseInt(qtdInput.value) : 1;
+                adicionarAoCarrinho(pId, qtd);
+            });
+        }
+    }
+}
+async function buscarProdutoPorId(id) {
+    try {
+        const res = await fetch(`${API_URL}/products/${id}`);
+        const p = await res.json();
+        document.getElementById('product-title').textContent = p.name || p.titulo;
+        document.getElementById('main-product-image').src = p.image || p.imagem;
+        document.getElementById('product-price-new').textContent = formatarMoeda(parseFloat(p.price || p.preco_novo));
+    } catch(e) {}
+}
+
+async function buscarProdutosPromocao() {
+    try {
+        const res = await fetch(`${API_URL}/search?q=`);
+        const data = await res.json();
+        const track = document.getElementById("promocoes-track");
+        if(track) {
+            track.innerHTML = '';
+            data.slice(0, 4).forEach(p => {
+                track.innerHTML += `<a href="product.html?id=${p.id}" class="product-card">
+                    <div class="product-image"><img src="${p.image||p.imagem}" onerror="this.src='https://placehold.co/150'"></div>
+                    <h3>${p.name||p.titulo}</h3>
+                    <p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p>
+                </a>`;
+            });
+        }
+    } catch(e) {}
+}
+
+// =======================================================
+// 🦊 FUNÇÕES DO PARCEIRO (ESTA É A QUE TINHA SUMIDO!)
+// =======================================================
+function ativarModoParceiro(afiliado) {
+    const btnLogin = document.getElementById('btn-login-header');
+    if (btnLogin) {
+        btnLogin.innerHTML = `<i class="ph ph-sign-out"></i><span>Sair (${afiliado.nome})</span>`;
+        btnLogin.href = "#";
+        btnLogin.style.color = "#e67e22"; 
+        btnLogin.onclick = (e) => {
+            e.preventDefault();
+            if(confirm(`Sair do modo parceiro?`)) {
+                localStorage.removeItem('afiliadoLogado');
+                localStorage.removeItem('minhaMargem'); 
+                window.location.reload();
+            }
+        };
+    }
+
+    const margemAtual = localStorage.getItem('minhaMargem') || 0;
+    const barraAntiga = document.getElementById('barra-parceiro');
+    if (barraAntiga) barraAntiga.remove();
+
+    const barra = document.createElement('div');
+    barra.id = "barra-parceiro";
+    // Estilo fixo no topo
+    barra.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 50px;
+        background: #2c3e50; color: white; 
+        z-index: 999999; display: flex; justify-content: center; align-items: center; gap: 15px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3); font-family: sans-serif;
+    `;
+    
+    barra.innerHTML = `
+        <span style="font-weight:bold; color:#f39c12;">🦊 ${afiliado.nome}</span>
+        <div style="height: 20px; width: 1px; background: #555;"></div>
+        
+        <a href="afiliado_dashboard.html" style="text-decoration: none; color: white; background: rgba(255,255,255,0.15); padding: 5px 12px; border-radius: 4px; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.2);">
+            <i class="ph ph-gauge"></i> Meu Painel
+        </a>
+
+        <div style="height: 20px; width: 1px; background: #555;"></div>
+
+        <div style="display:flex; align-items:center; gap:5px; background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px;">
+            <label style="font-size: 0.85rem; color:#ddd;">Margem Global:</label>
+            <input type="number" id="input-margem" value="${margemAtual}" min="0" max="100" style="width:50px; padding:4px; border-radius:4px; border:none; text-align:center; font-weight:bold; color:#2c3e50;">
+            <span style="font-weight:bold; font-size:0.9rem;">%</span>
+        </div>
+
+        <button id="btn-aplicar-margem" style="background:#27ae60; color:white; border:none; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold; font-size: 0.8rem;">
+            APLICAR
+        </button>
+    `;
+
+    document.body.prepend(barra); 
+    document.body.style.paddingTop = "50px"; 
+
+    document.getElementById('btn-aplicar-margem').addEventListener('click', async () => {
+        const novaMargem = parseFloat(document.getElementById('input-margem').value);
+        if(isNaN(novaMargem) || novaMargem < 0) return alert("Margem inválida");
+        
+        localStorage.setItem('minhaMargem', novaMargem);
+        try {
+            if(afiliado.token) await fetch('/afiliado/config', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${afiliado.token}` }, body: JSON.stringify({ novaMargem }) });
+        } catch(e) {}
+        alert("Margem global atualizada!");
+        window.location.reload(); 
+    });
+}
+
+async function carregarMargemDoCodigo(codigo) {
+    try {
+        const res = await fetch(`${API_URL}/afiliado/check/${codigo}`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.margem) {
+                FATOR_GLOBAL = 1 + (data.margem / 100);
+            }
+        }
+    } catch (e) {}
+}
+
+// ==============================================================
+// 🖼️ SLIDER DA HOME
+// ==============================================================
+let slideIndex = 0;
+let slideInterval;
+
+function iniciarSlider() {
+    const slides = document.querySelectorAll('.slide');
+    if(slides.length > 0) {
+        mostrarSlide(slideIndex);
+        slideInterval = setInterval(() => mudarSlide(1), 5000);
+    }
+}
+
+function mudarSlide(n) {
+    slideIndex += n;
+    mostrarSlide(slideIndex);
+    clearInterval(slideInterval);
+    slideInterval = setInterval(() => mudarSlide(1), 5000);
+}
+
+function mostrarSlide(n) {
+    const slides = document.querySelectorAll('.slide');
+    if (slides.length === 0) return;
+    if (n >= slides.length) slideIndex = 0;
+    if (n < 0) slideIndex = slides.length - 1;
+    slides.forEach(slide => slide.classList.remove('active'));
+    slides[slideIndex].classList.add('active');
+}
+window.mudarSlide = mudarSlide;
+window.iniciarSlider = iniciarSlider;

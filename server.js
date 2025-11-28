@@ -20,7 +20,7 @@ app.get('/produtos/:id', async (req, res) => { const p = await prisma.produto.fi
 // ... (resto do código)
 
 // =================================================================
-// 🔎 ROTA DE BUSCA SUPER ROBUSTA (Ignora Maiúsculas e Erros)
+// 🔎 ROTA DE BUSCA (CORRIGIDA PARA SQLITE)
 // =================================================================
 app.get('/search', async (req, res) => {
     try {
@@ -30,24 +30,23 @@ app.get('/search', async (req, res) => {
         // 1. Filtro por Categoria (clique no card)
         if (categoria) {
             whereClause.categoria = { 
-                contains: categoria,
-                mode: 'insensitive' // Ignora maiúsculas/minúsculas
+                contains: categoria 
             };
         }
 
         // 2. Filtro por Texto (barra de pesquisa)
         if (q) {
             whereClause.OR = [
-                { titulo: { contains: q, mode: 'insensitive' } },
-                { referencia: { contains: q, mode: 'insensitive' } },
-                { carros: { contains: q, mode: 'insensitive' } },     
-                { pesquisa: { contains: q, mode: 'insensitive' } },   
-                { fabricante: { contains: q, mode: 'insensitive' } },
-                { categoria: { contains: q, mode: 'insensitive' } }
+                { titulo: { contains: q } },
+                { referencia: { contains: q } },
+                { carros: { contains: q } },     
+                { pesquisa: { contains: q } },   
+                { fabricante: { contains: q } },
+                { categoria: { contains: q } }
             ];
         }
 
-        console.log("🔍 Buscando por:", { q, categoria }); // Log para ver no Render
+        console.log("🔍 Buscando SQLite:", { q, categoria });
 
         const produtos = await prisma.produto.findMany({
             where: whereClause,
@@ -58,8 +57,7 @@ app.get('/search', async (req, res) => {
 
     } catch (error) {
         console.error("❌ Erro na busca:", error);
-        // Retorna array vazio em vez de erro para não travar o front
-        res.json([]); 
+        res.status(500).json({ erro: "Erro ao buscar produtos" }); 
     }
 });
 

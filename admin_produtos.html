@@ -3,21 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Produtos</title>
+    <title>Produtos - Admin</title>
     <link rel="stylesheet" href="admin.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
-        /* Estilos do Modal de Edição */
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
-        .modal.active { display: flex; }
-        .modal-content { background-color: white; padding: 20px; border-radius: 8px; width: 500px; max-width: 90%; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-group input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        /* CSS Específico do Modal de Produtos */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
+        .modal-content { background-color: #fff; padding: 25px; border-radius: 8px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.2); position: relative; }
+        .close { float: right; font-size: 28px; font-weight: bold; cursor: pointer; color: #aaa; }
+        .close:hover { color: #000; }
+
+        /* Grid do Formulário */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        .form-group.full { grid-column: span 2; }
+        
+        label { font-weight: bold; font-size: 0.9rem; color: #444; }
+        input, select, textarea { padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; }
+        textarea { resize: vertical; min-height: 80px; }
+
+        .section-title { grid-column: span 2; margin-top: 15px; padding-bottom: 5px; border-bottom: 2px solid #eee; color: #2c3e50; font-size: 1.1rem; }
+
+        .btn-save { background: #27ae60; color: white; border: none; padding: 12px; width: 100%; border-radius: 5px; font-size: 1rem; cursor: pointer; margin-top: 20px; font-weight: bold; }
+        .btn-save:hover { background: #219150; }
+
+        /* Lista de Produtos */
+        .product-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; margin-top: 20px; }
+        .product-card { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .product-card img { width: 100%; height: 150px; object-fit: contain; border-radius: 4px; }
+        .actions { display: flex; gap: 10px; margin-top: auto; }
+        .btn-edit { flex: 1; background: #f39c12; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; }
+        .btn-delete { flex: 1; background: #c0392b; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; }
+        
+        .add-btn-float { position: fixed; bottom: 30px; right: 30px; background: #2980b9; color: white; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: pointer; border: none; }
     </style>
 </head>
 <body>
+
     <div class="admin-container">
         <aside class="sidebar">
             <h3>Admin AutoPeças</h3>
@@ -26,80 +48,240 @@
                 <a href="admin_produtos.html" class="active"><i class="ph ph-package"></i> Produtos</a>
                 <a href="admin_pedidos.html"><i class="ph ph-shopping-cart-simple"></i> Pedidos</a>
                 <a href="admin_afiliados.html"><i class="ph ph-users"></i> Afiliados</a>
-                <a href="#" id="logout-button"><i class="ph ph-sign-out"></i> Sair</a>
+                <a href="#" onclick="logout()" style="margin-top:20px; color:#e74c3c;"><i class="ph ph-sign-out"></i> Sair</a>
             </nav>
         </aside>
 
         <main class="main-content">
             <header>
-                <h1>Gestão de Produtos</h1>
-                <button class="btn-add" onclick="abrirModalCriar()">+ Novo Produto</button>
+                <h1>Catálogo de Produtos</h1>
+                <input type="text" id="search-admin" placeholder="Buscar no painel..." style="padding:8px; border-radius:4px; border:1px solid #ddd;">
             </header>
 
-            <div class="card">
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Produto</th>
-                            <th>Preço</th>
-                            <th>Estoque</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="produtos-list">
-                        <tr><td colspan="5">Carregando...</td></tr>
-                    </tbody>
-                </table>
-            </div>
+            <div id="loading">Carregando estoque...</div>
+            <div class="product-list" id="products-container"></div>
         </main>
+
+        <button class="add-btn-float" onclick="openModal()">+</button>
     </div>
 
-    <div id="modal-produto" class="modal">
+    <div id="productModal" class="modal">
         <div class="modal-content">
-            <h2 id="modal-title">Editar Produto</h2>
-            <form id="form-produto">
-                <input type="hidden" id="edit-id">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2 id="modal-title">Novo Produto</h2>
+            
+            <form id="product-form">
+                <input type="hidden" id="prod-id">
                 
-                <div class="form-group">
-                    <label>Título</label>
-                    <input type="text" id="edit-titulo" required>
-                </div>
-                
-                <div class="form-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div>
-                        <label>Preço (R$)</label>
-                        <input type="number" id="edit-preco" step="0.01" required>
+                <div class="form-grid">
+                    <h3 class="section-title">📦 Informações Básicas</h3>
+                    
+                    <div class="form-group full">
+                        <label>Título do Produto *</label>
+                        <input type="text" id="prod-titulo" required placeholder="Ex: Kit Embreagem Gol G5">
                     </div>
-                    <div>
-                        <label>Estoque</label>
-                        <input type="number" id="edit-estoque" required>
+
+                    <div class="form-group">
+                        <label>Preço Novo (R$) *</label>
+                        <input type="number" id="prod-preco" step="0.01" required>
                     </div>
+
+                    <div class="form-group">
+                        <label>Estoque Atual *</label>
+                        <input type="number" id="prod-estoque" required>
+                    </div>
+
+                    <div class="form-group full">
+                        <label>Link da Imagem (URL) *</label>
+                        <input type="text" id="prod-imagem" required placeholder="https://...">
+                    </div>
+
+                    <h3 class="section-title">⚙️ Ficha Técnica & Busca</h3>
+
+                    <div class="form-group">
+                        <label>Código/Referência</label>
+                        <input type="text" id="prod-referencia" placeholder="Ex: KIT-1234">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Categoria (Ex: Motor, Freio)</label>
+                        <input type="text" id="prod-categoria" list="categorias-list" placeholder="Digite ou selecione">
+                        <datalist id="categorias-list">
+                            <option value="Motor">
+                            <option value="Freio">
+                            <option value="Suspensão">
+                            <option value="Elétrica">
+                            <option value="Óleo e Filtros">
+                        </datalist>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Fabricante</label>
+                        <input type="text" id="prod-fabricante" placeholder="Ex: Bosch, Moura">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Ano Compatível</label>
+                        <input type="text" id="prod-ano" placeholder="Ex: 2008-2012">
+                    </div>
+
+                    <div class="form-group full">
+                        <label>Carros Compatíveis (Separar por vírgula)</label>
+                        <textarea id="prod-carros" placeholder="Ex: Gol G5, Voyage, Saveiro (Isso ajuda na busca!)"></textarea>
+                    </div>
+
+                    <div class="form-group full">
+                        <label>Palavras-Chave (Tags de Pesquisa)</label>
+                        <input type="text" id="prod-pesquisa" placeholder="Ex: barato, promoção, original">
+                    </div>
+
                 </div>
 
-                <div class="form-group">
-                    <label>URL da Imagem</label>
-                    <input type="text" id="edit-imagem">
-                </div>
-
-                <div class="form-group">
-                    <label>Categoria</label>
-                    <input type="text" id="edit-categoria">
-                </div>
-
-                <div class="form-group">
-                    <label>Referência / Código</label>
-                    <input type="text" id="edit-referencia">
-                </div>
-
-                <div class="modal-actions">
-                    <button type="button" onclick="fecharModal()" style="padding: 10px; cursor: pointer;">Cancelar</button>
-                    <button type="submit" class="btn-add" style="border:none; cursor:pointer;">Salvar</button>
-                </div>
+                <button type="submit" class="btn-save">Salvar Produto</button>
             </form>
         </div>
     </div>
 
-    <script src="admin.js"></script>
+    <script>
+        const API_URL = ''; 
+        let produtosCache = [];
+
+        // 1. Carregar Produtos
+        async function loadProducts() {
+            const token = localStorage.getItem('adminToken');
+            if(!token) return window.location.href = 'admin_login.html';
+
+            try {
+                // Traz todos os produtos (rota search sem query traz tudo ou rota especifica)
+                const res = await fetch(`${API_URL}/search?q=`); 
+                const data = await res.json();
+                produtosCache = data;
+                renderProducts(data);
+                document.getElementById('loading').style.display = 'none';
+            } catch (e) {
+                console.error(e);
+                document.getElementById('loading').innerText = "Erro ao carregar.";
+            }
+        }
+
+        // 2. Renderizar na Tela
+        function renderProducts(lista) {
+            const container = document.getElementById('products-container');
+            container.innerHTML = '';
+            
+            lista.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'product-card';
+                card.innerHTML = `
+                    <img src="${p.imagem || 'https://via.placeholder.com/150'}" alt="${p.titulo}">
+                    <strong>${p.titulo}</strong>
+                    <div style="font-size:0.9rem; color:#666;">Ref: ${p.referencia || '-'}</div>
+                    <div style="font-size:0.9rem; color:#666;">Cat: ${p.categoria || '-'}</div>
+                    <div style="color:#27ae60; font-weight:bold;">R$ ${parseFloat(p.preco_novo).toFixed(2)}</div>
+                    <div style="font-size:0.8rem;">Estoque: ${p.estoque}</div>
+                    <div class="actions">
+                        <button class="btn-edit" onclick="editProduct(${p.id})">Editar</button>
+                        <button class="btn-delete" onclick="deleteProduct(${p.id})">Excluir</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // 3. Abrir Modal (Criar ou Editar)
+        window.openModal = function() {
+            document.getElementById('product-form').reset();
+            document.getElementById('prod-id').value = '';
+            document.getElementById('modal-title').innerText = 'Novo Produto';
+            document.getElementById('productModal').style.display = 'flex';
+        }
+
+        window.editProduct = function(id) {
+            const p = produtosCache.find(x => x.id === id);
+            if(p) {
+                document.getElementById('prod-id').value = p.id;
+                document.getElementById('prod-titulo').value = p.titulo;
+                document.getElementById('prod-preco').value = p.preco_novo;
+                document.getElementById('prod-estoque').value = p.estoque;
+                document.getElementById('prod-imagem').value = p.imagem;
+                
+                // Campos Novos (Ficha Técnica)
+                document.getElementById('prod-referencia').value = p.referencia || '';
+                document.getElementById('prod-categoria').value = p.categoria || '';
+                document.getElementById('prod-fabricante').value = p.fabricante || '';
+                document.getElementById('prod-ano').value = p.ano || '';
+                document.getElementById('prod-carros').value = p.carros || '';
+                document.getElementById('prod-pesquisa').value = p.pesquisa || '';
+
+                document.getElementById('modal-title').innerText = 'Editar Produto';
+                document.getElementById('productModal').style.display = 'flex';
+            }
+        }
+
+        window.closeModal = function() {
+            document.getElementById('productModal').style.display = 'none';
+        }
+
+        // 4. Salvar (POST/PUT)
+        document.getElementById('product-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('prod-id').value;
+            const token = localStorage.getItem('adminToken');
+
+            // Monta o objeto completo com os novos campos
+            const body = {
+                titulo: document.getElementById('prod-titulo').value,
+                preco_novo: parseFloat(document.getElementById('prod-preco').value),
+                estoque: parseInt(document.getElementById('prod-estoque').value),
+                imagem: document.getElementById('prod-imagem').value,
+                
+                // Novos Campos cruciais para a busca
+                referencia: document.getElementById('prod-referencia').value,
+                categoria: document.getElementById('prod-categoria').value,
+                fabricante: document.getElementById('prod-fabricante').value,
+                ano: document.getElementById('prod-ano').value,
+                carros: document.getElementById('prod-carros').value,
+                pesquisa: document.getElementById('prod-pesquisa').value
+            };
+
+            const url = id ? `${API_URL}/admin/produtos/${id}` : `${API_URL}/admin/produtos`;
+            const method = id ? 'PUT' : 'POST';
+
+            try {
+                const res = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(body)
+                });
+
+                if(res.ok) {
+                    alert("Produto salvo com sucesso!");
+                    closeModal();
+                    loadProducts();
+                } else {
+                    alert("Erro ao salvar.");
+                }
+            } catch(err) { console.error(err); }
+        });
+
+        // 5. Deletar
+        window.deleteProduct = async function(id) {
+            if(!confirm("Tem certeza que deseja excluir?")) return;
+            const token = localStorage.getItem('adminToken');
+            await fetch(`${API_URL}/admin/produtos/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+            loadProducts();
+        }
+
+        function logout() { localStorage.removeItem('adminToken'); window.location.href = 'admin_login.html'; }
+
+        // Filtro rápido na tela (sem ir no server)
+        document.getElementById('search-admin').addEventListener('input', (e) => {
+            const termo = e.target.value.toLowerCase();
+            const filtrados = produtosCache.filter(p => p.titulo.toLowerCase().includes(termo) || (p.referencia && p.referencia.toLowerCase().includes(termo)));
+            renderProducts(filtrados);
+        });
+
+        loadProducts();
+    </script>
 </body>
 </html>

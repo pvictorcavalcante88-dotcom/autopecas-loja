@@ -371,17 +371,23 @@ async function buscarProdutoPorId(id) {
 }
 
 /* ==============================================================
-   🔎 PRODUTOS & BUSCA (ADAPTADO PARA O SEU HTML)
+   🕵️‍♂️ BUSCA COM DEBUG (ESPIÃO ATIVADO)
    ============================================================== */
 
-// 1. Configura a Lupa e o Enter (Adaptado para #search-container)
+// 1. Configura a Lupa e chama o rastreador de categorias
 function setupGlobalSearch() {
-    const btn = document.getElementById('search-button'); // Seu ID correto
-    const input = document.getElementById('search-input'); // Seu ID correto
+    console.log("🔍 [DEBUG] Iniciando configuração da busca...");
     
+    const btn = document.getElementById('search-button');
+    const input = document.getElementById('search-input');
+    
+    if (!input) console.error("❌ [DEBUG] ERRO: Input 'search-input' não encontrado!");
+    if (!btn) console.error("❌ [DEBUG] ERRO: Botão 'search-button' não encontrado!");
+
     if(btn && input) {
         // Clique na Lupa
         btn.onclick = (e) => { 
+            console.log("🖱️ [DEBUG] Clique na Lupa detectado.");
             e.preventDefault(); 
             fazerPesquisa(input.value, ''); 
         };
@@ -389,47 +395,73 @@ function setupGlobalSearch() {
         // Apertar Enter
         input.addEventListener('keypress', (e) => {
             if(e.key === 'Enter') {
+                console.log("⌨️ [DEBUG] Enter pressionado.");
                 e.preventDefault();
                 fazerPesquisa(input.value, '');
             }
         });
     }
 
-    // Chama a função que "conserta" os links de categoria
+    // Configura os cards de categoria
     setupCategoryLinks();
 }
 
-// 2. Intercepta os cliques nos cards de categoria do seu HTML
+// 2. O Espião nos Cards de Categoria
 function setupCategoryLinks() {
-    const linksCategoria = document.querySelectorAll('.category-card'); // Pega todos os cards
+    // Procura todos os elementos com a classe .category-card
+    const linksCategoria = document.querySelectorAll('.category-card'); 
+    
+    console.log(`📊 [DEBUG] Encontrei ${linksCategoria.length} cards de categoria.`);
+
+    if (linksCategoria.length === 0) {
+        console.warn("⚠️ [DEBUG] ALERTA: Nenhum card de categoria encontrado. Verifique se a classe 'category-card' está no HTML.");
+        return;
+    }
+
     const input = document.getElementById('search-input');
 
-    linksCategoria.forEach(link => {
+    linksCategoria.forEach((link, index) => {
         link.addEventListener('click', (e) => {
-            // Se tiver texto digitado, a gente PREVINE o link normal e faz a busca combinada
-            if(input && input.value.trim() !== '') {
-                e.preventDefault(); // Cancela o href="busca.html?categoria=..."
-                
-                // Pega a categoria do atributo data-categoria ou do texto do span
-                const categoria = link.dataset.categoria || link.querySelector('span').innerText;
-                
-                // Faz a busca combinada (Texto + Categoria)
-                fazerPesquisa(input.value, categoria);
+            const textoDigitado = input ? input.value.trim() : '';
+            
+            // Pega o nome da categoria (do data-categoria ou do texto dentro do span)
+            let categoriaNome = link.dataset.categoria;
+            if (!categoriaNome) {
+                const span = link.querySelector('span');
+                categoriaNome = span ? span.innerText : "Desconhecida";
             }
-            // Se NÃO tiver texto, deixa o link funcionar normal (vai só pra categoria)
+
+            console.log(`🖱️ [DEBUG] Clique no Card #${index+1}: Categoria="${categoriaNome}"`);
+            console.log(`📝 [DEBUG] Texto atual no input: "${textoDigitado}"`);
+
+            // SE tiver texto digitado, nós INTERROMPEMOS o link normal
+            if(textoDigitado !== '') {
+                console.log("🛑 [DEBUG] Texto detectado! Bloqueando link padrão e combinando busca...");
+                e.preventDefault(); // <--- AQUI É O PULO DO GATO
+                
+                fazerPesquisa(textoDigitado, categoriaNome);
+            } else {
+                console.log("🟢 [DEBUG] Input vazio. Deixando o link funcionar normalmente...");
+                // Não fazemos e.preventDefault(), o navegador segue o href do link
+            }
         });
     });
 }
 
 // 3. Função Central que redireciona
 function fazerPesquisa(texto, categoria) {
-    // Se não tiver nada digitado e nenhuma categoria, não faz nada
-    if(!texto && !categoria) return;
+    console.log(`🚀 [DEBUG] Processando redirecionamento... Texto: "${texto}", Categoria: "${categoria}"`);
+
+    if(!texto && !categoria) {
+        console.warn("⚠️ [DEBUG] Busca cancelada: Nada digitado e nenhuma categoria.");
+        return;
+    }
 
     let url = `busca.html?`;
     if(texto) url += `q=${encodeURIComponent(texto)}&`;
     if(categoria) url += `categoria=${encodeURIComponent(categoria)}`;
 
+    console.log(`🌐 [DEBUG] Indo para URL: ${url}`);
     window.location.href = url;
 }
 
@@ -439,7 +471,8 @@ function setupSearchPage() {
     const q = params.get('q');           
     const categoria = params.get('categoria'); 
     
-    // Executa a busca se tiver qualquer parametro
+    console.log(`📥 [DEBUG] Página de Busca carregada. Params -> q: "${q}", categoria: "${categoria}"`);
+
     if(q || categoria) executarBusca(q, categoria);
 }
 
@@ -449,8 +482,18 @@ async function executarBusca(q, categoria) {
         if (q) url += `q=${encodeURIComponent(q)}&`;
         if (categoria) url += `categoria=${encodeURIComponent(categoria)}`;
 
+        console.log(`📡 [DEBUG] Chamando API: ${url}`);
+
         const res = await fetch(url);
+        
+        if (!res.ok) {
+            console.error(`❌ [DEBUG] Erro na API: ${res.status} - ${res.statusText}`);
+            return;
+        }
+
         const data = await res.json();
+        console.log(`📦 [DEBUG] API respondeu. Produtos encontrados: ${data.length}`);
+
         const track = document.getElementById("search-track");
         
         if(track) {
@@ -471,7 +514,7 @@ async function executarBusca(q, categoria) {
             });
         }
     } catch(e){
-        console.error("Erro busca:", e);
+        console.error("❌ [DEBUG] Erro fatal na busca:", e);
     }
 }
 

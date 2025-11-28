@@ -20,33 +20,51 @@ app.get('/produtos/:id', async (req, res) => { const p = await prisma.produto.fi
 // ... (resto do código)
 
 // =================================================================
-// 🔎 ROTA DE BUSCA (CORRIGIDA PARA SQLITE)
+// =================================================================
+// 🔎 ROTA DE BUSCA INTELIGENTE (Quebra palavras)
 // =================================================================
 app.get('/search', async (req, res) => {
     try {
         const { q, categoria } = req.query;
+        
+        // Começa o filtro vazio
         let whereClause = {};
+        let condicoesAnd = []; // Vamos empilhar as condições aqui
 
-        // 1. Filtro por Categoria (clique no card)
+        // 1. Filtro por Categoria (Se clicou no card)
         if (categoria) {
-            whereClause.categoria = { 
-                contains: categoria 
-            };
+            condicoesAnd.push({
+                categoria: { contains: categoria }
+            });
         }
 
-        // 2. Filtro por Texto (barra de pesquisa)
+        // 2. Filtro por Texto (Se digitou algo)
         if (q) {
-            whereClause.OR = [
-                { titulo: { contains: q } },
-                { referencia: { contains: q } },
-                { carros: { contains: q } },     
-                { pesquisa: { contains: q } },   
-                { fabricante: { contains: q } },
-                { categoria: { contains: q } }
-            ];
+            // A MÁGICA: Quebra o texto em palavras (termos)
+            const termos = q.trim().split(/\s+/); // Separa por espaço
+
+            // Para CADA palavra digitada, criamos uma regra:
+            // "Essa palavra precisa aparecer no Título OU Carros OU Referência..."
+            termos.forEach(termo => {
+                condicoesAnd.push({
+                    OR: [
+                        { titulo: { contains: termo } },
+                        { referencia: { contains: termo } },
+                        { carros: { contains: termo } },
+                        { pesquisa: { contains: termo } },
+                        { fabricante: { contains: termo } },
+                        { categoria: { contains: termo } }
+                    ]
+                });
+            });
         }
 
-        console.log("🔍 Buscando SQLite:", { q, categoria });
+        // Junta tudo no AND (E)
+        if (condicoesAnd.length > 0) {
+            whereClause.AND = condicoesAnd;
+        }
+
+        console.log("🔍 Buscando Inteligente:", JSON.stringify(whereClause, null, 2));
 
         const produtos = await prisma.produto.findMany({
             where: whereClause,
@@ -57,7 +75,7 @@ app.get('/search', async (req, res) => {
 
     } catch (error) {
         console.error("❌ Erro na busca:", error);
-        res.status(500).json({ erro: "Erro ao buscar produtos" }); 
+        res.json([]); 
     }
 });
 

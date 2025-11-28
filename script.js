@@ -524,3 +524,41 @@ async function buscarProdutosPromocao() {
         }
     } catch(e) {}
 }
+
+/* ==============================================================
+   🖼️ SLIDER / CARROSSEL DA HOME
+   ============================================================== */
+let slideIndex = 0;
+let slideInterval;
+
+function iniciarSlider() {
+    const slides = document.querySelectorAll('.slide');
+    if(slides.length > 0) {
+        mostrarSlide(slideIndex);
+        // Passar sozinho a cada 5 segundos
+        slideInterval = setInterval(() => mudarSlide(1), 5000);
+    }
+}
+
+function mudarSlide(n) {
+    slideIndex += n;
+    mostrarSlide(slideIndex);
+    // Reseta o timer se o usuário clicar manualmente
+    clearInterval(slideInterval);
+    slideInterval = setInterval(() => mudarSlide(1), 5000);
+}
+
+function mostrarSlide(n) {
+    const slides = document.querySelectorAll('.slide');
+    if (slides.length === 0) return;
+
+    if (n >= slides.length) slideIndex = 0;
+    if (n < 0) slideIndex = slides.length - 1;
+
+    slides.forEach(slide => slide.classList.remove('active'));
+    slides[slideIndex].classList.add('active');
+}
+
+// Expõe a função para o HTML poder usar no onclick="..."
+window.mudarSlide = mudarSlide;
+window.iniciarSlider = iniciarSlider;

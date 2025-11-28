@@ -443,32 +443,50 @@ async function executarBusca(q) {
     } catch(e){}
 }
 
-// BARRA DO PARCEIRO
+/* =======================================================
+   🦊 FUNÇÕES DO MODO PARCEIRO (AFILIADO LOGADO)
+   ======================================================= */
 function ativarModoParceiro(afiliado) {
-    const btn = document.getElementById('btn-login-header');
-    if(btn) {
-        btn.innerHTML = `<i class="ph ph-sign-out"></i> Sair`;
-        btn.href="#";
-        btn.onclick=(e)=>{
+    // 1. Muda o botão "Entrar" para "Sair" no cabeçalho
+    const btnLogin = document.getElementById('btn-login-header');
+    if (btnLogin) {
+        btnLogin.innerHTML = `<i class="ph ph-sign-out"></i><span>Sair (${afiliado.nome})</span>`;
+        btnLogin.href = "#";
+        btnLogin.style.color = "#e67e22"; 
+        btnLogin.onclick = (e) => {
             e.preventDefault();
-            if(confirm("Sair do modo parceiro?")){
+            if(confirm(`Olá ${afiliado.nome}, deseja sair do modo parceiro?`)) {
                 localStorage.removeItem('afiliadoLogado');
-                localStorage.removeItem('minhaMargem');
+                localStorage.removeItem('minhaMargem'); 
                 window.location.reload();
             }
         };
     }
-    const m = localStorage.getItem('minhaMargem')||0;
-    const b = document.createElement('div');
-    b.style.cssText = "position:fixed;top:0;left:0;width:100%;height:50px;background:#2c3e50;color:#fff;z-index:99999;display:flex;justify-content:center;align-items:center;gap:15px;";
-    b.innerHTML = `
+
+    // 2. Cria a BARRA DE COMANDO
+    const margemAtual = localStorage.getItem('minhaMargem') || 0;
+    
+    // Remove barra antiga se existir (pra não duplicar)
+    const barraAntiga = document.getElementById('barra-parceiro');
+    if (barraAntiga) barraAntiga.remove();
+
+    const barra = document.createElement('div');
+    barra.id = "barra-parceiro";
+    barra.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 50px;
+        background: #2c3e50; color: white; 
+        z-index: 999999; display: flex; justify-content: center; align-items: center; gap: 15px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3); font-family: sans-serif;
+    `;
+    
+    barra.innerHTML = `
         <div style="display:flex; align-items:center; gap:8px;">
             <span style="font-weight:bold; color:#f39c12;">🦊 ${afiliado.nome}</span>
         </div>
 
         <div style="height: 20px; width: 1px; background: #555;"></div>
 
-        <a href="afiliado_dashboard.html" style="text-decoration: none; color: white; background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 4px; font-size: 0.85rem; display: flex; align-items: center; gap: 5px; transition: 0.2s;">
+        <a href="afiliado_dashboard.html" style="text-decoration: none; color: white; background: rgba(255,255,255,0.15); padding: 5px 12px; border-radius: 4px; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.2);">
             <i class="ph ph-gauge"></i> Meu Painel
         </a>
 
@@ -485,14 +503,31 @@ function ativarModoParceiro(afiliado) {
             APLICAR
         </button>
     `;
-    document.body.prepend(b);
-    document.body.style.marginTop="50px";
-    document.getElementById('bap').onclick=()=>{
-        const v=parseFloat(document.getElementById('imargem').value);
-        localStorage.setItem('minhaMargem',v);
-        alert('Atualizado!');
-        window.location.reload();
-    };
+
+    document.body.prepend(barra); 
+    document.body.style.paddingTop = "50px"; 
+
+    // 3. Ação do Botão Aplicar
+    document.getElementById('btn-aplicar-margem').addEventListener('click', async () => {
+        const novaMargem = parseFloat(document.getElementById('input-margem').value);
+        if(isNaN(novaMargem) || novaMargem < 0) return alert("Valor inválido.");
+
+        localStorage.setItem('minhaMargem', novaMargem);
+        
+        // Tenta salvar no servidor
+        try {
+            if(afiliado.token) {
+                await fetch('/afiliado/config', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${afiliado.token}` },
+                    body: JSON.stringify({ novaMargem })
+                });
+            }
+        } catch(e) {}
+        
+        alert(`Comissão atualizada para ${novaMargem}%!`);
+        window.location.reload(); 
+    });
 }
 
 // --- Função para buscar a margem do afiliado pelo código (Para o Cliente) ---

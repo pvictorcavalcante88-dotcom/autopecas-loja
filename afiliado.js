@@ -278,7 +278,11 @@ function gerarPDF() {
     
     const finalY = doc.lastAutoTable.finalY + 20;
     
-    const dadosParaRestaurar = ITENS_ORCAMENTO.map(i => ({id: i.id, quantidade: i.qtd}));
+    const dadosParaRestaurar = ITENS_ORCAMENTO.map(i => ({
+        id: i.id, 
+        quantidade: i.qtd,
+        customMargin: i.margemIndividual // <--- O PULO DO GATO: Enviamos a margem no link!
+    }));
     const jsonRestore = encodeURIComponent(JSON.stringify(dadosParaRestaurar));
     
     const baseUrl = window.location.origin + '/checkout.html'; 

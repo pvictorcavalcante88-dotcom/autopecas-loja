@@ -370,14 +370,108 @@ async function buscarProdutoPorId(id) {
     } catch(e) {}
 }
 
+/* ==============================================================
+   🔎 PRODUTOS & BUSCA (ADAPTADO PARA O SEU HTML)
+   ============================================================== */
+
+// 1. Configura a Lupa e o Enter (Adaptado para #search-container)
 function setupGlobalSearch() {
-    const btn = document.getElementById('search-button');
-    const input = document.getElementById('search-input');
+    const btn = document.getElementById('search-button'); // Seu ID correto
+    const input = document.getElementById('search-input'); // Seu ID correto
+    
     if(btn && input) {
-        btn.onclick = () => { if(input.value) window.location.href=`busca.html?q=${input.value}`; };
+        // Clique na Lupa
+        btn.onclick = (e) => { 
+            e.preventDefault(); 
+            fazerPesquisa(input.value, ''); 
+        };
+
+        // Apertar Enter
         input.addEventListener('keypress', (e) => {
-            if(e.key === 'Enter' && input.value) window.location.href=`busca.html?q=${input.value}`; 
+            if(e.key === 'Enter') {
+                e.preventDefault();
+                fazerPesquisa(input.value, '');
+            }
         });
+    }
+
+    // Chama a função que "conserta" os links de categoria
+    setupCategoryLinks();
+}
+
+// 2. Intercepta os cliques nos cards de categoria do seu HTML
+function setupCategoryLinks() {
+    const linksCategoria = document.querySelectorAll('.category-card'); // Pega todos os cards
+    const input = document.getElementById('search-input');
+
+    linksCategoria.forEach(link => {
+        link.addEventListener('click', (e) => {
+            // Se tiver texto digitado, a gente PREVINE o link normal e faz a busca combinada
+            if(input && input.value.trim() !== '') {
+                e.preventDefault(); // Cancela o href="busca.html?categoria=..."
+                
+                // Pega a categoria do atributo data-categoria ou do texto do span
+                const categoria = link.dataset.categoria || link.querySelector('span').innerText;
+                
+                // Faz a busca combinada (Texto + Categoria)
+                fazerPesquisa(input.value, categoria);
+            }
+            // Se NÃO tiver texto, deixa o link funcionar normal (vai só pra categoria)
+        });
+    });
+}
+
+// 3. Função Central que redireciona
+function fazerPesquisa(texto, categoria) {
+    // Se não tiver nada digitado e nenhuma categoria, não faz nada
+    if(!texto && !categoria) return;
+
+    let url = `busca.html?`;
+    if(texto) url += `q=${encodeURIComponent(texto)}&`;
+    if(categoria) url += `categoria=${encodeURIComponent(categoria)}`;
+
+    window.location.href = url;
+}
+
+// 4. Executa a busca na página busca.html
+function setupSearchPage() {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get('q');           
+    const categoria = params.get('categoria'); 
+    
+    // Executa a busca se tiver qualquer parametro
+    if(q || categoria) executarBusca(q, categoria);
+}
+
+async function executarBusca(q, categoria) {
+    try {
+        let url = `${API_URL}/search?`;
+        if (q) url += `q=${encodeURIComponent(q)}&`;
+        if (categoria) url += `categoria=${encodeURIComponent(categoria)}`;
+
+        const res = await fetch(url);
+        const data = await res.json();
+        const track = document.getElementById("search-track");
+        
+        if(track) {
+            track.innerHTML = '';
+            
+            if (data.length === 0) {
+                track.innerHTML = '<p style="padding:20px; width:100%; text-align:center;">Nenhum produto encontrado.</p>';
+                return;
+            }
+
+            data.forEach(p => {
+                track.innerHTML += `
+                <a href="product.html?id=${p.id}" class="product-card">
+                    <div class="product-image"><img src="${p.image||p.imagem}" onerror="this.src='https://via.placeholder.com/150'"></div>
+                    <h3>${p.name||p.titulo}</h3>
+                    <p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p>
+                </a>`;
+            });
+        }
+    } catch(e){
+        console.error("Erro busca:", e);
     }
 }
 

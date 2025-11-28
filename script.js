@@ -461,9 +461,30 @@ function ativarModoParceiro(afiliado) {
     const m = localStorage.getItem('minhaMargem')||0;
     const b = document.createElement('div');
     b.style.cssText = "position:fixed;top:0;left:0;width:100%;height:50px;background:#2c3e50;color:#fff;z-index:99999;display:flex;justify-content:center;align-items:center;gap:15px;";
-    b.innerHTML = `<span>🦊 ${afiliado.nome}</span>
-    <input type="number" id="imargem" value="${m}" style="width:50px;text-align:center;"> %
-    <button id="bap" style="background:#27ae60;border:none;color:#fff;padding:5px 10px;cursor:pointer;">APLICAR</button>`;
+    b.innerHTML = `
+        <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-weight:bold; color:#f39c12;">🦊 ${afiliado.nome}</span>
+        </div>
+
+        <div style="height: 20px; width: 1px; background: #555;"></div>
+
+        <a href="afiliado_dashboard.html" style="text-decoration: none; color: white; background: rgba(255,255,255,0.1); padding: 5px 10px; border-radius: 4px; font-size: 0.85rem; display: flex; align-items: center; gap: 5px; transition: 0.2s;">
+            <i class="ph ph-gauge"></i> Meu Painel
+        </a>
+
+        <div style="height: 20px; width: 1px; background: #555;"></div>
+
+        <div style="display:flex; align-items:center; gap:5px; background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px;">
+            <label style="font-size: 0.85rem; color:#ddd;">Comissão:</label>
+            <input type="number" id="input-margem" value="${margemAtual}" min="0" max="100" 
+                style="width:50px; padding:4px; border-radius:4px; border:none; text-align:center; font-weight:bold; color:#2c3e50;">
+            <span style="font-weight:bold; font-size:0.9rem;">%</span>
+        </div>
+
+        <button id="btn-aplicar-margem" style="background:#27ae60; color:white; border:none; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight:bold; font-size: 0.8rem;">
+            APLICAR
+        </button>
+    `;
     document.body.prepend(b);
     document.body.style.marginTop="50px";
     document.getElementById('bap').onclick=()=>{

@@ -4,102 +4,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Afiliados - Admin</title>
-    <link rel="stylesheet" href="admin.css?v=2.0">
+    <link rel="stylesheet" href="admin.css"> 
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
-        /* Estilos Específicos da Tabela de Afiliados */
-        .table-container {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 600px;
-        }
-
-        th {
-            background: #f8f9fa;
-            color: #333;
-            font-weight: bold;
-            text-align: left;
-            padding: 15px;
-            border-bottom: 2px solid #eee;
-        }
-
-        td {
-            padding: 15px;
-            border-bottom: 1px solid #eee;
-            color: #555;
-            vertical-align: middle;
-        }
-
-        tr:hover { background: #fcfcfc; }
-
-        /* Badges de Status */
-        .status-badge {
-            padding: 5px 10px;
-            border-radius: 15px;
-            font-size: 0.8rem;
-            font-weight: bold;
-        }
+        /* CSS EXTRA SÓ PARA A TABELA (Não quebra o resto) */
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .table-container { overflow-x: auto; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { text-align: left; padding: 12px; border-bottom: 2px solid #eee; color: #444; }
+        td { padding: 12px; border-bottom: 1px solid #eee; color: #666; vertical-align: middle; }
+        
+        /* Badges e Botões */
+        .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; }
         .status-pending { background: #fff3cd; color: #856404; }
         .status-active { background: #d4edda; color: #155724; }
 
-        /* Botões de Ação */
-        .btn-action {
-            border: none;
-            padding: 8px 12px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 0.85rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            transition: 0.2s;
-        }
-
-        .btn-approve { background: #27ae60; color: white; }
-        .btn-approve:hover { background: #219150; }
-
-        .btn-pay { background: #3498db; color: white; }
-        .btn-pay:hover { background: #2980b9; }
-
-        .btn-disabled { background: #ccc; cursor: not-allowed; color: #666; }
-
-        /* Nome e Chave Pix */
-        .afiliado-info strong { display: block; color: #2c3e50; font-size: 1rem; }
-        .pix-key { font-size: 0.85rem; color: #7f8c8d; background: #eee; padding: 2px 5px; border-radius: 4px; }
+        .btn-action { border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; color: white; }
+        .btn-approve { background: #27ae60; }
+        .btn-pay { background: #3498db; }
+        
+        .pix-key { font-size: 0.8rem; background: #eee; padding: 2px 6px; border-radius: 4px; color: #555; }
     </style>
 </head>
 <body>
 
-    <div class="admin-layout">
+    <div class="admin-container">
         
-        <nav class="admin-sidebar">
-            <div class="logo">AutoPeças <span>Veloz</span></div>
-            <ul>
-                <li><a href="admin_dashboard.html"><i class="ph ph-gauge"></i> Dashboard</a></li>
-                <li><a href="admin_produtos.html"><i class="ph ph-package"></i> Produtos</a></li>
-                <li><a href="admin_pedidos.html"><i class="ph ph-shopping-cart-simple"></i> Pedidos</a></li>
-                <li class="active"><a href="admin_afiliados.html"><i class="ph ph-users"></i> Afiliados</a></li>
-            </ul>
-        </nav>
+        <aside class="sidebar">
+            <h3>Admin AutoPeças</h3>
+            <nav>
+                <a href="admin_dashboard.html"><i class="ph ph-gauge"></i> Dashboard</a>
+                <a href="admin_produtos.html"><i class="ph ph-package"></i> Produtos</a>
+                <a href="admin_pedidos.html"><i class="ph ph-shopping-cart-simple"></i> Pedidos</a>
+                <a href="admin_afiliados.html" class="active"><i class="ph ph-users"></i> Afiliados</a>
+                
+                <a href="#" onclick="logout()" style="margin-top: 20px; color: #e74c3c;">
+                    <i class="ph ph-sign-out"></i> Sair
+                </a>
+            </nav>
+        </aside>
 
-        <main class="admin-main">
-            <header class="admin-header">
-                <h2>Gestão de Parceiros</h2>
-                <div class="admin-user">
-                    <span>Admin</span>
-                    <button onclick="logout()">Sair <i class="ph ph-sign-out"></i></button>
-                </div>
+        <main class="main-content">
+            <header>
+                <h1>Gestão de Parceiros</h1>
+                <span>Admin Logado</span>
             </header>
 
-            <div class="admin-content">
+            <section class="card">
                 <div class="table-container">
                     <table>
                         <thead>
@@ -113,13 +65,12 @@
                             </tr>
                         </thead>
                         <tbody id="afiliados-list">
-                            <tr><td colspan="6" style="text-align:center; padding:20px;">Carregando...</td></tr>
+                            <tr><td colspan="6" style="text-align:center;">Carregando...</td></tr>
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </section>
         </main>
-
     </div>
 
     <script>
@@ -137,7 +88,7 @@
                 renderizarTabela(afiliados);
             } catch (error) {
                 console.error(error);
-                alert("Erro ao carregar afiliados.");
+                document.getElementById('afiliados-list').innerHTML = '<tr><td colspan="6">Erro ao carregar.</td></tr>';
             }
         }
 
@@ -146,97 +97,54 @@
             tbody.innerHTML = '';
 
             if(lista.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;">Nenhum afiliado cadastrado.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Nenhum afiliado.</td></tr>';
                 return;
             }
 
             lista.forEach(a => {
-                // Calcula total vendido somando os pedidos dele
                 const totalVendido = a.pedidos ? a.pedidos.reduce((acc, p) => acc + parseFloat(p.valorTotal), 0) : 0;
                 const saldo = parseFloat(a.saldo || 0);
                 
-                // Define Status
                 const statusHtml = a.aprovado 
                     ? `<span class="status-badge status-active">Ativo</span>`
                     : `<span class="status-badge status-pending">Pendente</span>`;
 
-                // Botão Aprovar (só aparece se não for aprovado)
-                let btnAprovar = '';
-                if (!a.aprovado) {
-                    btnAprovar = `<button onclick="aprovar(${a.id})" class="btn-action btn-approve"><i class="ph ph-check"></i> Aprovar</button>`;
-                }
-
-                // Botão Pagar (só aparece se tiver saldo > 0)
-                let btnPagar = '';
-                if (saldo > 0) {
-                    btnPagar = `<button onclick="pagar(${a.id}, '${a.nome}', ${saldo})" class="btn-action btn-pay"><i class="ph ph-money"></i> Pagar</button>`;
-                } else {
-                    btnPagar = `<span style="font-size:0.8rem; color:#aaa;">Sem saldo</span>`;
-                }
+                let btnAprovar = !a.aprovado ? `<button onclick="aprovar(${a.id})" class="btn-action btn-approve">Aprovar</button>` : '';
+                let btnPagar = saldo > 0 ? `<button onclick="pagar(${a.id}, '${a.nome}', ${saldo})" class="btn-action btn-pay">Pagar</button>` : '<span style="color:#aaa; font-size:0.8rem">Sem saldo</span>';
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>
-                        <div class="afiliado-info">
-                            <strong>${a.nome}</strong>
-                            <span style="font-size:0.85rem; color:#666;">${a.telefone}</span><br>
-                            <span class="pix-key">Pix: ${a.chavePix || 'Não inf.'}</span>
-                        </div>
+                        <strong>${a.nome}</strong><br>
+                        <span style="font-size:0.85rem; color:#666;">${a.telefone}</span><br>
+                        <span class="pix-key">Pix: ${a.chavePix || '-'}</span>
                     </td>
                     <td><strong>${a.codigo}</strong></td>
                     <td>${statusHtml}</td>
                     <td>${totalVendido.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</td>
                     <td><strong style="color:${saldo>0?'#e67e22':'#666'}">${saldo.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</strong></td>
-                    <td>
-                        <div style="display:flex; gap:10px; align-items:center;">
-                            ${btnAprovar}
-                            ${btnPagar}
-                        </div>
-                    </td>
+                    <td><div style="display:flex; gap:5px;">${btnAprovar} ${btnPagar}</div></td>
                 `;
                 tbody.appendChild(tr);
             });
         }
 
         async function aprovar(id) {
-            if(!confirm("Deseja aprovar este parceiro? Ele poderá acessar o sistema.")) return;
-            
+            if(!confirm("Aprovar parceiro?")) return;
             const token = localStorage.getItem('adminToken');
-            try {
-                const res = await fetch(`${API_URL}/admin/afiliados/${id}/aprovar`, {
-                    method: 'PUT',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if(res.ok) {
-                    alert("Aprovado com sucesso!");
-                    carregarAfiliados();
-                } else alert("Erro ao aprovar.");
-            } catch(e) { alert("Erro de conexão."); }
+            await fetch(`${API_URL}/admin/afiliados/${id}/aprovar`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } });
+            carregarAfiliados();
         }
 
         async function pagar(id, nome, valor) {
-            const valorFmt = valor.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
-            if(!confirm(`Confirma que realizou o pagamento de ${valorFmt} para ${nome} via Pix?\n\nIsso irá zerar o saldo dele no sistema.`)) return;
-
+            if(!confirm(`Confirmar pagamento de R$ ${valor} para ${nome}?`)) return;
             const token = localStorage.getItem('adminToken');
-            try {
-                const res = await fetch(`${API_URL}/admin/afiliados/${id}/pagar`, {
-                    method: 'PUT',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if(res.ok) {
-                    alert("Saldo zerado com sucesso!");
-                    carregarAfiliados();
-                } else alert("Erro ao registrar pagamento.");
-            } catch(e) { alert("Erro de conexão."); }
+            await fetch(`${API_URL}/admin/afiliados/${id}/pagar`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } });
+            carregarAfiliados();
         }
 
-        function logout() {
-            localStorage.removeItem('adminToken');
-            window.location.href = 'admin_login.html';
-        }
-
-        // Inicia
+        function logout() { localStorage.removeItem('adminToken'); window.location.href = 'admin_login.html'; }
+        
         carregarAfiliados();
     </script>
 </body>

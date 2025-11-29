@@ -3,157 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel Afiliado</title>
+    <title>Painel do Parceiro | AutoPeças Veloz</title>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-
+    <link rel="stylesheet" href="style.css">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7fa; margin: 0; color: #333; }
+        /* Estilos Específicos do Dashboard */
+        body { background-color: #f4f6f9; }
+        .dashboard-container { max-width: 1200px; margin: 40px auto; padding: 20px; }
+        .dashboard-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .dashboard-header h1 { color: #2c3e50; font-size: 1.8rem; }
         
-        .header { background: #005fb9; color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .container { max-width: 800px; margin: 30px auto; padding: 20px; }
-        .card { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #eee; }
+        /* Cards */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 40px; }
+        .stat-card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
+        .stat-card h3 { font-size: 0.9rem; color: #7f8c8d; margin-bottom: 10px; font-weight: 600; text-transform: uppercase; }
+        .stat-card .value { font-size: 1.8rem; font-weight: bold; color: #2c3e50; }
+        .stat-card .icon { font-size: 2rem; color: #3498db; margin-bottom: 15px; }
 
-        .saldo-box { text-align: center; padding: 30px; background: linear-gradient(135deg, #27ae60, #2ecc71); color: white; border-radius: 10px; border: none; }
-        .saldo-valor { font-size: 3rem; font-weight: bold; margin: 10px 0; }
-
-        .link-box { background: #f8f9fa; padding: 15px; border: 1px dashed #ccc; border-radius: 5px; display: flex; align-items: center; gap: 10px; margin-top: 10px; }
-        .link-box input { flex: 1; border: none; background: transparent; font-size: 1.1rem; color: #555; outline: none; }
+        /* Tabelas */
+        .section-title { font-size: 1.2rem; color: #2c3e50; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .table-box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
+        th { color: #7f8c8d; font-weight: 600; font-size: 0.9rem; }
+        tr:last-child td { border-bottom: none; }
         
-        .btn-copy { background: #005fb9; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
-        .btn-copy:hover { background: #004a94; }
-        .btn-danger { background: #c0392b; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+        .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; background: #e8f5e9; color: #27ae60; }
 
-        .margem-input { width: 80px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 1.1rem; text-align: center; }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
-        th { color: #666; font-size: 0.9rem; }
-        
-        .btn-logout { background: rgba(255,255,255,0.2); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; text-decoration: none; }
+        /* Botões */
+        .btn-action { text-decoration: none; padding: 8px 15px; border-radius: 6px; font-size: 0.9rem; font-weight: bold; transition: 0.2s; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+        .btn-blue { background: #3498db; color: white; }
+        .btn-red { background: #e74c3c; color: white; }
+        .btn-orange { background: #f39c12; color: white; }
 
-        /* Estilos do Orçamento */
-        .orcamento-search { position: relative; margin-bottom: 15px; }
-        .orcamento-search input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 5px; }
-        .search-results { position: absolute; top: 100%; left: 0; width: 100%; background: white; border: 1px solid #ddd; max-height: 200px; overflow-y: auto; z-index: 10; display: none; }
-        .search-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
-        .search-item:hover { background: #f0f0f0; }
-        .orcamento-footer { margin-top: 20px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 15px; }
+        /* Input Copy */
+        .link-box { display: flex; gap: 10px; margin-top: 10px; }
+        .link-box input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px; background: #f9f9f9; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div style="display: flex; align-items: center; gap: 15px;">
-            <h3>👋 Olá, <span id="afiliado-nome">Afiliado</span></h3>
-            
-            <a href="index.html" style="background: rgba(255,255,255,0.2); color: white; text-decoration: none; padding: 8px 12px; border-radius: 5px; font-size: 0.9rem; display: flex; align-items: center; gap: 5px;">
-                <i class="ph ph-storefront"></i> Ir para Loja
-            </a>
-        </div>
 
-        <a href="#" id="logout-btn" class="btn-logout">Sair</a>
-    </div>
-
-    <div class="container">
-
-<div style="display:flex; gap:10px; margin-bottom:10px;">
-    <input type="text" id="filtro-cliente" placeholder="Filtrar por Cliente..." onkeyup="filtrarVendas()" style="padding:8px; border:1px solid #ddd; border-radius:5px;">
-    <input type="date" id="filtro-data" onchange="filtrarVendas()" style="padding:8px; border:1px solid #ddd; border-radius:5px;">
-</div>
-
-        
-        <div class="card">
-            <h3>📈 Sua Margem de Lucro</h3>
-            <p style="color: #666; margin-bottom: 15px;">Defina quanto você quer ganhar em cima do preço da loja. (Máx: 30%)</p>
-            <div style="display:flex; gap:10px; align-items:center;">
-                <input type="number" id="afiliado-margem" class="margem-input" min="0" max="30" step="0.5" placeholder="0">
-                <span style="font-weight:bold; font-size: 1.2rem;">%</span>
-                <button onclick="salvarMargem()" class="btn-copy" style="background: #ff6b00;">Salvar</button>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div>
+                <h1>Olá, <span id="afiliado-nome">Parceiro</span>! 🦊</h1>
+                <p>Bem-vindo ao seu painel de controle.</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <a href="index.html" class="btn-action btn-blue"><i class="ph ph-storefront"></i> Ir para Loja</a>
+                <button id="logout-btn" class="btn-action btn-red"><i class="ph ph-sign-out"></i> Sair</button>
             </div>
         </div>
 
-        <section class="dashboard-section" style="margin-top: 30px;">
-            <h3>📁 Meus Orçamentos Salvos</h3>
-            <div class="table-container">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <i class="ph ph-wallet icon" style="color: #27ae60;"></i>
+                <h3>Saldo Disponível</h3>
+                <div class="value" id="afiliado-saldo">R$ 0,00</div>
+            </div>
+            <div class="stat-card">
+                <i class="ph ph-tag icon" style="color: #e67e22;"></i>
+                <h3>Margem Padrão</h3>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="number" id="afiliado-margem" value="0" style="width: 60px; padding: 5px; font-size: 1.1rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <button onclick="salvarMargem()" class="btn-action btn-blue" style="padding: 5px 10px;">OK</button>
+                </div>
+            </div>
+            <div class="stat-card">
+                <i class="ph ph-link icon" style="color: #8e44ad;"></i>
+                <h3>Seu Link de Indicação</h3>
+                <div class="link-box">
+                    <input type="text" id="afiliado-link" readonly>
+                    <button onclick="copiarLink()" class="btn-action btn-orange"><i class="ph ph-copy"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 40px;">
+            <div class="section-title">
+                <span><i class="ph ph-folder-open"></i> Meus Orçamentos Salvos</span>
+                <small>Orçamentos criados via Loja</small>
+            </div>
+            <div class="table-box">
                 <table>
                     <thead>
                         <tr>
-                            <th>Nome / Cliente</th>
+                            <th>Nome do Orçamento</th>
                             <th>Data</th>
-                            <th>Total</th>
+                            <th>Total Estimado</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
                     <tbody id="lista-orcamentos-salvos">
-                        <tr><td colspan="4">Carregando...</td></tr>
+                        <tr><td colspan="4" style="text-align:center;">Carregando...</td></tr>
                     </tbody>
                 </table>
             </div>
-        </section>
+        </div>
 
-        <div class="card">
-            <h3>📄 Criar Orçamento PDF</h3>
-            <p style="color:#666; margin-bottom: 15px;">Crie um orçamento personalizado para seu cliente com seus preços.</p>
-            
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <input type="text" id="cliente-nome" placeholder="Nome do Cliente" style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
+        <div>
+            <div class="section-title">
+                <span><i class="ph ph-chart-line-up"></i> Vendas Realizadas</span>
             </div>
-
-            <div class="orcamento-search">
-                <input type="text" id="search-orcamento" placeholder="Digite o nome da peça para adicionar..." autocomplete="off">
-                <div class="search-results" id="search-results"></div>
-            </div>
-
-            <table id="tabela-orcamento">
-                <thead>
-                    <tr>
-                        <th>Produto</th>
-                        <th>Qtd</th>
-                        <th>Margem %</th> <th>Preço Unit. (Seu)</th>
-                        <th>Total</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody id="lista-orcamento">
+            <div class="table-box">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Valor Venda</th>
+                            <th>Sua Comissão</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vendas-list">
+                        <tr><td colspan="3" style="text-align:center;">Carregando...</td></tr>
                     </tbody>
-            </table>
-
-            <div class="orcamento-footer">
-                <h3 style="margin:0;">Total: <span id="total-orcamento">R$ 0,00</span></h3>
-                <button onclick="gerarPDF()" class="btn-copy"><i class="ph ph-file-pdf"></i> Baixar PDF</button>
+                </table>
             </div>
-        </div>
-
-        <div class="card saldo-box">
-            <span>Comissões Disponíveis</span>
-            <div class="saldo-valor" id="afiliado-saldo">R$ 0,00</div>
-            <small>Pagamentos via PIX na chave: <span id="afiliado-pix">...</span></small>
-        </div>
-
-        <div class="card">
-            <h3>🔗 Seu Link de Vendas</h3>
-            <div class="link-box">
-                <i class="ph ph-link"></i>
-                <input type="text" id="afiliado-link" readonly value="Carregando...">
-                <button class="btn-copy" onclick="copiarLink()">Copiar</button>
-            </div>
-        </div>
-
-        <div class="card">
-            <h3>💰 Vendas Indicadas</h3>
-            <table>
-                <thead>
-                    <tr><th>Data</th><th>Valor Venda</th><th>Sua Comissão</th></tr>
-                </thead>
-                <tbody id="vendas-list">
-                    <tr><td colspan="3">Carregando...</td></tr>
-                </tbody>
-            </table>
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    
     <script src="afiliado.js"></script>
 </body>
 </html>

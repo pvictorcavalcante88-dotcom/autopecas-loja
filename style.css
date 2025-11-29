@@ -798,3 +798,64 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         margin-left: 5px;
     }
 }
+
+/* --- ESTILO DOS ÍCONES DE CATEGORIA --- */
+
+/* Grade responsiva */
+.categories .category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    gap: 15px;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+/* O Cartão (Link) */
+.categories .category-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-decoration: none; /* Tira o sublinhado do link */
+    gap: 10px;
+    transition: transform 0.2s ease;
+}
+
+.categories .category-card:hover {
+    transform: translateY(-5px); /* Efeito de pulinho */
+}
+
+/* A caixinha colorida atrás do ícone */
+.categories .category-card .icon-box {
+    width: 65px;
+    height: 65px;
+    background-color: #fff4e6; /* Fundo laranja bem claro */
+    border-radius: 20px;       /* Bordas arredondadas */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+/* O Ícone em si */
+.categories .category-card .icon-box i {
+    font-size: 32px;
+    color: #e67e22; /* Cor laranja principal */
+}
+
+/* Efeito ao passar o mouse (fica laranja forte) */
+.categories .category-card:hover .icon-box {
+    background-color: #e67e22;
+    box-shadow: 0 5px 15px rgba(230, 126, 34, 0.4);
+}
+
+.categories .category-card:hover .icon-box i {
+    color: white; /* Ícone fica branco */
+}
+
+/* Texto da categoria */
+.categories .category-card span {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #333;
+}

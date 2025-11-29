@@ -1,50 +1,84 @@
-// ... (IMPORTAÇÕES E CONFIGURAÇÕES IGUAIS AO ANTERIOR) ...
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const cors = require('cors');
+const { PrismaClient } = require('@prisma/client');
 const jwt = require('jsonwebtoken');
-const path = require('path');
 
 const prisma = new PrismaClient();
 const app = express();
-const PORT = process.env.PORT || 21109;
-const JWT_SECRET = 'seu_segredo_jwt_super_secreto';
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname)); 
 
-// ... (ROTAS DE PRODUTOS MANTIDAS IGUAIS) ...
-app.get('/produtos', async (req, res) => { const p = await prisma.produto.findMany({ orderBy: { createdAt: 'desc' } }); res.json(p); });
-app.get('/produtos/:id', async (req, res) => { const p = await prisma.produto.findUnique({ where: { id: parseInt(req.params.id) } }); if(!p) return res.status(404).json({erro:"Não encontrado"}); res.json(p); });
-// ... (resto do código)
+const SECRET_KEY = "SEGREDO_SUPER_SECRETO"; // Em produção, use variável de ambiente
 
 // =================================================================
+// 🛡️ MIDDLEWARE DE SEGURANÇA (A função que faltava!)
+// =================================================================
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Formato: "Bearer TOKEN"
+
+    if (!token) return res.sendStatus(401); // Sem token
+
+    jwt.verify(token, SECRET_KEY, (err, user) => {
+        if (err) return res.sendStatus(403); // Token inválido
+        req.user = user; // Salva os dados do usuário na requisição
+        next();
+    });
+}
+
+// =================================================================
+// 🔑 ROTAS DE LOGIN (ADMIN E AFILIADO)
+// =================================================================
+
+// Login Admin
+app.post('/login', async (req, res) => {
+    const { email, senha } = req.body;
+    if (email === "admin@autopecas.com" && senha === "admin123") {
+        const token = jwt.sign({ role: 'admin' }, SECRET_KEY, { expiresIn: '12h' });
+        return res.json({ token });
+    }
+    res.status(401).json({ erro: "Credenciais inválidas" });
+});
+
+// Login Afiliado
+app.post('/afiliado/login', async (req, res) => {
+    const { telefone, senha } = req.body;
+    try {
+        const afiliado = await prisma.afiliado.findUnique({ where: { telefone } });
+        if (!afiliado) return res.status(404).json({ erro: "Afiliado não encontrado" });
+        
+        if (afiliado.senha !== senha) return res.status(401).json({ erro: "Senha incorreta" });
+        if (!afiliado.aprovado) return res.status(403).json({ erro: "Cadastro pendente de aprovação" });
+
+        const token = jwt.sign({ id: afiliado.id, role: 'afiliado' }, SECRET_KEY, { expiresIn: '30d' });
+        
+        res.json({ 
+            token, 
+            nome: afiliado.nome, 
+            codigo: afiliado.codigo,
+            margem: afiliado.margem 
+        });
+    } catch (error) {
+        res.status(500).json({ erro: "Erro no servidor" });
+    }
+});
+
 // =================================================================
 // 🔎 ROTA DE BUSCA INTELIGENTE (Quebra palavras)
 // =================================================================
 app.get('/search', async (req, res) => {
     try {
         const { q, categoria } = req.query;
-        
-        // Começa o filtro vazio
         let whereClause = {};
-        let condicoesAnd = []; // Vamos empilhar as condições aqui
+        let condicoesAnd = [];
 
-        // 1. Filtro por Categoria (Se clicou no card)
         if (categoria) {
-            condicoesAnd.push({
-                categoria: { contains: categoria }
-            });
+            condicoesAnd.push({ categoria: { contains: categoria } });
         }
 
-        // 2. Filtro por Texto (Se digitou algo)
         if (q) {
-            // A MÁGICA: Quebra o texto em palavras (termos)
-            const termos = q.trim().split(/\s+/); // Separa por espaço
-
-            // Para CADA palavra digitada, criamos uma regra:
-            // "Essa palavra precisa aparecer no Título OU Carros OU Referência..."
+            const termos = q.trim().split(/\s+/);
             termos.forEach(termo => {
                 condicoesAnd.push({
                     OR: [
@@ -59,12 +93,11 @@ app.get('/search', async (req, res) => {
             });
         }
 
-        // Junta tudo no AND (E)
         if (condicoesAnd.length > 0) {
             whereClause.AND = condicoesAnd;
         }
 
-        console.log("🔍 Buscando Inteligente:", JSON.stringify(whereClause, null, 2));
+        console.log("🔍 Buscando:", JSON.stringify(whereClause));
 
         const produtos = await prisma.produto.findMany({
             where: whereClause,
@@ -79,301 +112,20 @@ app.get('/search', async (req, res) => {
     }
 });
 
-// 1. Rota de Checagem de Margem (Mais segura)
-app.get('/afiliado/check/:codigo', async (req, res) => {
-    const { codigo } = req.params;
-    try {
-        const afiliado = await prisma.afiliado.findUnique({ where: { codigo } });
-        // Se não achar ou não tiver margem, devolve 0
-        const margemSegura = (afiliado && afiliado.aprovado && afiliado.margem) ? parseFloat(afiliado.margem) : 0;
-        
-        res.json({ margem: margemSegura, nome: afiliado ? afiliado.nome : '' });
-    } catch (e) { res.status(500).json({ margem: 0 }); }
-});
-
-// 2. Rota de Finalizar Pedido (Mais robusta)
-app.post('/finalizar-pedido', async (req, res) => {
-    const { cliente, itens, afiliadoCodigo } = req.body; 
-
-    if (!itens || itens.length === 0) {
-        return res.status(400).json({ erro: "O carrinho está vazio!" });
-    }
-
-    try {
-        const resultado = await prisma.$transaction(async (tx) => {
-            let afiliado = null;
-            let margemAplicada = 0;
-
-            if (afiliadoCodigo) {
-                afiliado = await tx.afiliado.findUnique({ where: { codigo: afiliadoCodigo } });
-                if (afiliado && afiliado.aprovado) {
-                    // Garante que é número. Se for null, vira 0.
-                    margemAplicada = afiliado.margem ? parseFloat(afiliado.margem) : 0; 
-                }
-            }
-
-            let totalPedidoReal = 0;
-            let totalComissao = 0;
-
-            for (const item of itens) {
-                const prod = await tx.produto.findUnique({ where: { id: item.id } });
-                if (!prod) throw new Error(`Produto (ID ${item.id}) não encontrado no banco.`);
-                if (prod.estoque < item.quantidade) throw new Error(`Estoque insuficiente para: ${prod.titulo}`);
-                
-                await tx.produto.update({ where: { id: item.id }, data: { estoque: { decrement: item.quantidade } } });
-
-                // Cálculo Protegido
-                const precoBase = parseFloat(prod.preco_novo);
-                const valorExtra = precoBase * (margemAplicada / 100); 
-                const precoFinalItem = precoBase + valorExtra; 
-                
-                totalPedidoReal += precoFinalItem * item.quantidade;
-                totalComissao += valorExtra * item.quantidade;
-            }
-
-            if (afiliado && totalComissao > 0) {
-                await tx.afiliado.update({
-                    where: { id: afiliado.id },
-                    data: { saldo: { increment: totalComissao } }
-                });
-            }
-
-            const novoPedido = await tx.pedido.create({
-                data: {
-                    clienteNome: cliente.nome,
-                    clienteEmail: cliente.email,
-                    clienteEndereco: cliente.endereco,
-                    valorTotal: totalPedidoReal, 
-                    itens: JSON.stringify(itens),
-                    afiliadoId: afiliado ? afiliado.id : null,
-                    comissaoGerada: totalComissao
-                }
-            });
-            return novoPedido;
-        });
-        res.status(201).json(resultado);
-    } catch (e) { 
-        console.error("Erro no Pedido:", e); // Mostra o erro real no terminal
-        res.status(400).json({ erro: e.message }); 
-    }
-});
-
-// ... (ROTAS DE CADASTRO/LOGIN MANTIDAS) ...
-app.post('/afiliado/register', async (req, res) => {
-    const { nome, telefone, senha, codigo, chavePix } = req.body;
-    try {
-        const existe = await prisma.afiliado.findFirst({ where: { OR: [{ telefone }, { codigo }] } });
-        if (existe) return res.status(400).json({ erro: "Dados já em uso." });
-        await prisma.afiliado.create({ data: { nome, telefone, senha, codigo, chavePix } });
-        res.status(201).json({ msg: "Aguarde aprovação." });
-    } catch (e) { res.status(500).json({ erro: "Erro server" }); }
-});
-// ATUALIZE ESTA ROTA NO SEU SERVER.JS
-app.post('/afiliado/login', async (req, res) => {
-    const { telefone, senha } = req.body;
-    try {
-        const afiliado = await prisma.afiliado.findUnique({ where: { telefone } });
-        
-        if (!afiliado || afiliado.senha !== senha) return res.status(401).json({ erro: "Telefone ou senha incorretos." });
-        if (!afiliado.aprovado) return res.status(403).json({ erro: "Sua conta ainda está em análise." });
-
-        const token = jwt.sign({ id: afiliado.id, role: 'afiliado' }, JWT_SECRET, { expiresIn: '30d' });
-
-        // RESPOSTA ATUALIZADA (Devolve a margem para o site usar)
-        res.json({ 
-            token, 
-            nome: afiliado.nome, 
-            codigo: afiliado.codigo,
-            margemPadrao: afiliado.margem // <--- IMPORTANTE
-        });
-
-    } catch (e) { 
-        res.status(500).json({ erro: "Erro interno do servidor" }); 
-    }
-});
-
-// ===== NOVA ROTA: AFILIADO ATUALIZA MARGEM =====
-app.put('/afiliado/config', async (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ erro: "Token ausente" });
-    const token = authHeader.split(' ')[1];
-
-    try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        const { novaMargem } = req.body;
-        const margem = parseFloat(novaMargem);
-
-        // Validação: Máximo 30%
-        if (margem < 0 || margem > 30) return res.status(400).json({ erro: "A margem deve ser entre 0% e 30%." });
-
-        await prisma.afiliado.update({
-            where: { id: decoded.id },
-            data: { margem: margem }
-        });
-
-        res.json({ msg: "Margem atualizada!" });
-    } catch (e) { res.status(400).json({ erro: "Erro ao atualizar" }); }
-});
-
-// ... (RESTO DAS ROTAS ADMIN E DASHBOARD MANTIDAS) ...
-// (Copie as rotas de admin/stats, admin/afiliados, etc do passo anterior aqui, elas não mudam a lógica, só o cálculo já foi feito no checkout)
-app.get('/afiliado/dashboard', async (req, res) => {
-    const authHeader = req.headers.authorization; if(!authHeader)return res.status(401).json({erro:"Token"});
-    try{const d=jwt.verify(authHeader.split(' ')[1], JWT_SECRET); if(d.role!=='afiliado')throw new Error();
-    const a=await prisma.afiliado.findUnique({where:{id:d.id},include:{pedidos:{orderBy:{createdAt:'desc'}}}}); res.json(a);}catch(e){res.status(401).json({erro:"Token"});}
-});
-function authMiddleware(req, res, next) { const authHeader = req.headers.authorization; if(!authHeader)return res.status(401).json({erro:"Token"}); try{req.admin=jwt.verify(authHeader.split(' ')[1], JWT_SECRET);next();}catch(e){res.status(401).json({erro:"Token"});} }
-app.post('/admin/login', async (req, res) => { const {email,senha}=req.body; try{const a=await prisma.admin.findUnique({where:{email}}); if(!a||a.senha!==senha)return res.status(401).json({erro:"Erro"}); res.json({token:jwt.sign({id:a.id,email:a.email},JWT_SECRET,{expiresIn:'8h'})});}catch(e){res.status(500).json({erro:"Erro"});} });
-app.get('/admin/afiliados', authMiddleware, async (req, res) => { try{const a=await prisma.afiliado.findMany({orderBy:{createdAt:'desc'},include:{pedidos:true}}); res.json(a);}catch(e){res.status(500).json({erro:"Erro"});} });
-app.put('/admin/afiliados/:id/aprovar', authMiddleware, async (req, res) => { try{await prisma.afiliado.update({where:{id:parseInt(req.params.id)},data:{aprovado:true}}); res.json({msg:"Aprovado"});}catch(e){res.status(500).json({erro:"Erro"});} });
-app.put('/admin/afiliados/:id/pagar', authMiddleware, async (req, res) => { try{await prisma.afiliado.update({where:{id:parseInt(req.params.id)},data:{saldo:0}}); res.json({msg:"Zerado"});}catch(e){res.status(500).json({erro:"Erro"});} });
-app.get('/admin/stats', authMiddleware, async (req, res) => { try{const v=await prisma.pedido.aggregate({_sum:{valorTotal:true}}); const tp=await prisma.pedido.count(); const tpr=await prisma.produto.count(); const eb=await prisma.produto.count({where:{estoque:{lt:5}}}); const up=await prisma.pedido.findMany({take:5,orderBy:{createdAt:'desc'}}); res.json({totalVendas:v._sum.valorTotal||0,totalPedidos:tp,totalProdutos:tpr,estoqueBaixo:eb,ultimosPedidos:up});}catch(e){res.status(500).json({erro:"Erro"});} });
-// ATUALIZE ESTA ROTA (Para incluir dados do afiliado)
-app.get('/admin/pedidos', authMiddleware, async (req, res) => {
-    try {
-        const pedidos = await prisma.pedido.findMany({
-            orderBy: { createdAt: 'desc' }, // Mais recentes primeiro
-            include: { 
-                afiliado: { // <--- Traz os dados do parceiro junto
-                    select: { nome: true, codigo: true } 
-                } 
-            }
-        });
-        res.json(pedidos);
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ erro: "Erro ao buscar pedidos" });
-    }
-});
-app.get('/admin/produtos', authMiddleware, async (req, res) => { const p=await prisma.produto.findMany({orderBy:{createdAt:'desc'}}); res.json(p); });
-app.post('/admin/produtos', authMiddleware, async(req,res)=>{ try{const n=await prisma.produto.create({data:{...req.body, preco_novo:parseFloat(req.body.preco_novo), estoque:parseInt(req.body.estoque)}}); res.status(201).json(n);}catch(e){res.status(500).json({erro:"Erro"});} });
-app.put('/admin/produtos/:id', authMiddleware, async(req,res)=>{ try{const a=await prisma.produto.update({where:{id:parseInt(req.params.id)}, data:{...req.body, preco_novo:parseFloat(req.body.preco_novo), estoque:parseInt(req.body.estoque)}}); res.json(a);}catch(e){res.status(500).json({erro:"Erro"});} });
-app.delete('/admin/produtos/:id', authMiddleware, async(req,res)=>{ try{await prisma.produto.delete({where:{id:parseInt(req.params.id)}}); res.status(204).send();}catch(e){res.status(500).json({erro:"Erro"});} });
-// =======================================================
-// CORREÇÃO: ROTA DE BUSCAR 1 PRODUTO (USADA NO EDITAR)
-// =======================================================
-app.get('/admin/produtos/:id', authMiddleware, async (req, res) => {
-    try {
-        const id = parseInt(req.params.id);
-        const produto = await prisma.produto.findUnique({ where: { id: id } });
-        
-        if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
-        
-        res.json(produto);
-    } catch (error) {
-        console.error("Erro ao buscar produto:", error);
-        res.status(500).json({ erro: "Erro interno" });
-    }
-});
-// =======================================================
-
-app.get('/admin/stats', authMiddleware, async (req, res) => {
-    try {
-        // Total Vendas
-        const vendas = await prisma.pedido.aggregate({ _sum: { valorTotal: true } });
-        // Contagens
-        const totalPedidos = await prisma.pedido.count();
-        const totalProdutos = await prisma.produto.count();
-        const estoqueBaixo = await prisma.produto.count({ where: { estoque: { lt: 5 } } });
-        // Últimos Pedidos
-        const ultimos = await prisma.pedido.findMany({ take: 5, orderBy: { createdAt: 'desc' } });
-
-        res.json({
-            totalVendas: vendas._sum.valorTotal || 0,
-            totalPedidos: totalPedidos,
-            totalProdutos: totalProdutos,
-            estoqueBaixo: estoqueBaixo,
-            ultimosPedidos: ultimos
-        });
-    } catch (e) {
-        console.error("Erro Stats:", e);
-        res.status(500).json({ erro: "Erro stats" });
-    }
-});
-
-
-/* =======================================================
-   🛒 ROTAS PÚBLICAS (CORRIGIDAS PARA SEU SCHEMA)
-   ======================================================= */
-
-// 1. Rota para listar TODOS os produtos
-// ROTA PARA CRIAR PRODUTO (ATUALIZADA)
-app.post('/products', async (req, res) => {
-    try {
-        // 1. Recebe TODOS os campos do formulário
-        const { 
-            titulo, preco_novo, estoque, imagem, categoria, 
-            referencia, fabricante, carros, ano, motor, desconto 
-        } = req.body;
-
-        // 2. Cria no Banco de Dados usando o modelo 'Produto'
-        const novoProduto = await prisma.produto.create({
-            data: {
-                titulo: titulo,
-                preco_novo: parseFloat(preco_novo), // Garante que é número
-                estoque: parseInt(estoque) || 0,    // Garante que é inteiro
-                imagem: imagem,
-                categoria: categoria,
-                referencia: referencia,
-                fabricante: fabricante,
-                carros: carros,
-                ano: ano,
-                motor: motor,
-                desconto: desconto
-                // Outros campos opcionais podem ficar null
-            }
-        });
-
-        res.json(novoProduto);
-    } catch (error) {
-        console.error("Erro ao criar produto:", error);
-        res.status(500).json({ error: "Erro ao criar produto" });
-    }
-});
-
-// 2. Rota para buscar UM produto pelo ID
-app.get('/products/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        const p = await prisma.produto.findUnique({
-            where: { id: parseInt(id) }
-        });
-
-        if (p) {
-            // Traduzindo um único produto
-            const product = {
-                id: p.id,
-                name: p.titulo,
-                price: p.preco_novo,
-                image: p.imagem,
-                description: p.referencia || '',
-                quantity: p.estoque
-            };
-            res.json(product);
-        } else {
-            res.status(404).json({ error: 'Produto não encontrado' });
-        }
-    } catch (error) {
-        console.error("Erro ao buscar produto:", error);
-        res.status(500).json({ error: 'Erro ao buscar detalhes' });
-    }
-});
-/* ======================================================= */
-
 // =================================================================
 // 📂 ROTAS DE ORÇAMENTOS (SALVAR E LISTAR)
 // =================================================================
 
-// 1. Salvar um novo orçamento
+// 1. Salvar um novo orçamento (Usa o authenticateToken)
 app.post('/orcamentos', authenticateToken, async (req, res) => {
     try {
         const { nome, itens, total } = req.body;
-        const afiliadoId = req.user.id; // Pega do token
+        const afiliadoId = req.user.id; // Pega do token decodificado
 
         const novo = await prisma.orcamento.create({
             data: {
                 nome,
-                itens: JSON.stringify(itens), // Converte array pra texto
+                itens: JSON.stringify(itens),
                 total: parseFloat(total),
                 afiliadoId
             }
@@ -392,7 +144,7 @@ app.get('/afiliado/orcamentos', authenticateToken, async (req, res) => {
         const afiliadoId = req.user.id;
         const orcamentos = await prisma.orcamento.findMany({
             where: { afiliadoId },
-            orderBy: { createdAt: 'desc' } // Mais recentes primeiro
+            orderBy: { createdAt: 'desc' }
         });
         res.json(orcamentos);
     } catch (e) {
@@ -400,13 +152,12 @@ app.get('/afiliado/orcamentos', authenticateToken, async (req, res) => {
     }
 });
 
-// 3. Excluir orçamento (Opcional, mas útil)
+// 3. Excluir orçamento
 app.delete('/orcamentos/:id', authenticateToken, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         const afiliadoId = req.user.id;
         
-        // Só deleta se pertencer ao afiliado
         await prisma.orcamento.deleteMany({
             where: { id, afiliadoId }
         });
@@ -417,4 +168,130 @@ app.delete('/orcamentos/:id', authenticateToken, async (req, res) => {
     }
 });
 
-app.listen(PORT, () => { console.log(`🚀 Servidor v5.0 (Markup) na porta ${PORT}`); });
+// =================================================================
+// 📦 ROTAS DE PRODUTOS (CRUD BÁSICO)
+// =================================================================
+app.get('/products/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const produto = await prisma.produto.findUnique({ where: { id: parseInt(id) } });
+        if (produto) res.json(produto);
+        else res.status(404).json({ error: "Produto não encontrado" });
+    } catch (e) { res.status(500).json({ error: "Erro" }); }
+});
+
+// Admin: Criar/Editar Produtos
+app.post('/admin/produtos', authenticateToken, async (req, res) => {
+    if(req.user.role !== 'admin') return res.sendStatus(403);
+    try {
+        const p = await prisma.produto.create({ data: req.body });
+        res.json(p);
+    } catch(e) { res.status(500).json({erro: e.message}); }
+});
+
+app.put('/admin/produtos/:id', authenticateToken, async (req, res) => {
+    if(req.user.role !== 'admin') return res.sendStatus(403);
+    try {
+        const { id } = req.params;
+        const p = await prisma.produto.update({ where: { id: parseInt(id) }, data: req.body });
+        res.json(p);
+    } catch(e) { res.status(500).json({erro: e.message}); }
+});
+
+app.delete('/admin/produtos/:id', authenticateToken, async (req, res) => {
+    if(req.user.role !== 'admin') return res.sendStatus(403);
+    try {
+        await prisma.produto.delete({ where: { id: parseInt(req.params.id) } });
+        res.json({success: true});
+    } catch(e) { res.status(500).json({erro: e.message}); }
+});
+
+// =================================================================
+// 🦊 ROTAS DE AFILIADO (DASHBOARD E CONFIG)
+// =================================================================
+app.put('/afiliado/config', authenticateToken, async (req, res) => {
+    try {
+        const { novaMargem } = req.body;
+        await prisma.afiliado.update({
+            where: { id: req.user.id },
+            data: { margem: parseFloat(novaMargem) }
+        });
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ erro: "Erro ao atualizar margem" }); }
+});
+
+app.get('/afiliado/check/:codigo', async (req, res) => {
+    try {
+        const afiliado = await prisma.afiliado.findUnique({ where: { codigo: req.params.codigo } });
+        if (afiliado) res.json({ margem: afiliado.margem });
+        else res.status(404).json({ erro: "Não encontrado" });
+    } catch(e) { res.status(500).json({ erro: "Erro" }); }
+});
+
+app.get('/afiliado/dashboard', authenticateToken, async (req, res) => {
+    try {
+        const afiliado = await prisma.afiliado.findUnique({
+            where: { id: req.user.id },
+            include: { pedidos: true }
+        });
+        res.json(afiliado);
+    } catch (e) { res.status(500).json({ erro: "Erro" }); }
+});
+
+// =================================================================
+// 🛒 FINALIZAR PEDIDO
+// =================================================================
+app.post('/finalizar-pedido', async (req, res) => {
+    try {
+        const { cliente, itens, afiliadoCodigo } = req.body;
+        let valorTotal = 0;
+        let itensTexto = "";
+
+        // Calcula total (simplificado, ideal seria revalidar preços no banco)
+        itens.forEach(i => {
+            valorTotal += (i.unitario * i.qtd); // Usa o unitario que veio do front (com margem)
+            itensTexto += `${i.qtd}x ${i.nome} (R$ ${i.unitario.toFixed(2)}) | `;
+        });
+
+        let dadosPedido = {
+            clienteNome: cliente.nome,
+            clienteEmail: cliente.email,
+            clienteEndereco: cliente.endereco,
+            valorTotal: valorTotal,
+            itens: itensTexto
+        };
+
+        // Se tiver afiliado, vincula e calcula comissão
+        if (afiliadoCodigo) {
+            const afiliado = await prisma.afiliado.findUnique({ where: { codigo: afiliadoCodigo } });
+            if (afiliado) {
+                dadosPedido.afiliadoId = afiliado.id;
+                // Exemplo simples: 5% de comissão sobre o total vendido
+                dadosPedido.comissaoGerada = valorTotal * 0.05; 
+                
+                // Atualiza saldo do afiliado
+                await prisma.afiliado.update({
+                    where: { id: afiliado.id },
+                    data: { saldo: { increment: dadosPedido.comissaoGerada } }
+                });
+            }
+        }
+
+        const pedido = await prisma.pedido.create({ data: dadosPedido });
+        res.json(pedido);
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ erro: "Erro ao processar pedido" });
+    }
+});
+
+// Rota padrão para teste
+app.get('/', (req, res) => {
+    res.send('API AutoPeças Veloz Rodando 🚀');
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Servidor rodando na porta ${PORT}`);
+});

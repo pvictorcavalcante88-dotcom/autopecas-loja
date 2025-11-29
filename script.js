@@ -1,5 +1,5 @@
 /* ==============================================================
-   🚀 SCRIPT GERAL (CORREÇÃO: Vendas, Comissão e Orçamento)
+   🚀 SCRIPT GERAL (SALVAMENTO AUTOMÁTICO NO CHECKOUT)
    ============================================================== */
 
 const API_URL = ''; 
@@ -47,7 +47,6 @@ function adicionarAoCarrinho(id, qtd) {
 // ==============================================================
 document.addEventListener("DOMContentLoaded", async function() {
     
-    // 1. MODO PARCEIRO
     const afiliadoLogado = JSON.parse(localStorage.getItem('afiliadoLogado'));
     if (afiliadoLogado) {
         const margemSalva = parseFloat(localStorage.getItem('minhaMargem') || 0);
@@ -55,7 +54,6 @@ document.addEventListener("DOMContentLoaded", async function() {
         ativarModoParceiro(afiliadoLogado);
     } 
     else {
-        // 2. MODO CLIENTE (Link Indicação)
         const paramsURL = new URLSearchParams(window.location.search);
         const refCode = paramsURL.get('ref') || localStorage.getItem('afiliadoCodigo');
         if (refCode) {
@@ -64,7 +62,6 @@ document.addEventListener("DOMContentLoaded", async function() {
         }
     }
 
-    // 3. RESTAURAR CARRINHO
     const paramsURL = new URLSearchParams(window.location.search);
     const restoreData = paramsURL.get('restore'); 
     if (restoreData) {
@@ -76,7 +73,6 @@ document.addEventListener("DOMContentLoaded", async function() {
         } catch (e) { console.error("Erro link:", e); }
     }
 
-    // 4. ROTEAMENTO
     atualizarIconeCarrinho();
     const path = window.location.pathname;
 
@@ -91,7 +87,7 @@ document.addEventListener("DOMContentLoaded", async function() {
 });
 
 // ==============================================================
-// 🛒 CARRINHO INTELIGENTE
+// 🛒 CARRINHO
 // ==============================================================
 async function carregarPaginaCarrinho() {
     const cartItemsContainer = document.getElementById('cart-items');
@@ -165,6 +161,7 @@ function atualizarMargemCarrinho(id, novaMargem) {
     }
 }
 
+// Botão Simples no Carrinho (apenas leva ao checkout, onde a mágica acontece)
 function renderizarBotoesAfiliadoCarrinho() {
     const areaTotal = document.querySelector('.cart-total-box'); 
     if(!areaTotal) return;
@@ -175,17 +172,10 @@ function renderizarBotoesAfiliadoCarrinho() {
     const div = document.createElement('div');
     div.id = 'afiliado-cart-actions';
     div.style.marginTop = '15px';
-    div.style.display = 'flex';
-    div.style.flexDirection = 'column';
-    div.style.gap = '10px';
-
-    // AQUI ESTÁ O BOTÃO DE SALVAR QUE FALTAVA
+    
     div.innerHTML = `
         <button onclick="irParaCheckoutAfiliado()" style="background:#34495e; color:white; padding:12px; border:none; border-radius:5px; cursor:pointer; width:100%; font-weight:bold;">
-            <i class="ph ph-share-network"></i> Gerar Link / PDF
-        </button>
-        <button onclick="salvarOrcamentoNoPainel()" style="background:#f39c12; color:white; padding:12px; border:none; border-radius:5px; cursor:pointer; width:100%; font-weight:bold;">
-            <i class="ph ph-floppy-disk"></i> Salvar Orçamento no Painel
+            <i class="ph ph-share-network"></i> Finalizar / Gerar Link
         </button>
     `;
     areaTotal.appendChild(div);
@@ -193,55 +183,11 @@ function renderizarBotoesAfiliadoCarrinho() {
 
 function irParaCheckoutAfiliado() { window.location.href = 'checkout.html'; }
 
-// --- FUNÇÃO PARA SALVAR ORÇAMENTO (CORRIGIDA) ---
-async function salvarOrcamentoNoPainel() {
-    const afiliado = JSON.parse(localStorage.getItem('afiliadoLogado'));
-    
-    // Verificação de segurança: tem que ter TOKEN
-    if(!afiliado || !afiliado.token) {
-        alert("Sessão expirada. Por favor, faça login novamente.");
-        window.location.href = "index.html";
-        return;
-    }
-
-    const nome = prompt("Nome para identificar este orçamento (Ex: Cliente João):");
-    if(!nome) return;
-
-    const carrinho = getCarrinho(); 
-    if(carrinho.length === 0) return alert("Carrinho vazio.");
-
-    try {
-        const res = await fetch(`${API_URL}/orcamentos`, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${afiliado.token}` // Envia o Token
-            },
-            body: JSON.stringify({
-                nome: nome,
-                itens: carrinho, 
-                total: 0 // Simplificado
-            })
-        });
-
-        if(res.ok) {
-            alert("✅ Orçamento salvo! Veja no seu Painel.");
-        } else {
-            // Se der erro 403 ou 401, pede login
-            if(res.status === 403 || res.status === 401) {
-                alert("Sessão inválida. Faça login novamente.");
-            } else {
-                alert("Erro ao salvar.");
-            }
-        }
-    } catch(e) { console.error(e); alert("Erro de conexão."); }
-}
 
 /* ==============================================================
-   💳 CHECKOUT (CORREÇÃO DE VENDAS/COMISSÃO)
+   💳 CHECKOUT (MÁGICA DO SALVAMENTO AUTOMÁTICO)
    ============================================================== */
 async function carregarPaginaCheckout() {
-    // ... (Mantendo lógica de exibição, abreviada para focar na correção final) ...
     const listaResumo = document.querySelector('.summary-item-list');
     const areaBotoes = document.querySelector('.order-summary-box');
     const totalEl = document.getElementById('cart-total');
@@ -287,16 +233,21 @@ async function carregarPaginaCheckout() {
     const afiliadoLogado = JSON.parse(localStorage.getItem('afiliadoLogado'));
 
     if (afiliadoLogado) {
+        // BOTÕES QUE SALVAM AUTOMATICAMENTE
         container.innerHTML = `
-            <button onclick="gerarLinkZap('${afiliadoLogado.codigo}', ${subtotal})" class="btn-place-order" style="background:#27ae60;"><i class="ph ph-whatsapp-logo"></i> Mandar no WhatsApp</button>
-            <button onclick="gerarPDFCustom()" class="btn-place-order" style="background:#34495e;"><i class="ph ph-file-pdf"></i> Baixar PDF</button>
+            <button id="btn-zap" onclick="gerarLinkZap('${afiliadoLogado.codigo}', ${subtotal})" class="btn-place-order" style="background:#27ae60;">
+                <i class="ph ph-whatsapp-logo"></i> Mandar no WhatsApp
+            </button>
+            <button id="btn-pdf" onclick="gerarPDFCustom()" class="btn-place-order" style="background:#34495e;">
+                <i class="ph ph-file-pdf"></i> Baixar PDF
+            </button>
         `;
         window.ITENS_CHECKOUT = itensParaProcessar;
     } else {
         const btnPagar = document.createElement('button');
         btnPagar.className = "btn-place-order"; 
         btnPagar.innerHTML = `✅ Finalizar Pedido`;
-        btnPagar.onclick = () => finalizarPedido(itensParaProcessar); // Chama a função corrigida
+        btnPagar.onclick = () => finalizarPedido(itensParaProcessar); 
         container.appendChild(btnPagar);
     }
     if(areaBotoes) areaBotoes.appendChild(container);
@@ -304,53 +255,69 @@ async function carregarPaginaCheckout() {
     if(btnOriginal) btnOriginal.style.display = 'none';
 }
 
-// --- FINALIZAR PEDIDO (CORREÇÃO CRÍTICA PARA VENDAS/COMISSÃO) ---
-async function finalizarPedido(itens) {
-    const email = document.getElementById('email').value;
-    const rua = document.getElementById('rua').value;
-    if(!email || !rua) return alert("Preencha dados.");
+// --- FUNÇÃO "SILENCIOSA" PARA SALVAR ORÇAMENTO ---
+async function salvarOrcamentoSilencioso(tipo) {
+    const afiliado = JSON.parse(localStorage.getItem('afiliadoLogado'));
+    if(!afiliado || !afiliado.token) return;
 
-    // CORREÇÃO: Pega o código do localStorage OU do usuário logado
-    let afiliadoCodigo = localStorage.getItem('afiliadoCodigo');
-    const logado = JSON.parse(localStorage.getItem('afiliadoLogado'));
+    // Tenta pegar o nome do input "Nome" (se tiver preenchido)
+    // Se não tiver, gera um nome automático: "Orçamento WhatsApp - 29/11 10:30"
+    const inputNome = document.getElementById('email'); // Usando o campo email/nome do form
+    let nomeCliente = inputNome ? inputNome.value.trim() : "";
     
-    // Se não tem código no storage, mas tem usuário logado, USA O CÓDIGO DELE!
-    if (!afiliadoCodigo && logado && logado.codigo) {
-        afiliadoCodigo = logado.codigo;
+    const dataHora = new Date().toLocaleString('pt-BR', {day:'numeric', month:'numeric', hour:'2-digit', minute:'2-digit'});
+    
+    let nomeFinal = nomeCliente ? `${nomeCliente} (${tipo})` : `Orçamento ${tipo} - ${dataHora}`;
+
+    const carrinho = getCarrinho(); 
+    if(carrinho.length === 0) return;
+
+    // Feedback visual rápido (troca texto do botão)
+    const btnId = tipo === 'WhatsApp' ? 'btn-zap' : 'btn-pdf';
+    const btn = document.getElementById(btnId);
+    let textoOriginal = "";
+    if(btn) {
+        textoOriginal = btn.innerHTML;
+        btn.innerHTML = `<i class="ph ph-spinner"></i> Salvando...`;
     }
 
     try {
-        const body = {
-            cliente: { nome: email, email: email, endereco: rua },
-            itens: itens,
-            afiliadoCodigo: afiliadoCodigo // Agora envia corretamente
-        };
-        const res = await fetch(`${API_URL}/finalizar-pedido`, {
-            method: 'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+        await fetch(`${API_URL}/orcamentos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${afiliado.token}` },
+            body: JSON.stringify({ nome: nomeFinal, itens: carrinho, total: 0 })
         });
-        if(res.ok) {
-            alert("Pedido Realizado!");
-            localStorage.removeItem('nossoCarrinho');
-            window.location.href = 'index.html';
-        } else alert("Erro ao finalizar.");
-    } catch(e) { alert("Erro conexão."); }
+        console.log("✅ Orçamento salvo automaticamente: " + nomeFinal);
+    } catch(e) { 
+        console.error("Erro ao salvar auto", e); 
+    } finally {
+        if(btn) btn.innerHTML = textoOriginal; // Restaura botão
+    }
 }
 
-// RESTO DAS FUNÇÕES (Mantidas)
-function gerarPayloadUrl() {
-    const itens = window.ITENS_CHECKOUT || [];
-    const payload = itens.map(i => ({ id: i.id, quantidade: i.qtd, customMargin: i.customMargin }));
-    return encodeURIComponent(JSON.stringify(payload));
-}
-function gerarLinkZap(codigo, total) {
+// --- AÇÕES DO AFILIADO (COM SAVE AUTOMÁTICO) ---
+async function gerarLinkZap(codigo, total) {
+    // 1. Salva Primeiro
+    await salvarOrcamentoSilencioso('WhatsApp');
+
+    // 2. Gera depois
     const payload = gerarPayloadUrl();
     const baseUrl = window.location.origin + window.location.pathname.replace('checkout.html', '') + 'checkout.html';
     const link = `${baseUrl}?restore=${payload}&ref=${codigo}`;
-    let msg = `*Orçamento*\n`; window.ITENS_CHECKOUT.forEach(i => { msg += `${i.qtd}x ${i.nome} - ${formatarMoeda(i.total)}\n`; });
-    msg += `*Total: ${formatarMoeda(total)}*\n Link: ${link}`;
+    
+    let msg = `*Orçamento AutoPeças Veloz*\n`; 
+    window.ITENS_CHECKOUT.forEach(i => { msg += `${i.qtd}x ${i.nome} - ${formatarMoeda(i.total)}\n`; });
+    msg += `*Total: ${formatarMoeda(total)}*\n\n`;
+    msg += `Pague aqui: ${link}`;
+    
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
 }
-function gerarPDFCustom() {
+
+async function gerarPDFCustom() {
+    // 1. Salva Primeiro
+    await salvarOrcamentoSilencioso('PDF');
+
+    // 2. Gera depois
     if (!window.jspdf) return alert("Erro JS PDF");
     const doc = new window.jspdf.jsPDF(); const afiliado = JSON.parse(localStorage.getItem('afiliadoLogado')); const itens = window.ITENS_CHECKOUT;
     doc.setFontSize(20); doc.text("AutoPeças Veloz", 20, 20); doc.setFontSize(12); doc.text(`Consultor: ${afiliado.nome}`, 20, 30);
@@ -359,64 +326,45 @@ function gerarPDFCustom() {
     const payload = gerarPayloadUrl(); const baseUrl = window.location.origin + window.location.pathname.replace('checkout.html', '') + 'checkout.html'; const link = `${baseUrl}?restore=${payload}&ref=${afiliado.codigo}`;
     y += 30; doc.setTextColor(0,0,255); doc.textWithLink("CLIQUE AQUI PARA PAGAR", 20, y, {url: link}); doc.save("Orcamento.pdf");
 }
-function alterarQuantidade(id, delta) {
-    let c = getCarrinho(); let i = c.find(p => p.id == id);
-    if(i) { i.quantidade += delta; if(i.quantidade<=0) c = c.filter(p=>p.id!=id); localStorage.setItem('nossoCarrinho', JSON.stringify(c)); carregarPaginaCarrinho(); atualizarIconeCarrinho(); }
+
+function gerarPayloadUrl() {
+    const itens = window.ITENS_CHECKOUT || [];
+    const payload = itens.map(i => ({ id: i.id, quantidade: i.qtd, customMargin: i.customMargin }));
+    return encodeURIComponent(JSON.stringify(payload));
 }
-function removerItem(id) {
-    let c = getCarrinho().filter(p => p.id != id); localStorage.setItem('nossoCarrinho', JSON.stringify(c)); carregarPaginaCarrinho(); atualizarIconeCarrinho();
+
+// FINALIZAR PEDIDO (CLIENTE)
+async function finalizarPedido(itens) {
+    const email = document.getElementById('email').value;
+    const rua = document.getElementById('rua').value;
+    if(!email || !rua) return alert("Preencha dados.");
+
+    let afiliadoCodigo = localStorage.getItem('afiliadoCodigo');
+    const logado = JSON.parse(localStorage.getItem('afiliadoLogado'));
+    if (!afiliadoCodigo && logado && logado.codigo) afiliadoCodigo = logado.codigo;
+
+    try {
+        const body = { cliente: { nome: email, email: email, endereco: rua }, itens: itens, afiliadoCodigo: afiliadoCodigo };
+        const res = await fetch(`${API_URL}/finalizar-pedido`, { method: 'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+        if(res.ok) { alert("Pedido Realizado!"); localStorage.removeItem('nossoCarrinho'); window.location.href = 'index.html'; } 
+        else alert("Erro ao finalizar.");
+    } catch(e) { alert("Erro conexão."); }
 }
+
+// RESTO (Busca, Slider, etc - MANTIDOS)
+function alterarQuantidade(id, delta) { let c = getCarrinho(); let i = c.find(p => p.id == id); if(i) { i.quantidade += delta; if(i.quantidade<=0) c = c.filter(p=>p.id!=id); localStorage.setItem('nossoCarrinho', JSON.stringify(c)); carregarPaginaCarrinho(); atualizarIconeCarrinho(); } }
+function removerItem(id) { let c = getCarrinho().filter(p => p.id != id); localStorage.setItem('nossoCarrinho', JSON.stringify(c)); carregarPaginaCarrinho(); atualizarIconeCarrinho(); }
 function setupGlobalSearch() {
     const btn = document.getElementById('search-button'); const input = document.getElementById('search-input');
-    if(btn && input) {
-        btn.onclick = (e) => { e.preventDefault(); fazerPesquisa(input.value, ''); };
-        input.addEventListener('keypress', (e) => { if(e.key === 'Enter') { e.preventDefault(); fazerPesquisa(input.value, ''); } });
-    }
-    document.querySelectorAll('.category-card').forEach(link => {
-        link.addEventListener('click', (e) => {
-            let cat = link.dataset.categoria; if(!cat) cat = link.querySelector('span') ? link.querySelector('span').innerText : '';
-            const val = input ? input.value.trim() : '';
-            if(val !== '') { e.preventDefault(); fazerPesquisa(val, cat); }
-        });
-    });
+    if(btn && input) { btn.onclick = (e) => { e.preventDefault(); fazerPesquisa(input.value, ''); }; input.addEventListener('keypress', (e) => { if(e.key === 'Enter') { e.preventDefault(); fazerPesquisa(input.value, ''); } }); }
+    document.querySelectorAll('.category-card').forEach(link => { link.addEventListener('click', (e) => { let cat = link.dataset.categoria; if(!cat) cat = link.querySelector('span') ? link.querySelector('span').innerText : ''; const val = input ? input.value.trim() : ''; if(val !== '') { e.preventDefault(); fazerPesquisa(val, cat); } }); });
 }
 function fazerPesquisa(t, c) { window.location.href = `busca.html?q=${encodeURIComponent(t)}&categoria=${encodeURIComponent(c)}`; }
 function setupSearchPage() { const params = new URLSearchParams(window.location.search); if(params.get('q') || params.get('categoria')) executarBusca(params.get('q'), params.get('categoria')); }
-async function executarBusca(q, c) {
-    try {
-        let url = `${API_URL}/search?`; if (q) url += `q=${encodeURIComponent(q)}&`; if (c) url += `categoria=${encodeURIComponent(c)}`;
-        const res = await fetch(url); const data = await res.json();
-        const track = document.getElementById("search-track");
-        if(track) {
-            track.innerHTML = ''; if (data.length === 0) { track.innerHTML = '<p style="padding:20px; text-align:center;">Nenhum produto encontrado.</p>'; return; }
-            data.forEach(p => { track.innerHTML += `<a href="product.html?id=${p.id}" class="product-card"><div class="product-image"><img src="${p.image||p.imagem}" onerror="this.src='https://placehold.co/150'"></div><h3>${p.name||p.titulo}</h3><p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p></a>`; });
-        }
-    } catch(e) {}
-}
-function setupProductPage() {
-    const pId = new URLSearchParams(window.location.search).get('id');
-    if(pId) { buscarProdutoPorId(pId); const btn = document.querySelector('.btn-add-cart'); const qtd = document.getElementById('quantity-input'); if(btn) { const n = btn.cloneNode(true); btn.parentNode.replaceChild(n, btn); n.addEventListener('click', () => { adicionarAoCarrinho(pId, qtd ? parseInt(qtd.value) : 1); }); } }
-}
+async function executarBusca(q, c) { try { let url = `${API_URL}/search?`; if (q) url += `q=${encodeURIComponent(q)}&`; if (c) url += `categoria=${encodeURIComponent(c)}`; const res = await fetch(url); const data = await res.json(); const track = document.getElementById("search-track"); if(track) { track.innerHTML = ''; if (data.length === 0) { track.innerHTML = '<p style="padding:20px; text-align:center;">Nenhum produto encontrado.</p>'; return; } data.forEach(p => { track.innerHTML += `<a href="product.html?id=${p.id}" class="product-card"><div class="product-image"><img src="${p.image||p.imagem}" onerror="this.src='https://placehold.co/150'"></div><h3>${p.name||p.titulo}</h3><p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p></a>`; }); } } catch(e) {} }
+function setupProductPage() { const pId = new URLSearchParams(window.location.search).get('id'); if(pId) { buscarProdutoPorId(pId); const btn = document.querySelector('.btn-add-cart'); const qtd = document.getElementById('quantity-input'); if(btn) { const n = btn.cloneNode(true); btn.parentNode.replaceChild(n, btn); n.addEventListener('click', () => { adicionarAoCarrinho(pId, qtd ? parseInt(qtd.value) : 1); }); } } }
 async function buscarProdutoPorId(id) { try { const res = await fetch(`${API_URL}/products/${id}`); const p = await res.json(); document.getElementById('product-title').textContent = p.name || p.titulo; document.getElementById('main-product-image').src = p.image || p.imagem; document.getElementById('product-price-new').textContent = formatarMoeda(parseFloat(p.price || p.preco_novo)); } catch(e) {} }
 async function buscarProdutosPromocao() { try { const res = await fetch(`${API_URL}/search?q=`); const data = await res.json(); const track = document.getElementById("promocoes-track"); if(track) { track.innerHTML = ''; data.slice(0, 4).forEach(p => { track.innerHTML += `<a href="product.html?id=${p.id}" class="product-card"><div class="product-image"><img src="${p.image||p.imagem}" onerror="this.src='https://placehold.co/150'"></div><h3>${p.name||p.titulo}</h3><p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p></a>`; }); } } catch(e) {} }
 async function carregarMargemDoCodigo(c) { try { const res = await fetch(`${API_URL}/afiliado/check/${c}`); if(res.ok) { const d = await res.json(); if(d.margem) FATOR_GLOBAL = 1 + (d.margem/100); } } catch(e) {} }
-
-// FUNÇÃO VISUAL NOVA
-function ativarModoParceiro(afiliado) {
-    const btnLogin = document.getElementById('btn-login-header');
-    if (btnLogin) {
-        btnLogin.innerHTML = `<i class="ph ph-sign-out"></i><span>Sair</span>`;
-        btnLogin.href = "#"; btnLogin.style.color = "#e67e22";
-        btnLogin.onclick = (e) => { e.preventDefault(); if(confirm(`Sair da conta de parceiro?`)) { localStorage.removeItem('afiliadoLogado'); localStorage.removeItem('minhaMargem'); window.location.reload(); } };
-    }
-    const barraAntiga = document.getElementById('barra-parceiro'); if (barraAntiga) barraAntiga.remove();
-    const barra = document.createElement('div'); barra.id = "barra-parceiro";
-    barra.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 45px; background: linear-gradient(90deg, #1a252f 0%, #2c3e50 100%); color: white; z-index: 999999; display: flex; justify-content: space-between; align-items: center; padding: 0 5%; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-family: sans-serif; box-sizing: border-box;`;
-    barra.innerHTML = `<div style="display:flex; align-items:center; gap: 10px;"><div style="background:rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px; display:flex; align-items:center; gap:6px;"><span style="font-size: 1.1rem;">🦊</span><span style="font-size: 0.9rem; color: #ecf0f1;">Olá, <strong>${afiliado.nome}</strong></span></div><span style="font-size: 0.75rem; background:#27ae60; padding:2px 6px; border-radius:4px; font-weight:bold;">PARCEIRO ATIVO</span></div><a href="afiliado_dashboard.html" style="text-decoration: none; color: white; background: rgba(255,255,255,0.15); padding: 6px 15px; border-radius: 30px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,0.1);"><i class="ph ph-gauge"></i><span>Acessar Meu Painel</span></a>`;
-    document.body.prepend(barra); document.body.style.paddingTop = "45px"; 
-}
-let slideIndex = 0; let slideInterval;
-function iniciarSlider() { const slides = document.querySelectorAll('.slide'); if(slides.length > 0) { mostrarSlide(slideIndex); slideInterval = setInterval(() => mudarSlide(1), 5000); } }
-function mudarSlide(n) { slideIndex += n; mostrarSlide(slideIndex); clearInterval(slideInterval); slideInterval = setInterval(() => mudarSlide(1), 5000); }
-function mostrarSlide(n) { const slides = document.querySelectorAll('.slide'); if (slides.length === 0) return; if (n >= slides.length) slideIndex = 0; if (n < 0) slideIndex = slides.length - 1; slides.forEach(slide => slide.classList.remove('active')); slides[slideIndex].classList.add('active'); }
-window.mudarSlide = mudarSlide; window.iniciarSlider = iniciarSlider;
+function ativarModoParceiro(afiliado) { const btnLogin = document.getElementById('btn-login-header'); if (btnLogin) { btnLogin.innerHTML = `<i class="ph ph-sign-out"></i><span>Sair</span>`; btnLogin.href = "#"; btnLogin.style.color = "#e67e22"; btnLogin.onclick = (e) => { e.preventDefault(); if(confirm(`Sair da conta de parceiro?`)) { localStorage.removeItem('afiliadoLogado'); localStorage.removeItem('minhaMargem'); window.location.reload(); } }; } const barraAntiga = document.getElementById('barra-parceiro'); if (barraAntiga) barraAntiga.remove(); const barra = document.createElement('div'); barra.id = "barra-parceiro"; barra.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 45px; background: linear-gradient(90deg, #1a252f 0%, #2c3e50 100%); color: white; z-index: 999999; display: flex; justify-content: space-between; align-items: center; padding: 0 5%; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-family: sans-serif; box-sizing: border-box;`; barra.innerHTML = `<div style="display:flex; align-items:center; gap: 10px;"><div style="background:rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px; display:flex; align-items:center; gap:6px;"><span style="font-size: 1.1rem;">🦊</span><span style="font-size: 0.9rem; color: #ecf0f1;">Olá, <strong>${afiliado.nome}</strong></span></div><span style="font-size: 0.75rem; background:#27ae60; padding:2px 6px; border-radius:4px; font-weight:bold;">PARCEIRO ATIVO</span></div><a href="afiliado_dashboard.html" style="text-decoration: none; color: white; background: rgba(255,255,255,0.15); padding: 6px 15px; border-radius: 30px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,0.1);"><i class="ph ph-gauge"></i><span>Acessar Meu Painel</span></a>`; document.body.prepend(barra); document.body.style.paddingTop = "45px"; }
+let slideIndex = 0; let slideInterval; function iniciarSlider() { const slides = document.querySelectorAll('.slide'); if(slides.length > 0) { mostrarSlide(slideIndex); slideInterval = setInterval(() => mudarSlide(1), 5000); } } function mudarSlide(n) { slideIndex += n; mostrarSlide(slideIndex); clearInterval(slideInterval); slideInterval = setInterval(() => mudarSlide(1), 5000); } function mostrarSlide(n) { const slides = document.querySelectorAll('.slide'); if (slides.length === 0) return; if (n >= slides.length) slideIndex = 0; if (n < 0) slideIndex = slides.length - 1; slides.forEach(slide => slide.classList.remove('active')); slides[slideIndex].classList.add('active'); } window.mudarSlide = mudarSlide; window.iniciarSlider = iniciarSlider;

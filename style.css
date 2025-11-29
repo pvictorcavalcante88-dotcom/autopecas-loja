@@ -203,83 +203,101 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
 .category-card img { width: 50px; height: 50px; margin-bottom: 10px; }
 .category-card span { display: block; font-weight: 600; font-size: 0.9rem; color: var(--text-dark); }
 
-/* ========================================================================
-   5. PRODUTOS (Cards)
-   ======================================================================== */
+/* =======================================================
+   CARDS DE PRODUTO (PREMIUM)
+   ======================================================= */
+/* Container da grade de produtos */
 #promocoes-track, #search-track {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); /* Responsivo */
     gap: 25px;
+    padding: 10px;
 }
 
+/* O Card do Produto */
 .product-card {
-    background: var(--white);
-    border-radius: var(--radius);
-    overflow: hidden;
-    box-shadow: var(--shadow-sm);
-    transition: var(--transition);
-    position: relative;
+    background: #ffffff;
+    border: 1px solid #e1e1e1;
+    border-radius: 12px; /* Borda arredondada moderna */
+    padding: 15px;
+    text-decoration: none; /* Remove sublinhado do link */
+    color: #333;
     display: flex;
     flex-direction: column;
-    padding-bottom: 15px;
-    border: 1px solid #eee;
+    justify-content: space-between;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden; /* Para conter imagens grandes */
 }
 
+/* Efeito Hover (Mouse em cima) */
 .product-card:hover {
-    transform: translateY(-5px);
-    box-shadow: var(--shadow-md);
-    border-color: var(--primary-color);
+    transform: translateY(-8px); /* Sobe um pouquinho */
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1); /* Sombra suave */
+    border-color: #3498db; /* Borda azul sutil */
 }
 
-.product-image {
-    width: 100%;
-    height: 200px;
-    padding: 20px;
+/* Área da Imagem */
+.product-card .product-image {
+    height: 180px; /* Altura fixa para alinhar tudo */
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #fff;
-    position: relative;
+    margin-bottom: 15px;
+    background: #f9f9f9;
+    border-radius: 8px;
 }
 
-.product-image img { max-width: 100%; max-height: 100%; object-fit: contain; transition: transform 0.3s; }
-.product-card:hover .product-image img { transform: scale(1.05); }
-
-.discount-tag {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    background: var(--accent-color);
-    color: white;
-    font-size: 0.8rem;
-    font-weight: bold;
-    padding: 3px 8px;
-    border-radius: 4px;
+.product-card .product-image img {
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: contain; /* Garante que a foto não corte */
+    transition: transform 0.3s;
 }
 
+.product-card:hover .product-image img {
+    transform: scale(1.05); /* Zoom leve na imagem */
+}
+
+/* Título do Produto */
 .product-card h3 {
     font-size: 1rem;
-    margin: 10px 15px;
-    color: var(--text-dark);
-    height: 40px; /* Altura fixa para alinhar */
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 10px;
+    line-height: 1.4;
+    height: 40px; /* Altura fixa para títulos de 2 linhas */
     overflow: hidden;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
 }
 
-.price-old {
-    margin: 0 15px;
-    font-size: 0.85rem;
-    color: #999;
-    text-decoration: line-through;
+/* Preço */
+.product-card .price-new {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #27ae60; /* Verde dinheiro */
+    margin-bottom: 15px;
 }
 
-.price-new {
-    margin: 0 15px;
-    font-size: 1.3rem;
-    font-weight: 800;
-    color: var(--primary-color);
+/* Botão Falso "Ver Detalhes" (Visual) */
+.btn-card-action {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    background-color: #f1f2f6;
+    color: #2c3e50;
+    text-align: center;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    transition: 0.2s;
+}
+
+.product-card:hover .btn-card-action {
+    background-color: #3498db; /* Fica azul no hover */
+    color: white;
 }
 
 /* ========================================================================

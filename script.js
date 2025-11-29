@@ -361,10 +361,68 @@ function setupGlobalSearch() {
 }
 function fazerPesquisa(t, c) { window.location.href = `busca.html?q=${encodeURIComponent(t)}&categoria=${encodeURIComponent(c)}`; }
 function setupSearchPage() { const params = new URLSearchParams(window.location.search); if(params.get('q') || params.get('categoria')) executarBusca(params.get('q'), params.get('categoria')); }
-async function executarBusca(q, c) { try { let url = `${API_URL}/search?`; if (q) url += `q=${encodeURIComponent(q)}&`; if (c) url += `categoria=${encodeURIComponent(c)}`; const res = await fetch(url); const data = await res.json(); const track = document.getElementById("search-track"); if(track) { track.innerHTML = ''; if (data.length === 0) { track.innerHTML = '<p style="padding:20px; text-align:center;">Nenhum produto encontrado.</p>'; return; } data.forEach(p => { track.innerHTML += `<a href="product.html?id=${p.id}" class="product-card"><div class="product-image"><img src="${p.image||p.imagem}" onerror="this.src='https://placehold.co/150'"></div><h3>${p.name||p.titulo}</h3><p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p></a>`; }); } } catch(e) {} }
+async function executarBusca(q, categoria) {
+    try {
+        let url = `${API_URL}/search?`;
+        if (q) url += `q=${encodeURIComponent(q)}&`;
+        if (categoria) url += `categoria=${encodeURIComponent(categoria)}`;
+
+        const res = await fetch(url);
+        const data = await res.json();
+        const track = document.getElementById("search-track");
+        
+        if(track) {
+            track.innerHTML = '';
+            
+            if (data.length === 0) {
+                track.innerHTML = '<p style="padding:20px; width:100%; text-align:center;">Nenhum produto encontrado.</p>';
+                return;
+            }
+
+            data.forEach(p => {
+                track.innerHTML += `
+                <a href="product.html?id=${p.id}" class="product-card">
+                    <div class="product-image">
+                        <img src="${p.image||p.imagem}" onerror="this.src='https://placehold.co/150'">
+                    </div>
+                    <h3>${p.name||p.titulo}</h3>
+                    <p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p>
+                    
+                    <div class="btn-card-action">Ver Detalhes</div> 
+                </a>`;
+            });
+        }
+    } catch(e){
+        console.error("Erro busca:", e);
+    }
+}
 function setupProductPage() { const pId = new URLSearchParams(window.location.search).get('id'); if(pId) { buscarProdutoPorId(pId); const btn = document.querySelector('.btn-add-cart'); const qtd = document.getElementById('quantity-input'); if(btn) { const n = btn.cloneNode(true); btn.parentNode.replaceChild(n, btn); n.addEventListener('click', () => { adicionarAoCarrinho(pId, qtd ? parseInt(qtd.value) : 1); }); } } }
 async function buscarProdutoPorId(id) { try { const res = await fetch(`${API_URL}/products/${id}`); const p = await res.json(); document.getElementById('product-title').textContent = p.name || p.titulo; document.getElementById('main-product-image').src = p.image || p.imagem; document.getElementById('product-price-new').textContent = formatarMoeda(parseFloat(p.price || p.preco_novo)); } catch(e) {} }
-async function buscarProdutosPromocao() { try { const res = await fetch(`${API_URL}/search?q=`); const data = await res.json(); const track = document.getElementById("promocoes-track"); if(track) { track.innerHTML = ''; data.slice(0, 4).forEach(p => { track.innerHTML += `<a href="product.html?id=${p.id}" class="product-card"><div class="product-image"><img src="${p.image||p.imagem}" onerror="this.src='https://placehold.co/150'"></div><h3>${p.name||p.titulo}</h3><p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p></a>`; }); } } catch(e) {} }
+async function buscarProdutosPromocao() {
+    try {
+        const res = await fetch(`${API_URL}/search?q=`);
+        const data = await res.json();
+        const track = document.getElementById("promocoes-track");
+        
+        if(track) {
+            track.innerHTML = '';
+            
+            // Pega os 4 primeiros produtos
+            data.slice(0, 4).forEach(p => {
+                track.innerHTML += `
+                <a href="product.html?id=${p.id}" class="product-card">
+                    <div class="product-image">
+                        <img src="${p.image||p.imagem}" onerror="this.src='https://placehold.co/150'">
+                    </div>
+                    <h3>${p.name||p.titulo}</h3>
+                    <p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p>
+                    
+                    <div class="btn-card-action">Oferta 🔥</div>
+                </a>`;
+            });
+        }
+    } catch(e) { console.error(e); }
+}
 async function carregarMargemDoCodigo(c) { try { const res = await fetch(`${API_URL}/afiliado/check/${c}`); if(res.ok) { const d = await res.json(); if(d.margem) FATOR_GLOBAL = 1 + (d.margem/100); } } catch(e) {} }
 function ativarModoParceiro(afiliado) { const btnLogin = document.getElementById('btn-login-header'); if (btnLogin) { btnLogin.innerHTML = `<i class="ph ph-sign-out"></i><span>Sair</span>`; btnLogin.href = "#"; btnLogin.style.color = "#e67e22"; btnLogin.onclick = (e) => { e.preventDefault(); if(confirm(`Sair da conta de parceiro?`)) { localStorage.removeItem('afiliadoLogado'); localStorage.removeItem('minhaMargem'); window.location.reload(); } }; } const barraAntiga = document.getElementById('barra-parceiro'); if (barraAntiga) barraAntiga.remove(); const barra = document.createElement('div'); barra.id = "barra-parceiro"; barra.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 45px; background: linear-gradient(90deg, #1a252f 0%, #2c3e50 100%); color: white; z-index: 999999; display: flex; justify-content: space-between; align-items: center; padding: 0 5%; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-family: sans-serif; box-sizing: border-box;`; barra.innerHTML = `<div style="display:flex; align-items:center; gap: 10px;"><div style="background:rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px; display:flex; align-items:center; gap:6px;"><span style="font-size: 1.1rem;">🦊</span><span style="font-size: 0.9rem; color: #ecf0f1;">Olá, <strong>${afiliado.nome}</strong></span></div><span style="font-size: 0.75rem; background:#27ae60; padding:2px 6px; border-radius:4px; font-weight:bold;">PARCEIRO ATIVO</span></div><a href="afiliado_dashboard.html" style="text-decoration: none; color: white; background: rgba(255,255,255,0.15); padding: 6px 15px; border-radius: 30px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,0.1);"><i class="ph ph-gauge"></i><span>Acessar Meu Painel</span></a>`; document.body.prepend(barra); document.body.style.paddingTop = "45px"; }
 let slideIndex = 0; let slideInterval; function iniciarSlider() { const slides = document.querySelectorAll('.slide'); if(slides.length > 0) { mostrarSlide(slideIndex); slideInterval = setInterval(() => mudarSlide(1), 5000); } } function mudarSlide(n) { slideIndex += n; mostrarSlide(slideIndex); clearInterval(slideInterval); slideInterval = setInterval(() => mudarSlide(1), 5000); } function mostrarSlide(n) { const slides = document.querySelectorAll('.slide'); if (slides.length === 0) return; if (n >= slides.length) slideIndex = 0; if (n < 0) slideIndex = slides.length - 1; slides.forEach(slide => slide.classList.remove('active')); slides[slideIndex].classList.add('active'); } window.mudarSlide = mudarSlide; window.iniciarSlider = iniciarSlider;

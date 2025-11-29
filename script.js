@@ -87,7 +87,7 @@ document.addEventListener("DOMContentLoaded", async function() {
 });
 
 // ==============================================================
-// 🛒 CARRINHO
+// 🛒 CARRINHO COM BOTÃO "LIMPAR TUDO"
 // ==============================================================
 async function carregarPaginaCarrinho() {
     const cartItemsContainer = document.getElementById('cart-items');
@@ -102,6 +102,9 @@ async function carregarPaginaCarrinho() {
     if (cart.length === 0) {
         cartItemsContainer.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">Carrinho vazio.</td></tr>';
         if (cartTotalElement) cartTotalElement.innerText = 'R$ 0,00';
+        // Se estiver vazio, esconde botões de ação se existirem
+        const acoes = document.getElementById('afiliado-cart-actions');
+        if(acoes) acoes.remove();
         return;
     }
 
@@ -147,8 +150,44 @@ async function carregarPaginaCarrinho() {
             cartItemsContainer.appendChild(row);
         } catch (e) {}
     }
+    
+    // --- NOVO: Botão de Limpar Tudo no final da tabela ---
+    const rowLimpar = document.createElement('tr');
+    rowLimpar.innerHTML = `
+        <td colspan="6" style="text-align: right; padding-top: 15px;">
+            <button onclick="limparCarrinho()" style="
+                background: none; 
+                border: 1px solid #e74c3c; 
+                color: #e74c3c; 
+                padding: 5px 15px; 
+                border-radius: 4px; 
+                cursor: pointer; 
+                font-size: 0.9rem;
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+            ">
+                <i class="ph ph-trash"></i> Esvaziar Carrinho
+            </button>
+        </td>
+    `;
+    cartItemsContainer.appendChild(rowLimpar);
+    // -----------------------------------------------------
+
     if (cartTotalElement) cartTotalElement.innerText = formatarMoeda(total);
     if(isAfiliado) renderizarBotoesAfiliadoCarrinho();
+}
+
+// --- FUNÇÃO NOVA: LIMPAR TUDO ---
+function limparCarrinho() {
+    if(confirm("Tem certeza que deseja esvaziar todo o carrinho?")) {
+        localStorage.removeItem('nossoCarrinho');
+        carregarPaginaCarrinho();
+        atualizarIconeCarrinho();
+        // Se tiver botões de checkout do afiliado, remove também para forçar refresh
+        const acoes = document.getElementById('afiliado-cart-actions');
+        if(acoes) acoes.remove();
+    }
 }
 
 function atualizarMargemCarrinho(id, novaMargem) {

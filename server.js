@@ -35,14 +35,26 @@ function authenticateToken(req, res, next) {
 }
 
 // =================================================================
-// 🔑 ROTAS DE LOGIN
+// 🔑 ROTA DE LOGIN ADMIN (ATUALIZADA)
 // =================================================================
 app.post('/login', async (req, res) => {
     const { email, senha } = req.body;
+    
+    // Debug: Vai mostrar no terminal o que você digitou (ajuda a achar erro de digitação)
+    console.log("Tentativa de Login Admin recebida:", email, " | Senha:", senha);
+
+    // OPÇÃO 1: Credenciais Padrão
     if (email === "admin@autopecas.com" && senha === "admin123") {
         const token = jwt.sign({ role: 'admin' }, SECRET_KEY, { expiresIn: '12h' });
         return res.json({ token });
     }
+
+    // OPÇÃO 2: Credencial de Emergência (TESTE ESSA!)
+    if (email === "admin" && senha === "admin") {
+        const token = jwt.sign({ role: 'admin' }, SECRET_KEY, { expiresIn: '12h' });
+        return res.json({ token });
+    }
+
     res.status(401).json({ erro: "Credenciais inválidas" });
 });
 
@@ -260,6 +272,28 @@ app.get('/afiliado/mensagens', authenticateToken, async (req, res) => {
         });
         res.json(msgs);
     } catch(e) { res.status(500).json({ erro: "Erro ao buscar mensagens" }); }
+});
+
+// ROTA ADMIN: ENVIAR MENSAGEM PARA AFILIADO
+app.post('/admin/mensagens', authenticateToken, async (req, res) => {
+    // Verifica se é admin
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+
+    try {
+        const { afiliadoId, texto } = req.body;
+        
+        await prisma.mensagem.create({
+            data: {
+                texto: texto,
+                afiliadoId: parseInt(afiliadoId)
+            }
+        });
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ erro: "Erro ao enviar mensagem." });
+    }
 });
 
 const PORT = process.env.PORT || 3000;

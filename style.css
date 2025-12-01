@@ -877,3 +877,95 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
     font-weight: 600;
     color: #333;
 }
+
+/* =======================================================
+   PÁGINA DO PRODUTO (PREMIUM)
+   ======================================================= */
+.product-detail-container {
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Duas colunas iguais */
+    gap: 40px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+}
+
+/* Coluna da Imagem */
+.detail-image {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 20px;
+    max-height: 500px;
+}
+.detail-image img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    transition: transform 0.3s;
+}
+.detail-image:hover img { transform: scale(1.05); }
+
+/* Coluna de Informações */
+.detail-info h1 { font-size: 2rem; color: #2c3e50; margin-bottom: 10px; }
+.detail-code { color: #7f8c8d; font-size: 0.9rem; margin-bottom: 20px; display: block; }
+
+.detail-price-box {
+    margin: 20px 0;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 5px solid #27ae60;
+}
+.detail-old-price { text-decoration: line-through; color: #95a5a6; font-size: 1rem; }
+.detail-price { font-size: 2.5rem; color: #27ae60; font-weight: 800; }
+.detail-installments { color: #2c3e50; font-weight: 600; font-size: 0.9rem; margin-top: 5px; }
+
+/* Box do Afiliado */
+.affiliate-profit-box {
+    background: #eaf2f8;
+    border: 1px dashed #3498db;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: none; /* Escondido por padrão */
+}
+
+/* Botões de Ação */
+.action-group { display: flex; gap: 15px; margin-top: 25px; }
+.qty-selector { display: flex; align-items: center; border: 1px solid #ddd; border-radius: 6px; }
+.qty-selector button { background: none; border: none; padding: 10px 15px; font-size: 1.2rem; cursor: pointer; }
+.qty-selector input { width: 50px; text-align: center; border: none; font-weight: bold; font-size: 1.1rem; }
+
+.btn-buy-now {
+    flex: 1;
+    background: linear-gradient(135deg, #e67e22, #d35400);
+    color: white;
+    border: none;
+    padding: 15px;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+    box-shadow: 0 4px 15px rgba(230, 126, 34, 0.4);
+    transition: transform 0.2s;
+}
+.btn-buy-now:hover { transform: translateY(-2px); }
+
+/* Ícones de Segurança */
+.security-badges { display: flex; gap: 20px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
+.badge-item { display: flex; align-items: center; gap: 10px; color: #555; font-size: 0.85rem; }
+.badge-item i { font-size: 1.5rem; color: #27ae60; }
+
+/* Mobile */
+@media (max-width: 768px) {
+    .product-detail-container { grid-template-columns: 1fr; }
+    .action-group { flex-direction: column; }
+}

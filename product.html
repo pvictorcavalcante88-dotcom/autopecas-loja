@@ -3,99 +3,179 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Detalhes do Produto - AutoPeças Veloz</title>
+    <title>Detalhes do Produto | AutoPeças Veloz</title>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <link rel="stylesheet" href="style.css?v=2.0">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <header class="main-header">
         <div class="header-container">
             <a href="index.html" class="logo">
-                <i class="ph ph-car-profile"></i>
-                AutoPeças <span>Veloz</span>
+                <i class="ph ph-car-profile"></i> AutoPeças <span>Veloz</span>
             </a>
-
-            <div class="search-container">
-                <input type="text" id="search-input" placeholder="O que você está procurando?">
-                <button class="search-button" id="search-button" aria-label="Buscar">
-                    <i class="ph ph-magnifying-glass"></i>
-                </button>
-                <div class="search-dropdown-toggle" id="search-category-toggle">
-                    <span id="search-category-label" data-selected-category="">Categorias</span> 
-                    <i class="ph ph-caret-down"></i>
-                </div>
-                <div class="search-dropdown-menu" id="search-dropdown-menu">
-                    <a href="#" data-value="">Todas as Categorias</a>
-                    <a href="#" data-value="Motor">Motor</a>
-                    <a href="#" data-value="Freios">Freios</a>
-                    <a href="#" data-value="Suspensão">Suspensão</a>
-                    <a href="#" data-value="Elétrica">Elétrica</a>
-                    <a href="#" data-value="Câmbio">Câmbio</a>
-                    <a href="#" data-value="Acessórios">Acessórios</a>
-                </div>
-            </div>
-
             <div class="header-actions">
-                <a href="#" class="action-button"><i class="ph ph-user"></i><span>Entrar</span></a>
                 <a href="cart.html" class="action-button cart-button">
-                    <i class="ph ph-shopping-cart"></i><span>Carrinho</span><span>0</span>
+                    <i class="ph ph-shopping-cart"></i><span>Carrinho</span>
                 </a>
             </div>
         </div>
     </header>
 
-    <main class="product-page-container">
-        <div class="product-detail-grid">
+    <main class="product-detail-container" id="product-container">
+        <div class="detail-image">
+            <img id="prod-img" src="" alt="Imagem do Produto" onerror="this.src='https://placehold.co/400'">
+        </div>
+
+        <div class="detail-info">
+            <span class="detail-code" id="prod-cat">Categoria</span>
+            <h1 id="prod-title">Carregando produto...</h1>
             
-            <div class="product-gallery">
-                <div class="main-image-container">
-                    <img id="main-product-image" src="" alt="Produto">
-                </div>
-                <div class="thumbnail-list">
-                    </div>
+            <div class="detail-price-box">
+                <div class="detail-old-price" id="prod-old-price"></div>
+                <div class="detail-price" id="prod-price">R$ ...</div>
+                <div class="detail-installments">em até 12x no cartão</div>
             </div>
 
-            <div class="product-info">
-                <span class="product-sku" id="product-sku">Cód: ---</span>
-                <h1 id="product-title">Carregando...</h1>
-                
-                <div class="price-box">
-                    <span class="old-price" id="product-price-old"></span>
-                    <span class="new-price" id="product-price-new">---</span>
+            <div id="affiliate-area" class="affiliate-profit-box">
+                <h4 style="margin-bottom:10px; color:#2c3e50;"><i class="ph ph-currency-circle-dollar"></i> Painel do Parceiro</h4>
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                    <label>Sua Margem:</label>
+                    <input type="number" id="input-margem" value="0" style="width:60px; padding:5px; border-radius:4px; border:1px solid #ccc;"> %
                 </div>
-
-                <div id="stock-status" class="stock-status">Verificando estoque...</div>
-
-                <div class="purchase-actions">
-                    <div class="quantity-selector">
-                        <button class="quantity-btn" onclick="this.nextElementSibling.stepDown()">-</button>
-                        <input type="number" id="quantity-input" value="1" min="1" readonly>
-                        <button class="quantity-btn" onclick="this.previousElementSibling.stepUp()">+</button>
-                    </div>
-                    <button class="btn-add-cart">Adicionar ao Carrinho</button>
+                <div style="font-size:0.9rem; color:#27ae60; font-weight:bold;">
+                    Seu Lucro nesta venda: <span id="lucro-estimado">R$ 0,00</span>
                 </div>
+            </div>
 
-                <div class="description-box">
-                    <h3>Descrição</h3>
-                    <p id="product-description">Detalhes do produto...</p>
-                </div>
+            <p id="prod-desc" style="color:#666; line-height:1.6; margin-bottom:20px;">...</p>
 
-                <div class="specs-box">
-                    <h3>Ficha Técnica</h3>
-                    <table class="specs-table">
-                        <tbody id="specs-table-body">
-                            </tbody>
-                    </table>
+            <div class="action-group">
+                <div class="qty-selector">
+                    <button onclick="mudarQtd(-1)">-</button>
+                    <input type="text" id="qtd" value="1" readonly>
+                    <button onclick="mudarQtd(1)">+</button>
                 </div>
+                <button onclick="adicionarAoCarrinhoAtual()" class="btn-buy-now">
+                    <i class="ph ph-shopping-cart-plus"></i> Adicionar ao Carrinho
+                </button>
+            </div>
+
+            <div class="security-badges">
+                <div class="badge-item"><i class="ph ph-shield-check"></i> Compra Segura</div>
+                <div class="badge-item"><i class="ph ph-truck"></i> Entrega Rápida</div>
+                <div class="badge-item"><i class="ph ph-thumbs-up"></i> Garantia Veloz</div>
             </div>
         </div>
     </main>
 
     <footer class="main-footer">
-        <p>© 2025 AutoPeças Veloz. Todos os direitos reservados.</p>
+        <p>© 2025 AutoPeças Veloz.</p>
     </footer>
 
     <script src="script.js"></script>
+    <script>
+        // Lógica específica desta página
+        let PRODUTO_ATUAL = null;
+        let MARGEM_ATUAL = 0;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get('id');
+            if(id) carregarProduto(id);
+        });
+
+        async function carregarProduto(id) {
+            try {
+                // Tenta pegar margem do afiliado (se logado)
+                const afData = localStorage.getItem('afiliadoLogado');
+                const isAfiliado = !!afData;
+                
+                // Se for afiliado, pega a margem salva ou usa 0
+                if(isAfiliado) {
+                    MARGEM_ATUAL = parseFloat(localStorage.getItem('minhaMargem') || 0);
+                    document.getElementById('affiliate-area').style.display = 'block';
+                    document.getElementById('input-margem').value = MARGEM_ATUAL;
+                }
+
+                // Busca dados no servidor
+                const res = await fetch(`${API_URL}/products/${id}`); // Usa a variavel global API_URL do script.js
+                if(!res.ok) throw new Error("Produto não encontrado");
+                
+                PRODUTO_ATUAL = await res.json();
+
+                // Preenche a tela
+                document.getElementById('prod-img').src = PRODUTO_ATUAL.image || PRODUTO_ATUAL.imagem;
+                document.getElementById('prod-title').textContent = PRODUTO_ATUAL.name || PRODUTO_ATUAL.titulo;
+                document.getElementById('prod-cat').textContent = (PRODUTO_ATUAL.categoria || "Peças") + " > Cód: " + PRODUTO_ATUAL.id;
+                document.getElementById('prod-desc').textContent = PRODUTO_ATUAL.descricao || "Produto de alta qualidade original da AutoPeças Veloz.";
+
+                atualizarPrecoTela();
+
+            } catch(e) {
+                document.getElementById('product-container').innerHTML = '<h2>Produto não encontrado.</h2>';
+            }
+        }
+
+        // Atualiza preço quando muda a margem
+        document.getElementById('input-margem').addEventListener('input', (e) => {
+            MARGEM_ATUAL = parseFloat(e.target.value) || 0;
+            atualizarPrecoTela();
+        });
+
+        function atualizarPrecoTela() {
+            if(!PRODUTO_ATUAL) return;
+
+            const precoBase = parseFloat(PRODUTO_ATUAL.price || PRODUTO_ATUAL.preco_novo);
+            
+            // Calcula preço final com margem
+            const precoFinal = precoBase * (1 + (MARGEM_ATUAL / 100));
+            const lucro = precoFinal - precoBase;
+
+            // Exibe na tela
+            document.getElementById('prod-price').textContent = precoFinal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+            document.getElementById('lucro-estimado').textContent = lucro.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+            
+            // Preço antigo (fake, só pra dar efeito de desconto se margem for baixa)
+            if(MARGEM_ATUAL < 10) {
+                document.getElementById('prod-old-price').textContent = (precoFinal * 1.2).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+            } else {
+                document.getElementById('prod-old-price').textContent = "";
+            }
+        }
+
+        function mudarQtd(delta) {
+            const input = document.getElementById('qtd');
+            let val = parseInt(input.value) + delta;
+            if(val < 1) val = 1;
+            input.value = val;
+        }
+
+        function adicionarAoCarrinhoAtual() {
+            if(!PRODUTO_ATUAL) return;
+            const qtd = parseInt(document.getElementById('qtd').value);
+            
+            // Chama a função global do script.js, mas passando a margem customizada
+            // Precisamos garantir que a função adicionarAoCarrinho suporte isso ou salvar manual
+            
+            let carrinho = JSON.parse(localStorage.getItem('nossoCarrinho') || '[]');
+            const index = carrinho.findIndex(i => i.id == PRODUTO_ATUAL.id);
+            
+            if (index > -1) {
+                carrinho[index].quantidade += qtd;
+                carrinho[index].customMargin = MARGEM_ATUAL; // Atualiza margem
+            } else {
+                carrinho.push({ 
+                    id: PRODUTO_ATUAL.id, 
+                    quantidade: qtd,
+                    customMargin: MARGEM_ATUAL // Salva a margem escolhida aqui
+                });
+            }
+            
+            localStorage.setItem('nossoCarrinho', JSON.stringify(carrinho));
+            atualizarIconeCarrinho(); // Função do script.js
+            alert("Produto adicionado ao carrinho!");
+        }
+    </script>
 </body>
 </html>

@@ -67,24 +67,30 @@
     </div>
 </div>
 
-        <div class="order-summary-box">
-            <h3>Resumo do Pedido</h3>
+        <div class="order-summary-box cart-total-box"> <h3>Resumo do Pedido</h3>
+            
             <div class="summary-row">
                 <span>Subtotal</span>
                 <span id="cart-subtotal">R$ 0,00</span>
             </div>
+            
+            <div class="summary-row" id="row-afiliado-lucro" style="display: none; color: #27ae60; font-weight: bold; background: #e8f5e9; padding: 5px; border-radius: 4px; margin: 5px 0;">
+                <span>Seu Lucro Estimado:</span>
+                <span id="afiliado-lucro-valor">R$ 0,00</span>
+            </div>
+
             <div class="summary-row">
                 <span>Frete</span>
                 <span>Grátis</span>
             </div>
+            
             <div class="summary-row total">
                 <span>Total</span>
                 <span id="cart-total">R$ 0,00</span>
             </div>
             
-            <a href="checkout.html" class="btn-place-order" style="text-align: center; display: block; text-decoration: none;">
-                Ir para Pagamento
-            </a>
+            <div id="afiliado-cart-actions"></div> 
+            
             <a href="index.html" style="display: block; text-align: center; margin-top: 15px; font-size: 0.9rem; color: #666;">
                 Continuar Comprando
             </a>

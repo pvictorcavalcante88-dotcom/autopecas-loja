@@ -86,40 +86,61 @@ document.addEventListener("DOMContentLoaded", async function() {
     if (typeof iniciarSlider === 'function') iniciarSlider();
 });
 
+
 // ==============================================================
-// 🛒 CARRINHO COM BOTÃO "LIMPAR TUDO"
+// 🛒 CARRINHO COMPLETO (Lucro + Esvaziar + Subtotal)
 // ==============================================================
 async function carregarPaginaCarrinho() {
     const cartItemsContainer = document.getElementById('cart-items');
     const cartTotalElement = document.getElementById('cart-total');
+    const cartSubtotalElement = document.getElementById('cart-subtotal');
+    
+    // Elementos do Lucro (HTML novo)
+    const rowLucro = document.getElementById('row-afiliado-lucro');
+    const valorLucro = document.getElementById('afiliado-lucro-valor');
+
     if (!cartItemsContainer) return;
 
     let cart = getCarrinho();
     cartItemsContainer.innerHTML = ''; 
-    let total = 0;
+    
+    let totalVenda = 0;
+    let totalLucro = 0; 
+    
     const isAfiliado = !!localStorage.getItem('afiliadoLogado');
 
+    // 1. Carrinho Vazio
     if (cart.length === 0) {
         cartItemsContainer.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">Carrinho vazio.</td></tr>';
         if (cartTotalElement) cartTotalElement.innerText = 'R$ 0,00';
-        // Se estiver vazio, esconde botões de ação se existirem
+        if (cartSubtotalElement) cartSubtotalElement.innerText = 'R$ 0,00';
+        if (rowLucro) rowLucro.style.display = 'none';
+        
         const acoes = document.getElementById('afiliado-cart-actions');
         if(acoes) acoes.remove();
         return;
     }
 
+    // 2. Loop dos Itens
     for (const item of cart) {
         try {
             const response = await fetch(`${API_URL}/products/${item.id}`);
             if (!response.ok) continue;
             const p = await response.json();
 
+            // Preços
             const precoBase = parseFloat(p.price || p.preco_novo);
             let margemAplicada = (item.customMargin !== undefined) ? item.customMargin : ((FATOR_GLOBAL - 1) * 100);
             const precoFinal = precoBase * (1 + (margemAplicada / 100));
-            const subtotal = precoFinal * item.quantidade;
-            total += subtotal;
+            
+            // Cálculos
+            const subtotalItem = precoFinal * item.quantidade;
+            const lucroItem = (precoFinal - precoBase) * item.quantidade; // Lucro neste item
 
+            totalVenda += subtotalItem;
+            totalLucro += lucroItem;
+
+            // Input de Margem (Só afiliado vê)
             let htmlMargem = '';
             if(isAfiliado) {
                 htmlMargem = `
@@ -132,6 +153,7 @@ async function carregarPaginaCarrinho() {
                 `;
             }
 
+            // Desenha a linha
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td><img src="${p.image||p.imagem}" width="60" onerror="this.src='https://placehold.co/100'"></td>
@@ -144,37 +166,35 @@ async function carregarPaginaCarrinho() {
                         <button onclick="alterarQuantidade(${item.id}, 1)">+</button>
                     </div>
                 </td>
-                <td>${formatarMoeda(subtotal)}</td>
+                <td>${formatarMoeda(subtotalItem)}</td>
                 <td><button onclick="removerItem(${item.id})" style="color:red; border:none; cursor:pointer;">&times;</button></td>
             `;
             cartItemsContainer.appendChild(row);
         } catch (e) {}
     }
     
-    // --- NOVO: Botão de Limpar Tudo no final da tabela ---
+    // 3. Botão Esvaziar Carrinho (Adicionado no final)
     const rowLimpar = document.createElement('tr');
     rowLimpar.innerHTML = `
         <td colspan="6" style="text-align: right; padding-top: 15px;">
-            <button onclick="limparCarrinho()" style="
-                background: none; 
-                border: 1px solid #e74c3c; 
-                color: #e74c3c; 
-                padding: 5px 15px; 
-                border-radius: 4px; 
-                cursor: pointer; 
-                font-size: 0.9rem;
-                display: inline-flex;
-                align-items: center;
-                gap: 5px;
-            ">
+            <button onclick="limparCarrinho()" style="background:none; border:1px solid #e74c3c; color:#e74c3c; padding:5px 15px; border-radius:4px; cursor:pointer; font-size:0.9rem; display:inline-flex; align-items:center; gap:5px;">
                 <i class="ph ph-trash"></i> Esvaziar Carrinho
             </button>
-        </td>
-    `;
+        </td>`;
     cartItemsContainer.appendChild(rowLimpar);
-    // -----------------------------------------------------
 
-    if (cartTotalElement) cartTotalElement.innerText = formatarMoeda(total);
+    // 4. Atualiza Totais
+    if (cartTotalElement) cartTotalElement.innerText = formatarMoeda(totalVenda);
+    if (cartSubtotalElement) cartSubtotalElement.innerText = formatarMoeda(totalVenda);
+
+    // 5. Exibe o Lucro (Se for afiliado)
+    if (isAfiliado && rowLucro && valorLucro) {
+        rowLucro.style.display = 'flex'; 
+        valorLucro.innerText = formatarMoeda(totalLucro);
+    } else if (rowLucro) {
+        rowLucro.style.display = 'none';
+    }
+
     if(isAfiliado) renderizarBotoesAfiliadoCarrinho();
 }
 

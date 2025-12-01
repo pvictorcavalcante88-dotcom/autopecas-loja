@@ -300,18 +300,36 @@ app.post('/admin/mensagens', authenticateToken, async (req, res) => {
 // 👑 ROTAS DO PAINEL ADMIN (DADOS)
 // =================================================================
 
-// 1. DASHBOARD (Estatísticas)
+// ROTA DASHBOARD BLINDADA (Substitua a antiga no server.js)
 app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin') return res.sendStatus(403);
+    // 1. Verifica Permissão
+    if (!req.user || req.user.role !== 'admin') return res.sendStatus(403);
+
     try {
+        console.log("📊 Buscando dados do Dashboard..."); // Log para sabermos que começou
+
+        // Buscas individuais (Se uma falhar, sabemos qual foi)
         const totalPedidos = await prisma.pedido.count();
+        console.log("- Pedidos OK:", totalPedidos);
+
         const produtos = await prisma.produto.count();
-        // Soma total das vendas
+        console.log("- Produtos OK:", produtos);
+        
+        // Cuidado aqui: Se 'valorTotal' não existir, vai dar erro
         const somaVendas = await prisma.pedido.aggregate({ _sum: { valorTotal: true } });
-        // Contagem de estoque baixo (ex: menos de 5 itens)
-        const estoqueBaixo = await prisma.produto.count({ where: { quantidade: { lte: 5 } } });
-        // 5 últimos pedidos
+        console.log("- Soma Vendas OK");
+
+        // Cuidado aqui: Se 'quantidade' não for número, pode dar erro
+        let estoqueBaixo = 0;
+        try {
+            estoqueBaixo = await prisma.produto.count({ where: { quantidade: { lte: 5 } } });
+        } catch (err) {
+            console.log("⚠️ Aviso: Erro ao contar estoque baixo (Campo 'quantidade' existe?)");
+        }
+        console.log("- Estoque Baixo OK");
+
         const ultimosPedidos = await prisma.pedido.findMany({ take: 5, orderBy: { createdAt: 'desc' } });
+        console.log("- Últimos Pedidos OK");
 
         res.json({
             faturamento: somaVendas._sum.valorTotal || 0,
@@ -320,7 +338,11 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
             estoqueBaixo,
             ultimosPedidos
         });
-    } catch (e) { res.status(500).json({ erro: "Erro ao carregar dashboard" }); }
+
+    } catch (e) { 
+        console.error("❌ ERRO CRÍTICO NO DASHBOARD:", e); // Isso vai mostrar o erro real no terminal
+        res.status(500).json({ erro: "Erro interno no servidor: " + e.message }); 
+    }
 });
 
 // 2. LISTA DE PEDIDOS COMPLETA

@@ -83,6 +83,9 @@
             const params = new URLSearchParams(window.location.search);
             const id = params.get('id');
             if(id) carregarProduto(id);
+            
+            // Atualiza valores se digitar a quantidade manualmente
+            document.getElementById('qtd').addEventListener('input', atualizarPrecoTela);
         });
 
         async function carregarProduto(id) {
@@ -99,7 +102,7 @@
                 }
 
                 // Busca dados no servidor
-                const res = await fetch(`${API_URL}/products/${id}`); // Usa a variavel global API_URL do script.js
+                const res = await fetch(`${API_URL}/products/${id}`);
                 if(!res.ok) throw new Error("Produto não encontrado");
                 
                 PRODUTO_ATUAL = await res.json();
@@ -126,19 +129,30 @@
         function atualizarPrecoTela() {
             if(!PRODUTO_ATUAL) return;
 
+            // 1. Pega os valores básicos
             const precoBase = parseFloat(PRODUTO_ATUAL.price || PRODUTO_ATUAL.preco_novo);
-            
-            // Calcula preço final com margem
-            const precoFinal = precoBase * (1 + (MARGEM_ATUAL / 100));
-            const lucro = precoFinal - precoBase;
+            const qtd = parseInt(document.getElementById('qtd').value) || 1; // Pega a quantidade atual
 
-            // Exibe na tela
-            document.getElementById('prod-price').textContent = precoFinal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
-            document.getElementById('lucro-estimado').textContent = lucro.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+            // 2. Calcula preço unitário com margem
+            const precoUnitarioFinal = precoBase * (1 + (MARGEM_ATUAL / 100));
             
-            // Preço antigo (fake, só pra dar efeito de desconto se margem for baixa)
+            // 3. Calcula Totais
+            const lucroUnitario = precoUnitarioFinal - precoBase;
+            const lucroTotal = lucroUnitario * qtd; // Multiplica o lucro pela quantidade
+
+            // 4. Exibe na tela
+            // Preço do Produto (Mantém unitário para padrão de loja, ou multiplica se preferir)
+            document.getElementById('prod-price').textContent = precoUnitarioFinal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+            
+            // Lucro (Agora mostra o TOTAL baseado na quantidade)
+            document.getElementById('lucro-estimado').innerHTML = `
+                ${lucroTotal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} 
+                <small style="color:#7f8c8d; font-weight:normal;">(${qtd}x itens)</small>
+            `;
+            
+            // Preço antigo (efeito visual)
             if(MARGEM_ATUAL < 10) {
-                document.getElementById('prod-old-price').textContent = (precoFinal * 1.2).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+                document.getElementById('prod-old-price').textContent = (precoUnitarioFinal * 1.2).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
             } else {
                 document.getElementById('prod-old-price').textContent = "";
             }
@@ -149,32 +163,41 @@
             let val = parseInt(input.value) + delta;
             if(val < 1) val = 1;
             input.value = val;
+            
+            // IMPORTANTE: Chama a atualização aqui também!
+            atualizarPrecoTela();
         }
 
         function adicionarAoCarrinhoAtual() {
             if(!PRODUTO_ATUAL) return;
             const qtd = parseInt(document.getElementById('qtd').value);
             
-            // Chama a função global do script.js, mas passando a margem customizada
-            // Precisamos garantir que a função adicionarAoCarrinho suporte isso ou salvar manual
-            
             let carrinho = JSON.parse(localStorage.getItem('nossoCarrinho') || '[]');
             const index = carrinho.findIndex(i => i.id == PRODUTO_ATUAL.id);
             
             if (index > -1) {
                 carrinho[index].quantidade += qtd;
-                carrinho[index].customMargin = MARGEM_ATUAL; // Atualiza margem
+                carrinho[index].customMargin = MARGEM_ATUAL; 
             } else {
                 carrinho.push({ 
                     id: PRODUTO_ATUAL.id, 
                     quantidade: qtd,
-                    customMargin: MARGEM_ATUAL // Salva a margem escolhida aqui
+                    customMargin: MARGEM_ATUAL 
                 });
             }
             
             localStorage.setItem('nossoCarrinho', JSON.stringify(carrinho));
-            atualizarIconeCarrinho(); // Função do script.js
-            alert("Produto adicionado ao carrinho!");
+            atualizarIconeCarrinho(); 
+            
+            // Feedback visual melhor
+            const btn = document.querySelector('.btn-buy-now');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="ph ph-check"></i> Adicionado!';
+            btn.style.background = '#27ae60';
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.style.background = ''; // Volta ao gradiente original
+            }, 2000);
         }
     </script>
 </body>

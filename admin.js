@@ -1,54 +1,79 @@
-const API_URL = '';
+const API_URL = ''; // Deixe vazio se estiver no mesmo domínio
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Verifica Login
+    
+    // 1. Verifica se já tem Token (Se não tiver, chuta pro login)
     const token = localStorage.getItem('adminToken');
-    if (!token && !window.location.pathname.includes('admin_login.html')) {
+    const isLoginPage = window.location.pathname.includes('admin_login.html');
+
+    if (!token && !isLoginPage) {
         window.location.href = 'admin_login.html';
         return;
     }
 
-    // Logout
-    const btnLogout = document.getElementById('logout-button');
+    // 2. Configura o botão de Logout
+    const btnLogout = document.getElementById('logout-button'); // Verifique se o ID no HTML é esse mesmo
     if (btnLogout) {
         btnLogout.addEventListener('click', (e) => {
             e.preventDefault();
-            localStorage.removeItem('adminToken');
-            window.location.href = 'admin_login.html';
+            if(confirm("Tem certeza que deseja sair?")) {
+                localStorage.removeItem('adminToken');
+                window.location.href = 'admin_login.html';
+            }
         });
     }
 
-    // Roteamento das páginas
+    // 3. Roteamento (Carrega as funções de cada página)
     const path = window.location.pathname;
-    if (path.endsWith('admin_dashboard.html') || path.endsWith('/admin/')) {
-        carregarDashboard();
-    } else if (path.endsWith('admin_produtos.html')) {
-        carregarProdutos();
-        setupFormProduto(); // Configura o botão de salvar
-    } else if (path.endsWith('admin_pedidos.html')) {
-        carregarPedidos();
-    } else if (path.endsWith('admin_afiliados.html')) {
-        carregarAfiliados();
+    
+    if (path.includes('admin_dashboard.html') || path.endsWith('/admin/')) {
+        if(typeof carregarDashboard === 'function') carregarDashboard();
+    } 
+    else if (path.includes('admin_produtos.html')) {
+        if(typeof carregarProdutos === 'function') carregarProdutos();
+        if(typeof setupFormProduto === 'function') setupFormProduto(); 
+    } 
+    else if (path.includes('admin_pedidos.html')) {
+        if(typeof carregarPedidos === 'function') carregarPedidos();
+    } 
+    else if (path.includes('admin_afiliados.html')) {
+        if(typeof carregarAfiliados === 'function') carregarAfiliados();
     }
 
-    // Login Form
+    // 4. LÓGICA DO LOGIN (AQUI ESTAVA O ERRO)
     const loginForm = document.getElementById('admin-login-form');
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            
             const email = document.getElementById('email').value;
             const senha = document.getElementById('senha').value;
+
+            console.log("Tentando logar com:", email, senha);
+
             try {
-                const res = await fetch(`${API_URL}/admin/login`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                // CORREÇÃO: A rota no server.js é '/login', não '/admin/login'
+                const res = await fetch(`${API_URL}/login`, {
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, senha })
                 });
+
+                const data = await res.json();
+
                 if (res.ok) {
-                    const data = await res.json();
+                    console.log("Login Sucesso! Token:", data.token);
                     localStorage.setItem('adminToken', data.token);
-                    window.location.href = 'admin_dashboard.html';
-                } else { alert("Login inválido"); }
-            } catch (e) { alert("Erro de conexão"); }
+                    
+                    // IMPORTANTE: Verifique se o nome do seu arquivo principal é esse mesmo
+                    window.location.href = 'admin_dashboard.html'; 
+                } else { 
+                    alert("Erro: " + (data.erro || "Login inválido")); 
+                }
+            } catch (e) { 
+                console.error(e);
+                alert("Erro de conexão com o servidor."); 
+            }
         });
     }
 });

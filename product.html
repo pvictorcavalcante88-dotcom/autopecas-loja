@@ -6,6 +6,41 @@
     <title>Detalhes do Produto | AutoPeças Veloz</title>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Ajuste rápido para a barra de pesquisa ficar bonita no Header */
+        .search-container {
+            flex: 1;
+            max-width: 500px;
+            margin: 0 20px;
+            display: flex;
+            align-items: center;
+            background: #f1f2f6;
+            border-radius: 8px;
+            padding: 5px 15px;
+        }
+        .search-container input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 10px;
+            outline: none;
+            font-size: 1rem;
+        }
+        .search-container button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+            color: #2c3e50;
+        }
+        .search-container button:hover { color: #e67e22; }
+
+        /* Mobile: Ajusta a busca para não quebrar */
+        @media (max-width: 768px) {
+            .header-container { flex-wrap: wrap; gap: 10px; }
+            .search-container { order: 3; max-width: 100%; margin: 0; }
+        }
+    </style>
 </head>
 <body>
 
@@ -14,6 +49,12 @@
             <a href="index.html" class="logo">
                 <i class="ph ph-car-profile"></i> AutoPeças <span>Veloz</span>
             </a>
+
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="Buscar peça (ex: Motor, Freio)...">
+                <button id="search-button"><i class="ph ph-magnifying-glass"></i></button>
+            </div>
+
             <div class="header-actions">
                 <a href="cart.html" class="action-button cart-button">
                     <i class="ph ph-shopping-cart"></i><span>Carrinho</span>
@@ -44,7 +85,7 @@
                     <input type="number" id="input-margem" value="0" style="width:60px; padding:5px; border-radius:4px; border:1px solid #ccc;"> %
                 </div>
                 <div style="font-size:0.9rem; color:#27ae60; font-weight:bold;">
-                    Seu Lucro nesta venda: <span id="lucro-estimado">R$ 0,00</span>
+                    Seu Lucro Total: <span id="lucro-estimado">R$ 0,00</span>
                 </div>
             </div>
 
@@ -75,7 +116,25 @@
 
     <script src="script.js"></script>
     <script>
-        // Lógica específica desta página
+        // --- 1. LÓGICA DA PESQUISA ---
+        const btnSearch = document.getElementById('search-button');
+        const inputSearch = document.getElementById('search-input');
+
+        function realizarBusca() {
+            const termo = inputSearch.value.trim();
+            if(termo) {
+                // Redireciona para a Home com o termo na URL (ex: index.html?search=motor)
+                // O script da Home precisa saber ler isso (se não souber, avise que criamos rapidinho)
+                window.location.href = `index.html?search=${encodeURIComponent(termo)}`;
+            }
+        }
+
+        btnSearch.addEventListener('click', realizarBusca);
+        inputSearch.addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') realizarBusca();
+        });
+
+        // --- 2. LÓGICA DO PRODUTO (Igual antes, mas atualizada) ---
         let PRODUTO_ATUAL = null;
         let MARGEM_ATUAL = 0;
 
@@ -84,34 +143,31 @@
             const id = params.get('id');
             if(id) carregarProduto(id);
             
-            // Atualiza valores se digitar a quantidade manualmente
+            // Recalcula ao mudar quantidade manualmente
             document.getElementById('qtd').addEventListener('input', atualizarPrecoTela);
         });
 
         async function carregarProduto(id) {
             try {
-                // Tenta pegar margem do afiliado (se logado)
+                // Tenta pegar margem do afiliado
                 const afData = localStorage.getItem('afiliadoLogado');
                 const isAfiliado = !!afData;
                 
-                // Se for afiliado, pega a margem salva ou usa 0
                 if(isAfiliado) {
                     MARGEM_ATUAL = parseFloat(localStorage.getItem('minhaMargem') || 0);
                     document.getElementById('affiliate-area').style.display = 'block';
                     document.getElementById('input-margem').value = MARGEM_ATUAL;
                 }
 
-                // Busca dados no servidor
                 const res = await fetch(`${API_URL}/products/${id}`);
                 if(!res.ok) throw new Error("Produto não encontrado");
                 
                 PRODUTO_ATUAL = await res.json();
 
-                // Preenche a tela
                 document.getElementById('prod-img').src = PRODUTO_ATUAL.image || PRODUTO_ATUAL.imagem;
                 document.getElementById('prod-title').textContent = PRODUTO_ATUAL.name || PRODUTO_ATUAL.titulo;
                 document.getElementById('prod-cat').textContent = (PRODUTO_ATUAL.categoria || "Peças") + " > Cód: " + PRODUTO_ATUAL.id;
-                document.getElementById('prod-desc').textContent = PRODUTO_ATUAL.descricao || "Produto de alta qualidade original da AutoPeças Veloz.";
+                document.getElementById('prod-desc').textContent = PRODUTO_ATUAL.descricao || "Peça original com garantia.";
 
                 atualizarPrecoTela();
 
@@ -120,7 +176,7 @@
             }
         }
 
-        // Atualiza preço quando muda a margem
+        // Atualiza preço ao mudar margem
         document.getElementById('input-margem').addEventListener('input', (e) => {
             MARGEM_ATUAL = parseFloat(e.target.value) || 0;
             atualizarPrecoTela();
@@ -129,28 +185,21 @@
         function atualizarPrecoTela() {
             if(!PRODUTO_ATUAL) return;
 
-            // 1. Pega os valores básicos
             const precoBase = parseFloat(PRODUTO_ATUAL.price || PRODUTO_ATUAL.preco_novo);
-            const qtd = parseInt(document.getElementById('qtd').value) || 1; // Pega a quantidade atual
+            const qtd = parseInt(document.getElementById('qtd').value) || 1;
 
-            // 2. Calcula preço unitário com margem
             const precoUnitarioFinal = precoBase * (1 + (MARGEM_ATUAL / 100));
             
-            // 3. Calcula Totais
             const lucroUnitario = precoUnitarioFinal - precoBase;
-            const lucroTotal = lucroUnitario * qtd; // Multiplica o lucro pela quantidade
+            const lucroTotal = lucroUnitario * qtd; 
 
-            // 4. Exibe na tela
-            // Preço do Produto (Mantém unitário para padrão de loja, ou multiplica se preferir)
             document.getElementById('prod-price').textContent = precoUnitarioFinal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
             
-            // Lucro (Agora mostra o TOTAL baseado na quantidade)
             document.getElementById('lucro-estimado').innerHTML = `
                 ${lucroTotal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} 
-                <small style="color:#7f8c8d; font-weight:normal;">(${qtd}x itens)</small>
+                <small style="color:#7f8c8d; font-weight:normal;">(${qtd} itens)</small>
             `;
             
-            // Preço antigo (efeito visual)
             if(MARGEM_ATUAL < 10) {
                 document.getElementById('prod-old-price').textContent = (precoUnitarioFinal * 1.2).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
             } else {
@@ -163,8 +212,6 @@
             let val = parseInt(input.value) + delta;
             if(val < 1) val = 1;
             input.value = val;
-            
-            // IMPORTANTE: Chama a atualização aqui também!
             atualizarPrecoTela();
         }
 
@@ -189,14 +236,13 @@
             localStorage.setItem('nossoCarrinho', JSON.stringify(carrinho));
             atualizarIconeCarrinho(); 
             
-            // Feedback visual melhor
             const btn = document.querySelector('.btn-buy-now');
             const originalText = btn.innerHTML;
             btn.innerHTML = '<i class="ph ph-check"></i> Adicionado!';
             btn.style.background = '#27ae60';
             setTimeout(() => {
                 btn.innerHTML = originalText;
-                btn.style.background = ''; // Volta ao gradiente original
+                btn.style.background = ''; 
             }, 2000);
         }
     </script>

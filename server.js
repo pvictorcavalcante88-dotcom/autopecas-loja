@@ -296,6 +296,104 @@ app.post('/admin/mensagens', authenticateToken, async (req, res) => {
     }
 });
 
+// =================================================================
+// 👑 ROTAS DO PAINEL ADMIN (DADOS)
+// =================================================================
+
+// 1. DASHBOARD (Estatísticas Gerais)
+app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    try {
+        const totalPedidos = await prisma.pedido.count();
+        const produtos = await prisma.produto.count();
+        const estoqueBaixo = await prisma.produto.count({ where: { quantidade: { lte: 5 } } }); // Ex: menos de 5 itens
+
+        // Soma total das vendas
+        const somaVendas = await prisma.pedido.aggregate({
+            _sum: { valorTotal: true }
+        });
+
+        // Últimos 5 pedidos
+        const ultimosPedidos = await prisma.pedido.findMany({
+            take: 5,
+            orderBy: { createdAt: 'desc' }
+        });
+
+        res.json({
+            faturamento: somaVendas._sum.valorTotal || 0,
+            totalPedidos,
+            produtos,
+            estoqueBaixo,
+            ultimosPedidos
+        });
+    } catch (e) { res.status(500).json({ erro: "Erro ao carregar dashboard" }); }
+});
+
+// 2. LISTA DE PEDIDOS COMPLETA
+app.get('/admin/pedidos', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    try {
+        const pedidos = await prisma.pedido.findMany({
+            orderBy: { createdAt: 'desc' },
+            include: { afiliado: true } // Inclui dados do vendedor se tiver
+        });
+        res.json(pedidos);
+    } catch (e) { res.status(500).json({ erro: "Erro ao buscar pedidos" }); }
+});
+
+// 3. LISTA DE AFILIADOS COMPLETA
+app.get('/admin/afiliados', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    try {
+        // Busca afiliados e também soma quanto eles já venderam
+        const afiliados = await prisma.afiliado.findMany({
+            include: { pedidos: true } 
+        });
+
+        // Formata para enviar pro front
+        const resposta = afiliados.map(af => ({
+            id: af.id,
+            nome: af.nome,
+            telefone: af.telefone,
+            codigo: af.codigo,
+            saldo: af.saldo,
+            aprovado: af.aprovado,
+            chavePix: af.chavePix,
+            banco: af.banco,
+            agencia: af.agencia,
+            conta: af.conta,
+            vendasTotais: af.pedidos.reduce((acc, p) => acc + p.valorTotal, 0)
+        }));
+
+        res.json(resposta);
+    } catch (e) { res.status(500).json({ erro: "Erro ao buscar afiliados" }); }
+});
+
+// 4. APROVAR/BLOQUEAR AFILIADO
+app.put('/admin/afiliados/:id/status', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    try {
+        const { aprovado } = req.body;
+        await prisma.afiliado.update({
+            where: { id: parseInt(req.params.id) },
+            data: { aprovado }
+        });
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ erro: "Erro ao atualizar status" }); }
+});
+
+// 5. ENVIAR MENSAGEM (Já tínhamos feito, mas garanta que está lá)
+app.post('/admin/mensagens', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    try {
+        const { afiliadoId, texto } = req.body;
+        await prisma.mensagem.create({
+            data: { texto, afiliadoId: parseInt(afiliadoId) }
+        });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ erro: "Erro ao enviar mensagem." }); }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);

@@ -300,24 +300,18 @@ app.post('/admin/mensagens', authenticateToken, async (req, res) => {
 // 👑 ROTAS DO PAINEL ADMIN (DADOS)
 // =================================================================
 
-// 1. DASHBOARD (Estatísticas Gerais)
+// 1. DASHBOARD (Estatísticas)
 app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
     try {
         const totalPedidos = await prisma.pedido.count();
         const produtos = await prisma.produto.count();
-        const estoqueBaixo = await prisma.produto.count({ where: { quantidade: { lte: 5 } } }); // Ex: menos de 5 itens
-
         // Soma total das vendas
-        const somaVendas = await prisma.pedido.aggregate({
-            _sum: { valorTotal: true }
-        });
-
-        // Últimos 5 pedidos
-        const ultimosPedidos = await prisma.pedido.findMany({
-            take: 5,
-            orderBy: { createdAt: 'desc' }
-        });
+        const somaVendas = await prisma.pedido.aggregate({ _sum: { valorTotal: true } });
+        // Contagem de estoque baixo (ex: menos de 5 itens)
+        const estoqueBaixo = await prisma.produto.count({ where: { quantidade: { lte: 5 } } });
+        // 5 últimos pedidos
+        const ultimosPedidos = await prisma.pedido.findMany({ take: 5, orderBy: { createdAt: 'desc' } });
 
         res.json({
             faturamento: somaVendas._sum.valorTotal || 0,

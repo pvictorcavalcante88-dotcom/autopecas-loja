@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="admin.css"> 
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
-        /* CSS DA TABELA E LAYOUT */
         .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .table-container { overflow-x: auto; }
         
@@ -15,7 +14,6 @@
         th { text-align: left; padding: 12px; border-bottom: 2px solid #eee; color: #444; }
         td { padding: 12px; border-bottom: 1px solid #eee; color: #666; vertical-align: middle; }
         
-        /* Badges e Botões */
         .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; }
         .status-pending { background: #fff3cd; color: #856404; }
         .status-active { background: #d4edda; color: #155724; }
@@ -26,47 +24,16 @@
         
         .pix-key { font-size: 0.8rem; background: #eee; padding: 2px 6px; border-radius: 4px; color: #555; }
 
-        /* --- NOVO: BARRA DE AÇÕES (Mensagem em Massa) --- */
-        .action-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 6px;
-            border: 1px solid #eee;
-        }
+        /* Barra de Ações */
+        .action-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: #f8f9fa; padding: 10px; border-radius: 6px; border: 1px solid #eee; }
         .btn-msg { background: #8e44ad; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 5px;}
         .btn-msg:hover { background: #732d91; }
 
-        /* --- NOVO: MODAL (Janelinha) --- */
-        .modal-overlay {
-            display: none; /* Escondido por padrão */
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-        .modal-box {
-            background: white;
-            padding: 25px;
-            width: 500px;
-            max-width: 90%;
-            border-radius: 8px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-        }
-        .modal-box textarea {
-            width: 100%;
-            height: 120px;
-            margin: 15px 0;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-family: sans-serif;
-            resize: vertical;
-        }
+        /* Modal */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-box { background: white; padding: 25px; width: 500px; max-width: 90%; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .modal-box textarea { width: 100%; height: 100px; margin: 15px 0 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-family: sans-serif; resize: vertical; }
+        .file-input-wrapper { margin-bottom: 20px; border: 1px dashed #ccc; padding: 15px; text-align: center; border-radius: 5px; background: #f9f9f9; }
         .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; }
         .btn-cancel { background: #ccc; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; color: #333; }
         .btn-confirm { background: #8e44ad; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
@@ -75,7 +42,6 @@
 <body>
 
     <div class="admin-container">
-        
         <aside class="sidebar">
             <h3>Admin AutoPeças</h3>
             <nav>
@@ -83,10 +49,7 @@
                 <a href="admin_produtos.html"><i class="ph ph-package"></i> Produtos</a>
                 <a href="admin_pedidos.html"><i class="ph ph-shopping-cart-simple"></i> Pedidos</a>
                 <a href="admin_afiliados.html" class="active"><i class="ph ph-users"></i> Afiliados</a>
-                
-                <a href="#" onclick="logout()" style="margin-top: 20px; color: #e74c3c;">
-                    <i class="ph ph-sign-out"></i> Sair
-                </a>
+                <a href="#" onclick="logout()" style="margin-top: 20px; color: #e74c3c;"><i class="ph ph-sign-out"></i> Sair</a>
             </nav>
         </aside>
 
@@ -97,11 +60,10 @@
             </header>
 
             <section class="card">
-                
                 <div class="action-bar">
                     <span id="contador-selecionados" style="font-size: 0.9rem; color: #666;">Nenhum selecionado</span>
                     <button onclick="abrirModalMensagem()" class="btn-msg">
-                        <i class="ph ph-envelope-simple"></i> Enviar Mensagem
+                        <i class="ph ph-paper-plane-tilt"></i> Enviar Mensagem
                     </button>
                 </div>
 
@@ -129,11 +91,15 @@
 
     <div id="modal-msg" class="modal-overlay">
         <div class="modal-box">
-            <h3 style="color: #2c3e50;">Enviar Mensagem</h3>
-            <p style="font-size: 0.9rem; color: #666; margin-top: 5px;">Essa mensagem aparecerá no painel dos afiliados selecionados.</p>
+            <h3 style="color: #2c3e50;">Enviar Mensagem / Comprovante</h3>
             
-            <textarea id="texto-mensagem" placeholder="Digite aqui o aviso, novidade ou comprovante de pagamento..."></textarea>
+            <textarea id="texto-mensagem" placeholder="Digite uma mensagem (Opcional)..."></textarea>
             
+            <div class="file-input-wrapper">
+                <label style="display:block; margin-bottom:5px; font-weight:bold; font-size:0.9rem; color:#555;">Anexar Arquivo (PDF, JPG, PNG)</label>
+                <input type="file" id="arquivo-msg" accept=".pdf, .jpg, .jpeg, .png">
+            </div>
+
             <div class="modal-buttons">
                 <button onclick="fecharModal()" class="btn-cancel">Cancelar</button>
                 <button onclick="enviarMensagemMassa()" class="btn-confirm">Enviar Agora 🚀</button>
@@ -144,56 +110,39 @@
     <script>
         const API_URL = ''; 
 
-        // 1. CARREGAR LISTA
         async function carregarAfiliados() {
             const token = localStorage.getItem('adminToken');
             if(!token) return window.location.href = 'admin_login.html';
-
             try {
                 const res = await fetch(`${API_URL}/admin/afiliados`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const afiliados = await res.json();
                 renderizarTabela(afiliados);
-            } catch (error) {
-                console.error(error);
-                document.getElementById('afiliados-list').innerHTML = '<tr><td colspan="7">Erro ao carregar lista.</td></tr>';
-            }
+            } catch (error) { document.getElementById('afiliados-list').innerHTML = '<tr><td colspan="7">Erro ao carregar lista.</td></tr>'; }
         }
 
-        // 2. DESENHAR TABELA (Com Checkboxes)
         function renderizarTabela(lista) {
             const tbody = document.getElementById('afiliados-list');
             tbody.innerHTML = '';
-
-            if(lista.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Nenhum afiliado.</td></tr>';
-                return;
-            }
+            if(lista.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Nenhum afiliado.</td></tr>'; return; }
 
             lista.forEach(a => {
                 const totalVendido = a.vendasTotais || 0;
                 const saldo = parseFloat(a.saldo || 0);
-                
                 const statusHtml = a.aprovado 
                     ? `<span class="status-badge status-active">Ativo</span>`
                     : `<span class="status-badge status-pending">Pendente</span>`;
 
                 let btnAprovar = !a.aprovado ? `<button onclick="aprovar(${a.id})" class="btn-action btn-approve" title="Aprovar"><i class="ph ph-check"></i></button>` : '';
-                
-                // Botão Pagar (apenas abre modal de mensagem sugerindo pagamento, ou alerta)
                 let btnPagar = saldo > 0 
-                    ? `<button onclick="alert('Dica: Use a caixa de seleção para enviar mensagem de pagamento!')" class="btn-action btn-pay" title="Pagar"><i class="ph ph-money"></i></button>` 
+                    ? `<button onclick="alert('Use a caixa de seleção para enviar o comprovante!')" class="btn-action btn-pay" title="Pagar"><i class="ph ph-money"></i></button>` 
                     : '';
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><input type="checkbox" class="check-afiliado" value="${a.id}" onchange="atualizarContador()"></td>
-                    <td>
-                        <strong>${a.nome}</strong><br>
-                        <span style="font-size:0.85rem; color:#666;">${a.telefone}</span><br>
-                        <span class="pix-key">Pix: ${a.chavePix || '-'}</span>
-                    </td>
+                    <td><strong>${a.nome}</strong><br><span class="pix-key">Pix: ${a.chavePix || '-'}</span></td>
                     <td><strong>${a.codigo}</strong></td>
                     <td>${statusHtml}</td>
                     <td>${totalVendido.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</td>
@@ -204,84 +153,76 @@
             });
         }
 
-        // 3. SELEÇÃO MÚLTIPLA
         function toggleSelecionarTodos() {
             const master = document.getElementById('check-all');
-            const checks = document.querySelectorAll('.check-afiliado');
-            checks.forEach(c => c.checked = master.checked);
+            document.querySelectorAll('.check-afiliado').forEach(c => c.checked = master.checked);
             atualizarContador();
         }
 
         function atualizarContador() {
-            const selecionados = document.querySelectorAll('.check-afiliado:checked').length;
-            document.getElementById('contador-selecionados').innerText = selecionados + ' selecionado(s)';
+            document.getElementById('contador-selecionados').innerText = document.querySelectorAll('.check-afiliado:checked').length + ' selecionado(s)';
         }
 
-        // 4. LÓGICA DO MODAL DE MENSAGEM
         function abrirModalMensagem() {
-            const selecionados = document.querySelectorAll('.check-afiliado:checked');
-            if (selecionados.length === 0) return alert("Selecione pelo menos um afiliado na tabela.");
-            
+            if (document.querySelectorAll('.check-afiliado:checked').length === 0) return alert("Selecione alguém na tabela.");
             document.getElementById('modal-msg').style.display = 'flex';
         }
 
-        function fecharModal() {
-            document.getElementById('modal-msg').style.display = 'none';
-        }
+        function fecharModal() { document.getElementById('modal-msg').style.display = 'none'; }
 
         async function enviarMensagemMassa() {
             const texto = document.getElementById('texto-mensagem').value;
-            if (!texto.trim()) return alert("Digite uma mensagem.");
-
+            const arquivoInput = document.getElementById('arquivo-msg');
             const checks = document.querySelectorAll('.check-afiliado:checked');
+            
+            if (!texto.trim() && !arquivoInput.files[0]) return alert("Digite uma mensagem ou anexe um arquivo.");
+
             const token = localStorage.getItem('adminToken');
             const btn = document.querySelector('.btn-confirm');
-            
-            btn.innerText = "Enviando...";
-            btn.disabled = true;
+            btn.innerText = "Enviando..."; btn.disabled = true;
 
             let enviados = 0;
 
-            // Envia um por um
             for (const checkbox of checks) {
                 const id = checkbox.value;
+                
+                // CRIA O PACOTE DE DADOS (FormData é necessário para enviar arquivos)
+                const formData = new FormData();
+                formData.append('afiliadoId', id);
+                formData.append('texto', texto);
+                if (arquivoInput.files[0]) {
+                    formData.append('arquivo', arquivoInput.files[0]);
+                }
+
                 try {
+                    // NÃO coloque header 'Content-Type': 'application/json' aqui! O navegador resolve sozinho.
                     await fetch(`${API_URL}/admin/mensagens`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify({ afiliadoId: id, texto: texto })
+                        headers: { 'Authorization': `Bearer ${token}` }, 
+                        body: formData
                     });
                     enviados++;
-                } catch (e) { console.error("Erro ao enviar para ID " + id); }
+                } catch (e) { console.error("Erro ID " + id); }
             }
 
-            alert(`✅ Mensagem enviada para ${enviados} afiliado(s)!`);
-            btn.innerText = "Enviar Agora 🚀";
-            btn.disabled = false;
-            document.getElementById('texto-mensagem').value = '';
+            alert(`✅ Mensagem/Arquivo enviado para ${enviados} afiliado(s)!`);
+            btn.innerText = "Enviar Agora 🚀"; btn.disabled = false;
             fecharModal();
-            
-            // Limpa seleção
             document.getElementById('check-all').checked = false;
             document.querySelectorAll('.check-afiliado').forEach(c => c.checked = false);
             atualizarContador();
         }
 
-        // 5. AÇÕES DO SISTEMA (Aprovar/Sair)
         async function aprovar(id) {
             if(!confirm("Aprovar parceiro?")) return;
             const token = localStorage.getItem('adminToken');
             await fetch(`${API_URL}/admin/afiliados/${id}/status`, { 
-                method: 'PUT', 
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ aprovado: true })
+                method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ aprovado: true })
             });
             carregarAfiliados();
         }
 
         function logout() { localStorage.removeItem('adminToken'); window.location.href = 'admin_login.html'; }
-        
-        // Iniciar
         carregarAfiliados();
     </script>
 </body>

@@ -94,6 +94,7 @@ model Orcamento {
 model Mensagem {
   id        Int      @id @default(autoincrement())
   texto     String
+  arquivo   String?
   lida      Boolean  @default(false)
   
   afiliadoId Int

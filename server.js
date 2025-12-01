@@ -3,6 +3,8 @@ const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
 const jwt = require('jsonwebtoken');
 const path = require('path'); // <--- 1. IMPORTANTE: Importar o Path
+const multer = require('multer');
+const fs = require('fs');
 
 const prisma = new PrismaClient();
 const app = express();
@@ -15,6 +17,7 @@ app.use(express.json());
 // =================================================================
 // Isso diz ao servidor: "Se alguém pedir index.html, css ou js, entregue!"
 app.use(express.static(path.join(__dirname, '.'))); 
+app.use('/uploads', express.static('uploads'));
 
 const SECRET_KEY = "SEGREDO_SUPER_SECRETO"; 
 
@@ -33,6 +36,25 @@ function authenticateToken(req, res, next) {
         next();
     });
 }
+
+
+// Garante que a pasta uploads existe
+if (!fs.existsSync('uploads')) {
+    fs.mkdirSync('uploads');
+}
+
+// Configuração do Carteiro (Onde salvar e qual nome dar)
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/') 
+    },
+    filename: function (req, file, cb) {
+        // Salva com data para não repetir nome (ex: 171500-comprovante.pdf)
+        cb(null, Date.now() + path.extname(file.originalname)) 
+    }
+});
+
+const upload = multer({ storage: storage });
 
 // =================================================================
 // 🔑 ROTA DE LOGIN ADMIN (ATUALIZADA)
@@ -274,17 +296,19 @@ app.get('/afiliado/mensagens', authenticateToken, async (req, res) => {
     } catch(e) { res.status(500).json({ erro: "Erro ao buscar mensagens" }); }
 });
 
-// ROTA ADMIN: ENVIAR MENSAGEM PARA AFILIADO
-app.post('/admin/mensagens', authenticateToken, async (req, res) => {
-    // Verifica se é admin
+// NOVA ROTA: ENVIAR MENSAGEM COM ARQUIVO
+// Note o 'upload.single' ali no meio
+app.post('/admin/mensagens', authenticateToken, upload.single('arquivo'), async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
 
     try {
         const { afiliadoId, texto } = req.body;
-        
+        const arquivoPath = req.file ? req.file.path : null; // Pega o caminho se tiver arquivo
+
         await prisma.mensagem.create({
             data: {
-                texto: texto,
+                texto: texto || "", // Texto pode ser vazio se tiver anexo
+                arquivo: arquivoPath,
                 afiliadoId: parseInt(afiliadoId)
             }
         });

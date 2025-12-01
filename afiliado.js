@@ -117,10 +117,13 @@ async function carregarMensagens() {
             msgs.forEach(m => {
                 const data = new Date(m.createdAt).toLocaleDateString('pt-BR');
                 box.innerHTML += `
-                    <div class="msg-item">
-                        <span class="msg-date">${data}</span>
-                        <div class="msg-text">${m.texto}</div>
-                    </div>`;
+                                <div class="msg-item">
+                                <span class="msg-date">${data}</span>
+                                <div class="msg-text">
+                                    ${m.texto}
+                                    ${m.arquivo ? `<br><a href="${API_URL}/${m.arquivo}" target="_blank" style="color:#3498db; font-weight:bold; display:inline-flex; align-items:center; gap:5px; margin-top:5px;"><i class="ph ph-file-pdf"></i> Ver Anexo</a>` : ''}
+                                </div>
+                </div>`;
             });
         } else {
             box.innerHTML = '<div class="empty-msg">Nenhuma mensagem nova.</div>';

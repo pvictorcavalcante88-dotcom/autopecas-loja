@@ -238,6 +238,30 @@ app.post('/finalizar-pedido', async (req, res) => {
     } catch (error) { res.status(500).json({ erro: "Erro ao processar pedido" }); }
 });
 
+// ATUALIZAR DADOS BANCÁRIOS / PERFIL
+app.put('/afiliado/perfil', authenticateToken, async (req, res) => {
+    try {
+        const { chavePix, banco, agencia, conta } = req.body;
+        await prisma.afiliado.update({
+            where: { id: req.user.id },
+            data: { chavePix, banco, agencia, conta }
+        });
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ erro: "Erro ao atualizar perfil" }); }
+});
+
+// LER MENSAGENS DO ADMIN
+app.get('/afiliado/mensagens', authenticateToken, async (req, res) => {
+    try {
+        const msgs = await prisma.mensagem.findMany({
+            where: { afiliadoId: req.user.id },
+            orderBy: { createdAt: 'desc' },
+            take: 10
+        });
+        res.json(msgs);
+    } catch(e) { res.status(500).json({ erro: "Erro ao buscar mensagens" }); }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);

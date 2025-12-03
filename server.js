@@ -102,10 +102,7 @@ app.post('/afiliado/login', async (req, res) => {
     }
 });
 
-// =================================================================
-// 🔎 ROTA DE BUSCA
-// =================================================================
-app.get('/search', async (req, res) => {
+/app.get('/search', async (req, res) => {
     try {
         const { q, categoria } = req.query;
         let whereClause = {};
@@ -123,7 +120,8 @@ app.get('/search', async (req, res) => {
                         { carros: { contains: termo } },
                         { pesquisa: { contains: termo } },
                         { fabricante: { contains: termo } },
-                        { categoria: { contains: termo } }
+                        { categoria: { contains: termo } },
+                        { tags: { contains: termo } } // <--- ADICIONE SÓ ESSA LINHA AQUI!
                     ]
                 });
             });
@@ -432,6 +430,63 @@ app.post('/admin/mensagens', authenticateToken, async (req, res) => {
         });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ erro: "Erro ao enviar mensagem." }); }
+});
+
+// =========================================================
+// 🧠 ROTAS DE INTELIGÊNCIA (SUGESTÕES)
+// =========================================================
+
+// 1. AFILIADO ENVIA SUGESTÃO
+app.post('/afiliado/sugestoes', authenticateToken, async (req, res) => {
+    try {
+        const { produtoId, termo, motivo } = req.body;
+        await prisma.sugestao.create({
+            data: {
+                termo,
+                motivo,
+                produtoId: parseInt(produtoId),
+                afiliadoId: req.user.id
+            }
+        });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ erro: "Erro ao salvar sugestão." }); }
+});
+
+// 2. ADMIN LISTA SUGESTÕES
+app.get('/admin/sugestoes', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    const lista = await prisma.sugestao.findMany({
+        where: { status: 'PENDENTE' },
+        include: { produto: true, afiliado: true }
+    });
+    res.json(lista);
+});
+
+// 3. ADMIN APROVA (Adiciona nas TAGS do produto)
+app.post('/admin/sugestoes/:id/aprovar', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    try {
+        const sugestao = await prisma.sugestao.findUnique({ where: { id: parseInt(req.params.id) }, include: { produto: true } });
+        
+        // Pega as tags atuais e adiciona a nova
+        const tagsAtuais = sugestao.produto.tags || ""; 
+        const novasTags = tagsAtuais + " " + sugestao.termo; 
+        
+        await prisma.produto.update({
+            where: { id: sugestao.produtoId },
+            data: { tags: novasTags }
+        });
+
+        await prisma.sugestao.update({ where: { id: sugestao.id }, data: { status: 'APROVADO' } });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ erro: "Erro ao aprovar." }); }
+});
+
+// 4. ADMIN REJEITA
+app.post('/admin/sugestoes/:id/rejeitar', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    await prisma.sugestao.update({ where: { id: parseInt(req.params.id) }, data: { status: 'REJEITADO' } });
+    res.json({ success: true });
 });
 
 const PORT = process.env.PORT || 3000;

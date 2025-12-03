@@ -157,6 +157,7 @@
                     MARGEM_ATUAL = parseFloat(localStorage.getItem('minhaMargem') || 0);
                     document.getElementById('affiliate-area').style.display = 'block';
                     document.getElementById('input-margem').value = MARGEM_ATUAL;
+                    document.getElementById('box-sugestao').style.display = 'block'; // Mostra o botão
                 }
 
                 const res = await fetch(`${API_URL}/products/${id}`);
@@ -174,6 +175,31 @@
             } catch(e) {
                 document.getElementById('product-container').innerHTML = '<h2>Produto não encontrado.</h2>';
             }
+
+            function abrirModalSugestao() {
+    document.getElementById('modal-sugestao').style.display = 'flex';
+}
+
+async function enviarSugestao() {
+    const termo = document.getElementById('termo-sugestao').value;
+    if(!termo) return alert("Digite algo!");
+    
+    const afData = JSON.parse(localStorage.getItem('afiliadoLogado'));
+
+    try {
+        const res = await fetch(`${API_URL}/afiliado/sugestoes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${afData.token}` },
+            body: JSON.stringify({ produtoId: PRODUTO_ATUAL.id, termo: termo, motivo: "Sugestão via vitrine" })
+        });
+        if(res.ok) {
+            alert("Obrigado! Sua sugestão foi enviada para análise.");
+            document.getElementById('modal-sugestao').style.display = 'none';
+            document.getElementById('termo-sugestao').value = '';
+        }
+    } catch(e) { alert("Erro ao enviar."); }
+}
+
         }
 
         // Atualiza preço ao mudar margem

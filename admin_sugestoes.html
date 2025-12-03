@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Sugestões - Admin</title>
+    <link rel="stylesheet" href="admin.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <aside class="sidebar">
+            <h3>Admin</h3>
+            <nav>
+                <a href="admin_dashboard.html">Dashboard</a>
+                <a href="admin_sugestoes.html" class="active">💡 Sugestões</a> </nav>
+        </aside>
+
+        <main class="main-content">
+            <h1>Revisão de Sugestões</h1>
+            <p>Aprove o conhecimento dos seus parceiros para melhorar a busca.</p>
+
+            <div class="card" style="background:white; padding:20px; margin-top:20px; border-radius:8px;">
+                <table style="width:100%; border-collapse:collapse;">
+                    <thead>
+                        <tr style="text-align:left; border-bottom:2px solid #eee;">
+                            <th style="padding:10px;">Produto</th>
+                            <th style="padding:10px;">Sugestão (Termo)</th>
+                            <th style="padding:10px;">Quem sugeriu</th>
+                            <th style="padding:10px;">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lista-sugestoes"></tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const API_URL = ''; 
+        async function carregar() {
+            const token = localStorage.getItem('adminToken');
+            const res = await fetch(`${API_URL}/admin/sugestoes`, { headers: {'Authorization': `Bearer ${token}`} });
+            const lista = await res.json();
+            
+            const tbody = document.getElementById('lista-sugestoes');
+            tbody.innerHTML = '';
+            
+            if(lista.length === 0) tbody.innerHTML = '<tr><td colspan="4" style="padding:20px; text-align:center;">Tudo limpo! Nenhuma sugestão pendente.</td></tr>';
+
+            lista.forEach(s => {
+                tbody.innerHTML += `
+                    <tr style="border-bottom:1px solid #eee;">
+                        <td style="padding:10px;">
+                            <img src="${s.produto.image}" width="30" style="vertical-align:middle;"> 
+                            ${s.produto.name}
+                        </td>
+                        <td style="padding:10px; font-weight:bold; color:#2980b9;">${s.termo}</td>
+                        <td style="padding:10px;">${s.afiliado.nome}</td>
+                        <td style="padding:10px;">
+                            <button onclick="decidir(${s.id}, 'aprovar')" style="background:#27ae60; color:white; border:none; padding:5px 10px; cursor:pointer; border-radius:4px;">Aceitar</button>
+                            <button onclick="decidir(${s.id}, 'rejeitar')" style="background:#c0392b; color:white; border:none; padding:5px 10px; cursor:pointer; border-radius:4px;">Recusar</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function decidir(id, acao) {
+            const token = localStorage.getItem('adminToken');
+            await fetch(`${API_URL}/admin/sugestoes/${id}/${acao}`, { method: 'POST', headers: {'Authorization': `Bearer ${token}`} });
+            carregar();
+        }
+        carregar();
+    </script>
+</body>
+</html>

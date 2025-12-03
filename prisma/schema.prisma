@@ -35,6 +35,7 @@ model Afiliado {
   pedidos   Pedido[] 
   orcamentos Orcamento[]
   mensagens Mensagem[]
+  sugestoes   Sugestao[]
 
   createdAt DateTime @default(now())
 }
@@ -58,6 +59,9 @@ model Produto {
   imagem              String?
   imagens_extra       String?
   produtos_relacionados String?
+  tags        String?
+  sugestoes   Sugestao[]
+
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 }
@@ -96,6 +100,21 @@ model Mensagem {
   texto     String
   arquivo   String?
   lida      Boolean  @default(false)
+  
+  afiliadoId Int
+  afiliado   Afiliado @relation(fields: [afiliadoId], references: [id])
+  
+  createdAt DateTime @default(now())
+}
+
+model Sugestao {
+  id        Int      @id @default(autoincrement())
+  termo     String   // O que ele digitou (ex: "Tripoide")
+  motivo    String?  // Ex: "Conhecido também como..."
+  status    String   @default("PENDENTE") // PENDENTE, APROVADO, REJEITADO
+  
+  produtoId Int
+  produto   Produto  @relation(fields: [produtoId], references: [id])
   
   afiliadoId Int
   afiliado   Afiliado @relation(fields: [afiliadoId], references: [id])

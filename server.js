@@ -287,6 +287,49 @@ app.post('/finalizar-pedido', async (req, res) => {
     } catch (error) { res.status(500).json({ erro: "Erro ao processar pedido" }); }
 });
 
+// =========================================================
+// 🔔 SISTEMA DE NOTIFICAÇÕES DO AFILIADO
+// =========================================================
+
+// 1. Buscar Notificações (Vendas novas e Mensagens não lidas)
+app.get('/afiliado/notificacoes', authenticateToken, async (req, res) => {
+    try {
+        const id = req.user.id;
+        
+        // Busca mensagens não lidas
+        const mensagens = await prisma.mensagem.findMany({
+            where: { afiliadoId: id, lida: false },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        // Busca vendas que ele ainda não viu
+        const vendas = await prisma.pedido.findMany({
+            where: { afiliadoId: id, notificado_afiliado: false },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        res.json({ mensagens, vendas });
+    } catch (e) { res.status(500).json({ mensagens: [], vendas: [] }); }
+});
+
+// 2. Marcar como Lidas (Limpar o sininho)
+app.post('/afiliado/notificacoes/ler', authenticateToken, async (req, res) => {
+    try {
+        const id = req.user.id;
+        // Marca mensagens como lidas
+        await prisma.mensagem.updateMany({
+            where: { afiliadoId: id, lida: false },
+            data: { lida: true }
+        });
+        // Marca vendas como vistas
+        await prisma.pedido.updateMany({
+            where: { afiliadoId: id, notificado_afiliado: false },
+            data: { notificado_afiliado: true }
+        });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: "Erro ao limpar notificações" }); }
+});
+
 // ATUALIZAR DADOS BANCÁRIOS / PERFIL
 app.put('/afiliado/perfil', authenticateToken, async (req, res) => {
     try {

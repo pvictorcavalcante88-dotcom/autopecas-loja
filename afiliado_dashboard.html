@@ -55,6 +55,50 @@
         .btn-blue { background: #3498db; color: white; }
         .btn-red { background: #e74c3c; color: white; }
     </style>
+
+    <style>
+    /* SINO DE NOTIFICAÇÃO */
+    .notification-container { 
+        position: relative; 
+        margin-right: 20px; 
+        cursor: pointer; 
+        display: flex; 
+        align-items: center; 
+    }
+    
+    .bell-icon { 
+        font-size: 1.8rem; 
+        color: #fff; /* Branco para destacar no fundo escuro */
+        transition: 0.3s; 
+    }
+    .bell-icon:hover { color: #f1c40f; transform: scale(1.1); }
+
+    .badge {
+        position: absolute; top: -5px; right: -5px;
+        background: #e74c3c; color: white;
+        font-size: 0.7rem; font-weight: bold;
+        width: 18px; height: 18px;
+        border-radius: 50%; display: none; /* Escondido se for 0 */
+        align-items: center; justify-content: center;
+        border: 2px solid #2c3e50; /* Borda escura para separar */
+    }
+
+    /* MENUZINHO QUE ABRE */
+    .notif-dropdown {
+        position: absolute; top: 40px; right: 0;
+        width: 320px; background: white;
+        border-radius: 8px; box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        display: none; z-index: 1000; overflow: hidden;
+        border: 1px solid #eee;
+    }
+    .notif-header { background: #f8f9fa; padding: 10px 15px; font-weight: bold; color: #555; border-bottom: 1px solid #eee; display:flex; justify-content:space-between; align-items:center;}
+    .notif-list { max-height: 300px; overflow-y: auto; }
+    .notif-item { padding: 12px 15px; border-bottom: 1px solid #f1f1f1; font-size: 0.85rem; display: flex; gap: 10px; align-items: start; color: #333; }
+    .notif-item:hover { background: #f0f8ff; }
+    .notif-sale i { color: #27ae60; }
+    .notif-msg i { color: #3498db; }
+</style>
+
 </head>
 <body>
 
@@ -64,6 +108,31 @@
                 <h1>Olá, <span id="afiliado-nome">Parceiro</span>! 🦊</h1>
                 <p>Gerencie seus ganhos e orçamentos.</p>
             </div>
+            <header style="display:flex; justify-content:space-between; align-items:center; padding:15px 30px; background:#2c3e50; color:white;">
+    
+    <div class="user-info">
+        <h3>Olá, <span id="afiliado-nome">Parceiro</span>! 👋</h3>
+    </div>
+
+    <div style="display:flex; align-items:center;">
+        
+        <div class="notification-container" onclick="abrirNotificacoes()">
+            <i class="ph ph-bell bell-icon"></i>
+            <span id="notif-badge" class="badge">0</span>
+            
+            <div id="notif-dropdown" class="notif-dropdown" onclick="event.stopPropagation()">
+                <div class="notif-header">
+                    Notificações 
+                    <small style="cursor:pointer; color:#3498db;" onclick="limparTudo()">Limpar</small>
+                </div>
+                <div id="notif-list" class="notif-list">
+                    </div>
+            </div>
+        </div>
+        <a href="index.html" class="btn-loja" style="margin-left:20px;">Ir para Loja</a>
+        <button onclick="logout()" class="btn-sair">Sair</button>
+    </div>
+</header>
             <div style="display: flex; gap: 10px;">
                 <a href="index.html" class="btn-action btn-blue"><i class="ph ph-storefront"></i> Ir para Loja</a>
                 <button id="logout-btn" class="btn-action btn-red"><i class="ph ph-sign-out"></i> Sair</button>

@@ -212,3 +212,105 @@ async function excluirOrcamento(id) {
         if(res.ok) carregarMeusOrcamentos();
     } catch(e) { alert("Erro ao excluir"); }
 }
+
+// --- LÓGICA DE NOTIFICAÇÕES ---
+
+function iniciarNotificacoes() {
+    verificarNotificacoes();
+    // Verifica de novo a cada 30 segundos
+    setInterval(verificarNotificacoes, 30000);
+}
+
+async function verificarNotificacoes() {
+    try {
+        if(!AFILIADO_DADOS) return; // Se não estiver logado, para.
+        
+        const res = await fetch(`${API_URL}/afiliado/notificacoes`, {
+            headers: { 'Authorization': `Bearer ${AFILIADO_DADOS.token}` }
+        });
+        const dados = await res.json();
+        
+        const total = dados.mensagens.length + dados.vendas.length;
+        const badge = document.getElementById('notif-badge');
+        const lista = document.getElementById('notif-list');
+        
+        // Atualiza a bolinha vermelha
+        if(total > 0) {
+            badge.style.display = 'flex';
+            badge.innerText = total > 9 ? '9+' : total;
+        } else {
+            badge.style.display = 'none';
+        }
+
+        // Monta a lista
+        lista.innerHTML = '';
+        
+        if(total === 0) {
+            lista.innerHTML = '<div style="padding:15px; text-align:center; color:#999;">Nada novo por aqui. 💤</div>';
+            return;
+        }
+
+        // Adiciona Vendas
+        dados.vendas.forEach(v => {
+            lista.innerHTML += `
+                <div class="notif-item notif-sale">
+                    <i class="ph ph-currency-circle-dollar" style="font-size:1.2rem;"></i>
+                    <div>
+                        <strong>Venda Realizada!</strong><br>
+                        Pedido #${v.id} gerou comissão.<br>
+                        <small style="color:#aaa;">Agora mesmo</small>
+                    </div>
+                </div>`;
+        });
+
+        // Adiciona Mensagens
+        dados.mensagens.forEach(m => {
+            lista.innerHTML += `
+                <div class="notif-item notif-msg">
+                    <i class="ph ph-chat-centered-text" style="font-size:1.2rem;"></i>
+                    <div>
+                        <strong>Nova Mensagem do Admin</strong><br>
+                        "${m.texto.substring(0, 30)}..."<br>
+                        <small style="color:#aaa;">Veja no painel</small>
+                    </div>
+                </div>`;
+        });
+
+    } catch(e) { console.error("Erro notif:", e); }
+}
+
+async function abrirNotificacoes() {
+    const dropdown = document.getElementById('notif-dropdown');
+    const badge = document.getElementById('notif-badge');
+    
+    // Se estiver fechado, abre e marca como lido
+    if (dropdown.style.display !== 'block') {
+        dropdown.style.display = 'block';
+        
+        // Limpa no servidor
+        if(badge.style.display !== 'none') {
+            await fetch(`${API_URL}/afiliado/notificacoes/ler`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${AFILIADO_DADOS.token}` }
+            });
+            badge.style.display = 'none'; // Some a bolinha na hora
+        }
+    } else {
+        dropdown.style.display = 'none';
+    }
+}
+
+// Fecha o dropdown se clicar fora
+window.addEventListener('click', (e) => {
+    const container = document.querySelector('.notification-container');
+    const dropdown = document.getElementById('notif-dropdown');
+    if (container && !container.contains(e.target)) {
+        dropdown.style.display = 'none';
+    }
+});
+
+// INICIA TUDO
+document.addEventListener('DOMContentLoaded', () => {
+    // ... suas outras inits ...
+    iniciarNotificacoes();
+});

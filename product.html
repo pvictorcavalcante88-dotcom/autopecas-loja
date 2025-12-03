@@ -101,9 +101,7 @@
         <div style="background:white; padding:25px; width:400px; border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
             <h3>Sugerir Informação</h3>
             <p style="font-size:0.85rem; color:#666;">O que você quer adicionar? (Ex: "Serve no Gol G5", "Conhecido como Tripoide")</p>
-            
             <input type="text" id="termo-sugestao" placeholder="Digite o termo..." style="width:100%; padding:10px; margin:10px 0; border:1px solid #ddd; border-radius:4px;">
-            
             <div style="text-align:right; gap:10px; display:flex; justify-content:flex-end;">
                 <button onclick="document.getElementById('modal-sugestao').style.display='none'" style="padding:8px 15px; border:none; background:#eee; cursor:pointer; border-radius:4px;">Cancelar</button>
                 <button onclick="enviarSugestao()" style="padding:8px 15px; border:none; background:#27ae60; color:white; font-weight:bold; cursor:pointer; border-radius:4px;">Enviar</button>
@@ -155,8 +153,6 @@
                     MARGEM_ATUAL = parseFloat(localStorage.getItem('minhaMargem') || 0);
                     document.getElementById('affiliate-area').style.display = 'block';
                     document.getElementById('input-margem').value = MARGEM_ATUAL;
-                    
-                    // Agora este elemento EXISTE no HTML, então não vai dar erro
                     document.getElementById('box-sugestao').style.display = 'block'; 
                 }
 
@@ -165,16 +161,25 @@
                 
                 PRODUTO_ATUAL = await res.json();
 
-                document.getElementById('prod-img').src = PRODUTO_ATUAL.image || PRODUTO_ATUAL.imagem;
-                document.getElementById('prod-title').textContent = PRODUTO_ATUAL.name || PRODUTO_ATUAL.titulo;
-                document.getElementById('prod-cat').textContent = (PRODUTO_ATUAL.categoria || "Peças") + " > Cód: " + PRODUTO_ATUAL.id;
-                document.getElementById('prod-desc').textContent = PRODUTO_ATUAL.descricao || "Peça original com garantia.";
+                // CORREÇÃO: Usando os campos exatos do seu banco de dados
+                document.getElementById('prod-img').src = PRODUTO_ATUAL.imagem || 'https://placehold.co/400';
+                document.getElementById('prod-title').textContent = PRODUTO_ATUAL.titulo;
+                document.getElementById('prod-cat').textContent = (PRODUTO_ATUAL.categoria || "Peças") + " > Ref: " + (PRODUTO_ATUAL.referencia || "---");
+                
+                // Monta uma descrição com o que tem disponível
+                let desc = "";
+                if(PRODUTO_ATUAL.referencia) desc += `<strong>Ref:</strong> ${PRODUTO_ATUAL.referencia}<br>`;
+                if(PRODUTO_ATUAL.fabricante) desc += `<strong>Marca:</strong> ${PRODUTO_ATUAL.fabricante}<br>`;
+                if(PRODUTO_ATUAL.carros) desc += `<strong>Aplicação:</strong> ${PRODUTO_ATUAL.carros}<br>`;
+                if(PRODUTO_ATUAL.motor) desc += `<strong>Motor:</strong> ${PRODUTO_ATUAL.motor}`;
+                
+                document.getElementById('prod-desc').innerHTML = desc || "Detalhes técnicos não informados.";
 
                 atualizarPrecoTela();
 
             } catch(e) {
                 console.error(e);
-                document.getElementById('product-container').innerHTML = '<h2>Produto não encontrado.</h2>';
+                document.getElementById('product-container').innerHTML = '<h2>Produto não encontrado ou erro de conexão.</h2>';
             }
         }
 
@@ -182,7 +187,8 @@
         function atualizarPrecoTela() {
             if(!PRODUTO_ATUAL) return;
 
-            const precoBase = parseFloat(PRODUTO_ATUAL.price || PRODUTO_ATUAL.preco_novo);
+            // CORREÇÃO: Usando 'preco_novo'
+            const precoBase = parseFloat(PRODUTO_ATUAL.preco_novo);
             const qtd = parseInt(document.getElementById('qtd').value) || 1;
 
             const precoUnitarioFinal = precoBase * (1 + (MARGEM_ATUAL / 100));
@@ -192,8 +198,9 @@
             document.getElementById('prod-price').textContent = precoUnitarioFinal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
             document.getElementById('lucro-estimado').innerHTML = `${lucroTotal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} <small style="color:#7f8c8d;">(${qtd} itens)</small>`;
             
-            if(MARGEM_ATUAL < 10) {
-                document.getElementById('prod-old-price').textContent = (precoUnitarioFinal * 1.2).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+            // Verifica se tem preço antigo para mostrar promoção
+            if(PRODUTO_ATUAL.preco_antigo && PRODUTO_ATUAL.preco_antigo > precoBase) {
+                document.getElementById('prod-old-price').textContent = parseFloat(PRODUTO_ATUAL.preco_antigo).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
             } else {
                 document.getElementById('prod-old-price').textContent = "";
             }
@@ -222,7 +229,7 @@
             }
             
             localStorage.setItem('nossoCarrinho', JSON.stringify(carrinho));
-            atualizarIconeCarrinho(); // Função global do script.js
+            atualizarIconeCarrinho();
             
             const btn = document.querySelector('.btn-buy-now');
             btn.innerHTML = '<i class="ph ph-check"></i> Adicionado!';
@@ -233,7 +240,7 @@
             }, 2000);
         }
 
-        // --- 4. SUGESTÕES (Agora fora da função principal) ---
+        // --- 4. SUGESTÕES ---
         function abrirModalSugestao() {
             document.getElementById('modal-sugestao').style.display = 'flex';
         }
@@ -244,7 +251,6 @@
             
             const afData = localStorage.getItem('afiliadoLogado');
             if (!afData) return alert("Você precisa estar logado.");
-            
             const token = JSON.parse(afData).token;
 
             try {
@@ -257,9 +263,7 @@
                     alert("Obrigado! Sua sugestão foi enviada para análise.");
                     document.getElementById('modal-sugestao').style.display = 'none';
                     document.getElementById('termo-sugestao').value = '';
-                } else {
-                    alert("Erro ao enviar sugestão.");
-                }
+                } else { alert("Erro ao enviar sugestão."); }
             } catch(e) { alert("Erro de conexão."); }
         }
     </script>

@@ -113,9 +113,11 @@
         <p>© 2025 AutoPeças Veloz.</p>
     </footer>
 
-    <script src="script.js"></script>
+<script src="script.js"></script>
     <script>
-        const API_URL = ''; // Garante que a variável existe
+        // --- CORREÇÃO: Usa a URL do script.js ou define vazia se não existir ---
+        const BASE_API = (typeof API_URL !== 'undefined') ? API_URL : ''; 
+        
         let PRODUTO_ATUAL = null;
         let MARGEM_ATUAL = 0;
 
@@ -127,17 +129,26 @@
             const termo = inputSearch.value.trim();
             if(termo) window.location.href = `index.html?search=${encodeURIComponent(termo)}`;
         }
-        btnSearch.addEventListener('click', realizarBusca);
-        inputSearch.addEventListener('keypress', (e) => { if(e.key === 'Enter') realizarBusca(); });
+        if(btnSearch) btnSearch.addEventListener('click', realizarBusca);
+        if(inputSearch) inputSearch.addEventListener('keypress', (e) => { if(e.key === 'Enter') realizarBusca(); });
 
         // --- 2. CARREGAMENTO ---
         document.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams(window.location.search);
             const id = params.get('id');
-            if(id) carregarProduto(id);
             
-            document.getElementById('qtd').addEventListener('input', atualizarPrecoTela);
-            document.getElementById('input-margem').addEventListener('input', (e) => {
+            if(id) {
+                carregarProduto(id);
+            } else {
+                document.getElementById('product-container').innerHTML = '<h2>Produto não especificado. Volte para a loja.</h2>';
+            }
+            
+            // Eventos dos inputs
+            const qtdInput = document.getElementById('qtd');
+            if(qtdInput) qtdInput.addEventListener('input', atualizarPrecoTela);
+            
+            const margemInput = document.getElementById('input-margem');
+            if(margemInput) margemInput.addEventListener('input', (e) => {
                 MARGEM_ATUAL = parseFloat(e.target.value) || 0;
                 atualizarPrecoTela();
             });
@@ -145,43 +156,48 @@
 
         async function carregarProduto(id) {
             try {
-                // Afiliado Logado?
+                // Lógica do Afiliado
                 const afData = localStorage.getItem('afiliadoLogado');
-                const isAfiliado = !!afData;
-                
-                if(isAfiliado) {
+                if(afData) {
                     MARGEM_ATUAL = parseFloat(localStorage.getItem('minhaMargem') || 0);
-                    document.getElementById('affiliate-area').style.display = 'block';
-                    document.getElementById('input-margem').value = MARGEM_ATUAL;
-                    document.getElementById('box-sugestao').style.display = 'block'; 
+                    const areaAfiliado = document.getElementById('affiliate-area');
+                    const inputMargem = document.getElementById('input-margem');
+                    const boxSugestao = document.getElementById('box-sugestao');
+
+                    if(areaAfiliado) areaAfiliado.style.display = 'block';
+                    if(inputMargem) inputMargem.value = MARGEM_ATUAL;
+                    if(boxSugestao) boxSugestao.style.display = 'block';
                 }
 
-                const res = await fetch(`${API_URL}/products/${id}`);
-                if(!res.ok) throw new Error("Produto não encontrado");
+                // BUSCA O PRODUTO
+                const res = await fetch(`${BASE_API}/products/${id}`); // Usa a variável segura
+                if(!res.ok) throw new Error("Erro ao buscar");
                 
                 PRODUTO_ATUAL = await res.json();
 
-                // CORREÇÃO: Usando os campos exatos do seu banco de dados
+                // PREENCHE A TELA (Usando os nomes do seu Banco: titulo, preco_novo, imagem)
                 document.getElementById('prod-img').src = PRODUTO_ATUAL.imagem || 'https://placehold.co/400';
                 document.getElementById('prod-title').textContent = PRODUTO_ATUAL.titulo;
-                document.getElementById('prod-cat').textContent = (PRODUTO_ATUAL.categoria || "Peças") + " > Ref: " + (PRODUTO_ATUAL.referencia || "---");
-                
-                // Monta uma descrição com o que tem disponível
+                document.getElementById('prod-cat').textContent = (PRODUTO_ATUAL.categoria || "Peças") + " > " + (PRODUTO_ATUAL.referencia || "Ref: ---");
+
+                // Monta descrição
                 let desc = "";
                 if(PRODUTO_ATUAL.referencia) desc += `<strong>Ref:</strong> ${PRODUTO_ATUAL.referencia}<br>`;
                 if(PRODUTO_ATUAL.fabricante) desc += `<strong>Marca:</strong> ${PRODUTO_ATUAL.fabricante}<br>`;
                 if(PRODUTO_ATUAL.carros) desc += `<strong>Aplicação:</strong> ${PRODUTO_ATUAL.carros}<br>`;
                 if(PRODUTO_ATUAL.motor) desc += `<strong>Motor:</strong> ${PRODUTO_ATUAL.motor}`;
                 
-                document.getElementById('prod-desc').innerHTML = desc || "Detalhes técnicos não informados.";
+                document.getElementById('prod-desc').innerHTML = desc || "Sem descrição técnica.";
 
                 atualizarPrecoTela();
 
             } catch(e) {
                 console.error(e);
-                document.getElementById('product-container').innerHTML = '<h2>Produto não encontrado ou erro de conexão.</h2>';
+                document.getElementById('product-container').innerHTML = '<h2>Produto não encontrado.</h2>';
             }
         }
+        
+        // ... O RESTO DAS FUNÇÕES (atualizarPrecoTela, mudarQtd, etc) CONTINUA IGUAL ...
 
         // --- 3. LÓGICA DE PREÇO ---
         function atualizarPrecoTela() {

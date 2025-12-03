@@ -173,12 +173,28 @@ app.delete('/orcamentos/:id', authenticateToken, async (req, res) => {
 // =================================================================
 // 📦 ROTAS DE PRODUTOS E CONFIG
 // =================================================================
+// ROTA PARA BUSCAR UM ÚNICO PRODUTO (Detalhes)
 app.get('/products/:id', async (req, res) => {
     try {
-        const produto = await prisma.produto.findUnique({ where: { id: parseInt(req.params.id) } });
-        if (produto) res.json(produto);
-        else res.status(404).json({ error: "Não encontrado" });
-    } catch (e) { res.status(500).json({ error: "Erro" }); }
+        const id = parseInt(req.params.id); // Converte "1" (texto) para 1 (número)
+        
+        if (isNaN(id)) {
+            return res.status(400).json({ erro: "ID inválido" });
+        }
+
+        const produto = await prisma.produto.findUnique({
+            where: { id: id }
+        });
+
+        if (!produto) {
+            return res.status(404).json({ erro: "Produto não encontrado" });
+        }
+
+        res.json(produto);
+    } catch (e) {
+        console.error("Erro ao buscar produto:", e);
+        res.status(500).json({ erro: "Erro no servidor" });
+    }
 });
 
 app.post('/admin/produtos', authenticateToken, async (req, res) => {

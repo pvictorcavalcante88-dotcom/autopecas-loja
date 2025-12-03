@@ -102,7 +102,8 @@ app.post('/afiliado/login', async (req, res) => {
     }
 });
 
-/app.get('/search', async (req, res) => {
+// ROTA DE BUSCA INTELIGENTE (Corrigida e Melhorada)
+app.get('/search', async (req, res) => {
     try {
         const { q, categoria } = req.query;
         let whereClause = {};

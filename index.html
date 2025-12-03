@@ -40,6 +40,21 @@
             </div>
 
             <div class="header-actions">
+
+                <div id="box-sino" class="notification-container" onclick="abrirNotificacoes()">
+        <i class="ph ph-bell bell-icon"></i>
+        <span id="notif-badge" class="badge">0</span>
+        
+        <div id="notif-dropdown" class="notif-dropdown" onclick="event.stopPropagation()">
+            <div class="notif-header">
+                Atualizações
+                <small style="cursor:pointer; color:#3498db;" onclick="marcarLidas()">Limpar</small>
+            </div>
+            <div id="notif-list" class="notif-list">
+                </div>
+        </div>
+    </div>
+
                 <a href="login.html" class="action-button" id="btn-login-header">
                     <i class="ph ph-user"></i>
                     <span>Entrar</span>
@@ -131,6 +146,109 @@
     <footer class="main-footer">
         <p>© 2025 AutoPeças Veloz. Todos os direitos reservados.</p>
     </footer>
+
+    <script>
+        // --- LÓGICA DO SINO NA LOJA ---
+        const API_URL_NOTIF = ''; // Defina sua URL se precisar, ou deixe vazia se for relativa
+
+        document.addEventListener('DOMContentLoaded', () => {
+            verificarAfiliadoLogado();
+        });
+
+        function verificarAfiliadoLogado() {
+            const afData = localStorage.getItem('afiliadoLogado');
+            
+            if (afData) {
+                // 1. Mostra o sino
+                document.getElementById('box-sino').style.display = 'flex';
+                
+                // 2. Muda o botão "Entrar" para "Meu Painel" (Opcional, mas fica chique)
+                const linkLogin = document.getElementById('link-login');
+                if(linkLogin) {
+                    const afiliado = JSON.parse(afData);
+                    linkLogin.innerHTML = `<i class="ph ph-user-circle"></i><span>${afiliado.nome}</span>`;
+                    linkLogin.href = "afiliado_dashboard.html";
+                }
+
+                // 3. Busca notificações
+                buscarNotificacoes(afData);
+                setInterval(() => buscarNotificacoes(afData), 30000); // Atualiza a cada 30s
+            }
+        }
+
+        async function buscarNotificacoes(jsonString) {
+            try {
+                const dadosUser = JSON.parse(jsonString);
+                const res = await fetch(`${API_URL_NOTIF}/afiliado/notificacoes`, {
+                    headers: { 'Authorization': `Bearer ${dadosUser.token}` }
+                });
+                const dados = await res.json();
+                
+                const total = dados.mensagens.length + dados.vendas.length;
+                const badge = document.getElementById('notif-badge');
+                const lista = document.getElementById('notif-list');
+
+                if(total > 0) {
+                    badge.style.display = 'flex';
+                    badge.innerText = total > 9 ? '9+' : total;
+                } else {
+                    badge.style.display = 'none';
+                }
+
+                lista.innerHTML = '';
+                if(total === 0) lista.innerHTML = '<div style="padding:15px; text-align:center; color:#999;">Sem novidades.</div>';
+
+                // Renderiza Vendas
+                dados.vendas.forEach(v => {
+                    lista.innerHTML += `
+                        <div class="notif-item" style="border-left: 3px solid #27ae60;">
+                            <i class="ph ph-currency-circle-dollar" style="color:#27ae60; font-size:1.2rem;"></i>
+                            <div><strong>Venda Nova!</strong><br>Pedido #${v.id}</div>
+                        </div>`;
+                });
+
+                // Renderiza Mensagens
+                dados.mensagens.forEach(m => {
+                    lista.innerHTML += `
+                        <div class="notif-item" style="border-left: 3px solid #3498db;">
+                            <i class="ph ph-chat-centered-text" style="color:#3498db; font-size:1.2rem;"></i>
+                            <div><strong>Admin:</strong> ${m.texto.substring(0, 20)}...</div>
+                        </div>`;
+                });
+
+            } catch(e) { console.error("Erro no sino:", e); }
+        }
+
+        function abrirNotificacoes() {
+            const dropdown = document.getElementById('notif-dropdown');
+            if(dropdown.style.display === 'block') {
+                dropdown.style.display = 'none';
+            } else {
+                dropdown.style.display = 'block';
+                marcarLidas(); // Opcional: marca como lido ao abrir
+            }
+        }
+
+        async function marcarLidas() {
+            const afData = localStorage.getItem('afiliadoLogado');
+            if(!afData) return;
+            const token = JSON.parse(afData).token;
+            
+            await fetch(`${API_URL_NOTIF}/afiliado/notificacoes/ler`, {
+                method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
+            });
+            document.getElementById('notif-badge').style.display = 'none';
+        }
+
+        // Fecha ao clicar fora
+        window.addEventListener('click', (e) => {
+            const box = document.getElementById('box-sino');
+            const drop = document.getElementById('notif-dropdown');
+            if (box && !box.contains(e.target)) {
+                drop.style.display = 'none';
+            }
+        });
+    </script>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="script.js"></script>

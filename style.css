@@ -969,3 +969,29 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
     .product-detail-container { grid-template-columns: 1fr; }
     .action-group { flex-direction: column; }
 }
+
+/* --- SINO DE NOTIFICAÇÃO (Versão Loja / Fundo Claro) --- */
+.notification-container { position: relative; margin-right: 15px; cursor: pointer; display: none; /* Começa invisível */ align-items: center; }
+.bell-icon { font-size: 1.6rem; color: #333; transition: 0.3s; } /* Cor escura */
+.bell-icon:hover { color: #e67e22; transform: scale(1.1); }
+
+.badge {
+    position: absolute; top: -5px; right: -5px;
+    background: #e74c3c; color: white;
+    font-size: 0.7rem; font-weight: bold;
+    width: 18px; height: 18px;
+    border-radius: 50%; display: none;
+    align-items: center; justify-content: center;
+    border: 2px solid #fff;
+}
+
+.notif-dropdown {
+    position: absolute; top: 35px; right: -10px;
+    width: 300px; background: white;
+    border-radius: 8px; box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+    display: none; z-index: 2000; border: 1px solid #eee;
+}
+.notif-header { background: #f8f9fa; padding: 10px 15px; font-weight: bold; font-size: 0.9rem; color: #555; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+.notif-list { max-height: 300px; overflow-y: auto; }
+.notif-item { padding: 12px 15px; border-bottom: 1px solid #f1f1f1; font-size: 0.85rem; display: flex; gap: 10px; align-items: start; color: #333; }
+.notif-item:hover { background: #f9f9f9; }

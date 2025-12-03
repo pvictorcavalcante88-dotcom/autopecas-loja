@@ -7,35 +7,12 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <link rel="stylesheet" href="style.css">
     <style>
-        /* Ajuste rápido para a barra de pesquisa ficar bonita no Header */
-        .search-container {
-            flex: 1;
-            max-width: 500px;
-            margin: 0 20px;
-            display: flex;
-            align-items: center;
-            background: #f1f2f6;
-            border-radius: 8px;
-            padding: 5px 15px;
-        }
-        .search-container input {
-            flex: 1;
-            border: none;
-            background: transparent;
-            padding: 10px;
-            outline: none;
-            font-size: 1rem;
-        }
-        .search-container button {
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 1.2rem;
-            color: #2c3e50;
-        }
+        /* Barra de Pesquisa */
+        .search-container { flex: 1; max-width: 500px; margin: 0 20px; display: flex; align-items: center; background: #f1f2f6; border-radius: 8px; padding: 5px 15px; }
+        .search-container input { flex: 1; border: none; background: transparent; padding: 10px; outline: none; font-size: 1rem; }
+        .search-container button { background: none; border: none; cursor: pointer; font-size: 1.2rem; color: #2c3e50; }
         .search-container button:hover { color: #e67e22; }
 
-        /* Mobile: Ajusta a busca para não quebrar */
         @media (max-width: 768px) {
             .header-container { flex-wrap: wrap; gap: 10px; }
             .search-container { order: 3; max-width: 100%; margin: 0; }
@@ -78,7 +55,7 @@
                 <div class="detail-installments">em até 12x no cartão</div>
             </div>
 
-            <div id="affiliate-area" class="affiliate-profit-box">
+            <div id="affiliate-area" class="affiliate-profit-box" style="display:none;">
                 <h4 style="margin-bottom:10px; color:#2c3e50;"><i class="ph ph-currency-circle-dollar"></i> Painel do Parceiro</h4>
                 <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
                     <label>Sua Margem:</label>
@@ -101,6 +78,16 @@
                     <i class="ph ph-shopping-cart-plus"></i> Adicionar ao Carrinho
                 </button>
             </div>
+            
+            <div id="box-sugestao" style="display:none; margin-top:20px; border-top:1px solid #eee; padding-top:20px;">
+                <p style="font-size:0.9rem; color:#666; margin-bottom:10px;">
+                    <i class="ph ph-lightbulb" style="color:#f1c40f; font-size:1.2rem;"></i> 
+                    Conhece essa peça por outro nome? Ajude a melhorar a busca!
+                </p>
+                <button onclick="abrirModalSugestao()" style="background:#fff; border:1px solid #3498db; color:#3498db; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">
+                    + Adicionar Conhecimento
+                </button>
+            </div>
 
             <div class="security-badges">
                 <div class="badge-item"><i class="ph ph-shield-check"></i> Compra Segura</div>
@@ -110,46 +97,57 @@
         </div>
     </main>
 
+    <div id="modal-sugestao" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:2000; justify-content:center; align-items:center;">
+        <div style="background:white; padding:25px; width:400px; border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+            <h3>Sugerir Informação</h3>
+            <p style="font-size:0.85rem; color:#666;">O que você quer adicionar? (Ex: "Serve no Gol G5", "Conhecido como Tripoide")</p>
+            
+            <input type="text" id="termo-sugestao" placeholder="Digite o termo..." style="width:100%; padding:10px; margin:10px 0; border:1px solid #ddd; border-radius:4px;">
+            
+            <div style="text-align:right; gap:10px; display:flex; justify-content:flex-end;">
+                <button onclick="document.getElementById('modal-sugestao').style.display='none'" style="padding:8px 15px; border:none; background:#eee; cursor:pointer; border-radius:4px;">Cancelar</button>
+                <button onclick="enviarSugestao()" style="padding:8px 15px; border:none; background:#27ae60; color:white; font-weight:bold; cursor:pointer; border-radius:4px;">Enviar</button>
+            </div>
+        </div>
+    </div>
+
     <footer class="main-footer">
         <p>© 2025 AutoPeças Veloz.</p>
     </footer>
 
     <script src="script.js"></script>
     <script>
-        // --- 1. LÓGICA DA PESQUISA ---
+        const API_URL = ''; // Garante que a variável existe
+        let PRODUTO_ATUAL = null;
+        let MARGEM_ATUAL = 0;
+
+        // --- 1. BUSCA ---
         const btnSearch = document.getElementById('search-button');
         const inputSearch = document.getElementById('search-input');
 
         function realizarBusca() {
             const termo = inputSearch.value.trim();
-            if(termo) {
-                // Redireciona para a Home com o termo na URL (ex: index.html?search=motor)
-                // O script da Home precisa saber ler isso (se não souber, avise que criamos rapidinho)
-                window.location.href = `index.html?search=${encodeURIComponent(termo)}`;
-            }
+            if(termo) window.location.href = `index.html?search=${encodeURIComponent(termo)}`;
         }
-
         btnSearch.addEventListener('click', realizarBusca);
-        inputSearch.addEventListener('keypress', (e) => {
-            if(e.key === 'Enter') realizarBusca();
-        });
+        inputSearch.addEventListener('keypress', (e) => { if(e.key === 'Enter') realizarBusca(); });
 
-        // --- 2. LÓGICA DO PRODUTO (Igual antes, mas atualizada) ---
-        let PRODUTO_ATUAL = null;
-        let MARGEM_ATUAL = 0;
-
+        // --- 2. CARREGAMENTO ---
         document.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams(window.location.search);
             const id = params.get('id');
             if(id) carregarProduto(id);
             
-            // Recalcula ao mudar quantidade manualmente
             document.getElementById('qtd').addEventListener('input', atualizarPrecoTela);
+            document.getElementById('input-margem').addEventListener('input', (e) => {
+                MARGEM_ATUAL = parseFloat(e.target.value) || 0;
+                atualizarPrecoTela();
+            });
         });
 
         async function carregarProduto(id) {
             try {
-                // Tenta pegar margem do afiliado
+                // Afiliado Logado?
                 const afData = localStorage.getItem('afiliadoLogado');
                 const isAfiliado = !!afData;
                 
@@ -157,7 +155,9 @@
                     MARGEM_ATUAL = parseFloat(localStorage.getItem('minhaMargem') || 0);
                     document.getElementById('affiliate-area').style.display = 'block';
                     document.getElementById('input-margem').value = MARGEM_ATUAL;
-                    document.getElementById('box-sugestao').style.display = 'block'; // Mostra o botão
+                    
+                    // Agora este elemento EXISTE no HTML, então não vai dar erro
+                    document.getElementById('box-sugestao').style.display = 'block'; 
                 }
 
                 const res = await fetch(`${API_URL}/products/${id}`);
@@ -173,41 +173,12 @@
                 atualizarPrecoTela();
 
             } catch(e) {
+                console.error(e);
                 document.getElementById('product-container').innerHTML = '<h2>Produto não encontrado.</h2>';
             }
-
-            function abrirModalSugestao() {
-    document.getElementById('modal-sugestao').style.display = 'flex';
-}
-
-async function enviarSugestao() {
-    const termo = document.getElementById('termo-sugestao').value;
-    if(!termo) return alert("Digite algo!");
-    
-    const afData = JSON.parse(localStorage.getItem('afiliadoLogado'));
-
-    try {
-        const res = await fetch(`${API_URL}/afiliado/sugestoes`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${afData.token}` },
-            body: JSON.stringify({ produtoId: PRODUTO_ATUAL.id, termo: termo, motivo: "Sugestão via vitrine" })
-        });
-        if(res.ok) {
-            alert("Obrigado! Sua sugestão foi enviada para análise.");
-            document.getElementById('modal-sugestao').style.display = 'none';
-            document.getElementById('termo-sugestao').value = '';
-        }
-    } catch(e) { alert("Erro ao enviar."); }
-}
-
         }
 
-        // Atualiza preço ao mudar margem
-        document.getElementById('input-margem').addEventListener('input', (e) => {
-            MARGEM_ATUAL = parseFloat(e.target.value) || 0;
-            atualizarPrecoTela();
-        });
-
+        // --- 3. LÓGICA DE PREÇO ---
         function atualizarPrecoTela() {
             if(!PRODUTO_ATUAL) return;
 
@@ -215,16 +186,11 @@ async function enviarSugestao() {
             const qtd = parseInt(document.getElementById('qtd').value) || 1;
 
             const precoUnitarioFinal = precoBase * (1 + (MARGEM_ATUAL / 100));
-            
             const lucroUnitario = precoUnitarioFinal - precoBase;
             const lucroTotal = lucroUnitario * qtd; 
 
             document.getElementById('prod-price').textContent = precoUnitarioFinal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
-            
-            document.getElementById('lucro-estimado').innerHTML = `
-                ${lucroTotal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} 
-                <small style="color:#7f8c8d; font-weight:normal;">(${qtd} itens)</small>
-            `;
+            document.getElementById('lucro-estimado').innerHTML = `${lucroTotal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} <small style="color:#7f8c8d;">(${qtd} itens)</small>`;
             
             if(MARGEM_ATUAL < 10) {
                 document.getElementById('prod-old-price').textContent = (precoUnitarioFinal * 1.2).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
@@ -252,24 +218,49 @@ async function enviarSugestao() {
                 carrinho[index].quantidade += qtd;
                 carrinho[index].customMargin = MARGEM_ATUAL; 
             } else {
-                carrinho.push({ 
-                    id: PRODUTO_ATUAL.id, 
-                    quantidade: qtd,
-                    customMargin: MARGEM_ATUAL 
-                });
+                carrinho.push({ id: PRODUTO_ATUAL.id, quantidade: qtd, customMargin: MARGEM_ATUAL });
             }
             
             localStorage.setItem('nossoCarrinho', JSON.stringify(carrinho));
-            atualizarIconeCarrinho(); 
+            atualizarIconeCarrinho(); // Função global do script.js
             
             const btn = document.querySelector('.btn-buy-now');
-            const originalText = btn.innerHTML;
             btn.innerHTML = '<i class="ph ph-check"></i> Adicionado!';
             btn.style.background = '#27ae60';
             setTimeout(() => {
-                btn.innerHTML = originalText;
+                btn.innerHTML = '<i class="ph ph-shopping-cart-plus"></i> Adicionar ao Carrinho';
                 btn.style.background = ''; 
             }, 2000);
+        }
+
+        // --- 4. SUGESTÕES (Agora fora da função principal) ---
+        function abrirModalSugestao() {
+            document.getElementById('modal-sugestao').style.display = 'flex';
+        }
+
+        async function enviarSugestao() {
+            const termo = document.getElementById('termo-sugestao').value;
+            if(!termo) return alert("Digite algo!");
+            
+            const afData = localStorage.getItem('afiliadoLogado');
+            if (!afData) return alert("Você precisa estar logado.");
+            
+            const token = JSON.parse(afData).token;
+
+            try {
+                const res = await fetch(`${API_URL}/afiliado/sugestoes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ produtoId: PRODUTO_ATUAL.id, termo: termo, motivo: "Sugestão via vitrine" })
+                });
+                if(res.ok) {
+                    alert("Obrigado! Sua sugestão foi enviada para análise.");
+                    document.getElementById('modal-sugestao').style.display = 'none';
+                    document.getElementById('termo-sugestao').value = '';
+                } else {
+                    alert("Erro ao enviar sugestão.");
+                }
+            } catch(e) { alert("Erro de conexão."); }
         }
     </script>
 </body>

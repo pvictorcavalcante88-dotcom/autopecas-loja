@@ -134,6 +134,12 @@
                         <label>Palavras-Chave (Tags de Pesquisa)</label>
                         <input type="text" id="prod-pesquisa" placeholder="Ex: barato, promoção, original">
                     </div>
+                    
+                    <div class="form-group full" style="background:#f9f9f9; padding:10px; border-radius:5px; border:1px dashed #3498db;">
+                        <label style="color:#2980b9;">🔗 Produtos Relacionados (IDs)</label>
+                        <input type="text" id="prod-relacionados" placeholder="Ex: 12, 45, 88">
+                        <small style="color:#666; font-size:0.8rem;">Coloque os IDs separados por vírgula. Eles aparecerão como sugestão de "Compre Junto".</small>
+                    </div>
 
                 </div>
 
@@ -152,7 +158,7 @@
             if(!token) return window.location.href = 'admin_login.html';
 
             try {
-                // Traz todos os produtos (rota search sem query traz tudo ou rota especifica)
+                // Traz todos os produtos
                 const res = await fetch(`${API_URL}/search?q=`); 
                 const data = await res.json();
                 produtosCache = data;
@@ -176,8 +182,7 @@
                     <img src="${p.imagem || 'https://via.placeholder.com/150'}" alt="${p.titulo}">
                     <strong>${p.titulo}</strong>
                     <div style="font-size:0.9rem; color:#666;">Ref: ${p.referencia || '-'}</div>
-                    <div style="font-size:0.9rem; color:#666;">Cat: ${p.categoria || '-'}</div>
-                    <div style="color:#27ae60; font-weight:bold;">R$ ${parseFloat(p.preco_novo).toFixed(2)}</div>
+                    <div style="font-size:0.9rem; color:#666;">ID: ${p.id}</div> <div style="color:#27ae60; font-weight:bold;">R$ ${parseFloat(p.preco_novo).toFixed(2)}</div>
                     <div style="font-size:0.8rem;">Estoque: ${p.estoque}</div>
                     <div class="actions">
                         <button class="btn-edit" onclick="editProduct(${p.id})">Editar</button>
@@ -205,13 +210,16 @@
                 document.getElementById('prod-estoque').value = p.estoque;
                 document.getElementById('prod-imagem').value = p.imagem;
                 
-                // Campos Novos (Ficha Técnica)
+                // Campos Ficha Técnica
                 document.getElementById('prod-referencia').value = p.referencia || '';
                 document.getElementById('prod-categoria').value = p.categoria || '';
                 document.getElementById('prod-fabricante').value = p.fabricante || '';
                 document.getElementById('prod-ano').value = p.ano || '';
                 document.getElementById('prod-carros').value = p.carros || '';
                 document.getElementById('prod-pesquisa').value = p.pesquisa || '';
+
+                // CAMPO NOVO: Relacionados
+                document.getElementById('prod-relacionados').value = p.produtos_relacionados || '';
 
                 document.getElementById('modal-title').innerText = 'Editar Produto';
                 document.getElementById('productModal').style.display = 'flex';
@@ -228,20 +236,22 @@
             const id = document.getElementById('prod-id').value;
             const token = localStorage.getItem('adminToken');
 
-            // Monta o objeto completo com os novos campos
+            // Monta o objeto completo
             const body = {
                 titulo: document.getElementById('prod-titulo').value,
                 preco_novo: parseFloat(document.getElementById('prod-preco').value),
                 estoque: parseInt(document.getElementById('prod-estoque').value),
                 imagem: document.getElementById('prod-imagem').value,
                 
-                // Novos Campos cruciais para a busca
                 referencia: document.getElementById('prod-referencia').value,
                 categoria: document.getElementById('prod-categoria').value,
                 fabricante: document.getElementById('prod-fabricante').value,
                 ano: document.getElementById('prod-ano').value,
                 carros: document.getElementById('prod-carros').value,
-                pesquisa: document.getElementById('prod-pesquisa').value
+                pesquisa: document.getElementById('prod-pesquisa').value,
+                
+                // Salva os relacionados
+                produtos_relacionados: document.getElementById('prod-relacionados').value
             };
 
             const url = id ? `${API_URL}/admin/produtos/${id}` : `${API_URL}/admin/produtos`;
@@ -274,7 +284,7 @@
 
         function logout() { localStorage.removeItem('adminToken'); window.location.href = 'admin_login.html'; }
 
-        // Filtro rápido na tela (sem ir no server)
+        // Filtro rápido
         document.getElementById('search-admin').addEventListener('input', (e) => {
             const termo = e.target.value.toLowerCase();
             const filtrados = produtosCache.filter(p => p.titulo.toLowerCase().includes(termo) || (p.referencia && p.referencia.toLowerCase().includes(termo)));

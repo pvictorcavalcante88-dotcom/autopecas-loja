@@ -15,7 +15,7 @@
                 <a href="admin_dashboard.html"><i class="ph ph-gauge"></i> Dashboard</a>
                 <a href="admin_produtos.html" class="active"><i class="ph ph-package"></i> Produtos</a>
                 <a href="admin_pedidos.html"><i class="ph ph-shopping-cart-simple"></i> Pedidos</a>
-		<a href="admin_afiliados.html" class="active"><i class="ph ph-users"></i> Afiliados</a>
+                <a href="admin_afiliados.html"><i class="ph ph-users"></i> Afiliados</a>
                 <a href="#" id="logout-button"><i class="ph ph-sign-out"></i> Sair</a>
             </nav>
         </aside>
@@ -119,6 +119,13 @@
                             <input type="text" id="edit-produto-pesquisa">
                         </div>
                     </div>
+                    
+                    <div class="form-group">
+                        <label style="color: #e67e22; font-weight: bold;">🔗 Produtos Relacionados (IDs separados por vírgula)</label>
+                        <input type="text" id="edit-produto-relacionados" placeholder="Ex: 12, 45, 88">
+                        <small style="color:#666">Coloque aqui os IDs dos produtos que aparecem como sugestão (Ex: Coxim, Batente).</small>
+                    </div>
+
                     <div class="form-group">
                         <label>Outras Imagens (Separadas por vírgula)</label>
                         <input type="text" id="edit-produto-imagens-extra">
@@ -131,6 +138,89 @@
             </section>
         </main>
     </div>
-    <script src="admin.js"></script>
+    
+    <script>
+        const API_URL = ''; 
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get('id');
+        
+        document.getElementById('edit-produto-id').innerText = '#' + id;
+
+        // 1. CARREGAR DADOS DO PRODUTO
+        async function carregar() {
+            const token = localStorage.getItem('adminToken');
+            const res = await fetch(`${API_URL}/products/${id}`);
+            const p = await res.json();
+            
+            document.getElementById('edit-produto-titulo').value = p.titulo;
+            document.getElementById('edit-produto-categoria').value = p.categoria || "";
+            document.getElementById('edit-produto-preco-novo').value = p.preco_novo;
+            document.getElementById('edit-produto-preco-antigo').value = p.preco_antigo || "";
+            document.getElementById('edit-produto-estoque').value = p.estoque;
+            document.getElementById('edit-produto-desconto').value = p.desconto || "";
+            
+            document.getElementById('edit-produto-referencia').value = p.referencia || "";
+            document.getElementById('edit-produto-fabricante').value = p.fabricante || "";
+            document.getElementById('edit-produto-imagem-fabricante').value = p.imagem_fabricante || "";
+            
+            document.getElementById('edit-produto-carros').value = p.carros || "";
+            document.getElementById('edit-produto-ano').value = p.ano || "";
+            document.getElementById('edit-produto-motor').value = p.motor || "";
+            document.getElementById('edit-produto-qtd-veiculo').value = p.quatidade_por_veiculo || "";
+            
+            document.getElementById('edit-produto-imagem').value = p.imagem || "";
+            document.getElementById('edit-produto-pesquisa').value = p.pesquisa || "";
+            document.getElementById('edit-produto-imagens-extra').value = p.imagens_extra || "";
+            
+            // --- CARREGA OS RELACIONADOS ---
+            document.getElementById('edit-produto-relacionados').value = p.produtos_relacionados || "";
+        }
+
+        // 2. SALVAR ALTERAÇÕES
+        document.getElementById('edit-produto-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const token = localStorage.getItem('adminToken');
+            
+            const dados = {
+                titulo: document.getElementById('edit-produto-titulo').value,
+                categoria: document.getElementById('edit-produto-categoria').value,
+                preco_novo: parseFloat(document.getElementById('edit-produto-preco-novo').value),
+                preco_antigo: parseFloat(document.getElementById('edit-produto-preco-antigo').value || 0),
+                estoque: parseInt(document.getElementById('edit-produto-estoque').value),
+                desconto: document.getElementById('edit-produto-desconto').value,
+                
+                referencia: document.getElementById('edit-produto-referencia').value,
+                fabricante: document.getElementById('edit-produto-fabricante').value,
+                imagem_fabricante: document.getElementById('edit-produto-imagem-fabricante').value,
+                
+                carros: document.getElementById('edit-produto-carros').value,
+                ano: document.getElementById('edit-produto-ano').value,
+                motor: document.getElementById('edit-produto-motor').value,
+                quatidade_por_veiculo: parseInt(document.getElementById('edit-produto-qtd-veiculo').value || 1),
+                
+                imagem: document.getElementById('edit-produto-imagem').value,
+                pesquisa: document.getElementById('edit-produto-pesquisa').value,
+                imagens_extra: document.getElementById('edit-produto-imagens-extra').value,
+                
+                // --- SALVA OS RELACIONADOS ---
+                produtos_relacionados: document.getElementById('edit-produto-relacionados').value
+            };
+
+            const res = await fetch(`${API_URL}/admin/products/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(dados)
+            });
+
+            if(res.ok) {
+                alert("Produto atualizado com sucesso!");
+                window.location.href = "admin_produtos.html";
+            } else {
+                alert("Erro ao salvar.");
+            }
+        });
+
+        carregar();
+    </script>
 </body>
 </html>

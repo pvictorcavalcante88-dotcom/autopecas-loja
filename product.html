@@ -59,7 +59,7 @@
                 <h4 style="margin-bottom:10px; color:#2c3e50;"><i class="ph ph-currency-circle-dollar"></i> Painel do Parceiro</h4>
                 <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
                     <label>Sua Margem:</label>
-                    <input type="number" id="input-margem" value="0" style="width:60px; padding:5px; border-radius:4px; border:1px solid #ccc;"> %
+                    <input type="number" id="input-margem" value="0" min="0" style="width:60px; padding:5px; border-radius:4px; border:1px solid #ccc;"> %
                 </div>
                 <div style="font-size:0.9rem; color:#27ae60; font-weight:bold;">
                     Seu Lucro Total: <span id="lucro-estimado">R$ 0,00</span>
@@ -148,10 +148,21 @@
             if(qtdInput) qtdInput.addEventListener('input', atualizarPrecoTela);
             
             const margemInput = document.getElementById('input-margem');
-            if(margemInput) margemInput.addEventListener('input', (e) => {
-                MARGEM_ATUAL = parseFloat(e.target.value) || 0;
-                atualizarPrecoTela();
-            });
+            if(margemInput) {
+        margemInput.addEventListener('input', (e) => {
+            let valor = parseFloat(e.target.value);
+            
+            // --- TRAVA DE SEGURANÇA ---
+            if(valor < 0) {
+                valor = 0;
+                e.target.value = 0; // Corrige o campo visualmente para 0
+                // alert("A margem não pode ser negativa!"); // Se quiser avisar
+            }
+            
+            MARGEM_ATUAL = valor || 0;
+            atualizarPrecoTela();
+        });
+    }
         });
 
         async function carregarProduto(id) {

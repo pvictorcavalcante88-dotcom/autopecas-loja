@@ -170,27 +170,38 @@ app.delete('/orcamentos/:id', authenticateToken, async (req, res) => {
     } catch (e) { res.status(500).json({ erro: "Erro ao deletar." }); }
 });
 
-// =================================================================
-// 📦 ROTAS DE PRODUTOS E CONFIG
-// =================================================================
-// ROTA PARA BUSCAR UM ÚNICO PRODUTO (Detalhes)
+// ROTA: DETALHES DO PRODUTO + RELACIONADOS
 app.get('/products/:id', async (req, res) => {
     try {
-        const id = parseInt(req.params.id); // Converte "1" (texto) para 1 (número)
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return res.status(400).json({ erro: "ID inválido" });
+
+        // 1. Busca o produto principal
+        const produto = await prisma.produto.findUnique({ where: { id: id } });
+        if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
+
+        // 2. Busca os Relacionados (A Mágica acontece aqui)
+        let listaRelacionados = [];
         
-        if (isNaN(id)) {
-            return res.status(400).json({ erro: "ID inválido" });
+        // O campo 'produtos_relacionados' existe no seu schema como String?, então verificamos se ele tem conteúdo
+        if (produto.produtos_relacionados) {
+            // Transforma "12, 15, 20" em uma lista de números [12, 15, 20]
+            const ids = produto.produtos_relacionados.split(',')
+                .map(num => parseInt(num.trim()))
+                .filter(n => !isNaN(n)); // Remove erros caso tenha virgula sobrando ou espaços
+
+            if (ids.length > 0) {
+                listaRelacionados = await prisma.produto.findMany({
+                    where: { id: { in: ids } }, // Busca todos que tenham esses IDs
+                    // AQUI ESTÁ O SEGREDO: Usamos os nomes do SEU schema (titulo, preco_novo, imagem)
+                    select: { id: true, titulo: true, imagem: true, preco_novo: true, categoria: true } 
+                });
+            }
         }
 
-        const produto = await prisma.produto.findUnique({
-            where: { id: id }
-        });
+        // 3. Envia tudo junto: Produto + Lista de Relacionados
+        res.json({ ...produto, listaRelacionados });
 
-        if (!produto) {
-            return res.status(404).json({ erro: "Produto não encontrado" });
-        }
-
-        res.json(produto);
     } catch (e) {
         console.error("Erro ao buscar produto:", e);
         res.status(500).json({ erro: "Erro no servidor" });

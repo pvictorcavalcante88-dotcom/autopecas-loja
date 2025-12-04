@@ -95,6 +95,14 @@
                 <div class="badge-item"><i class="ph ph-thumbs-up"></i> Garantia Veloz</div>
             </div>
         </div>
+
+        <div id="related-section" style="grid-column: 1 / -1; margin-top: 40px; display: none; border-top: 1px solid #eee; padding-top: 20px;">
+    <h3 style="color: #2c3e50; margin-bottom: 20px;">
+        <i class="ph ph-arrows-left-right"></i> Compre Junto / Relacionados
+    </h3>
+    <div id="related-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px;">
+        </div>
+</div>
     </main>
 
     <div id="modal-sugestao" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:2000; justify-content:center; align-items:center;">
@@ -199,6 +207,31 @@
                 if(PRODUTO_ATUAL.motor) desc += `<strong>Motor:</strong> ${PRODUTO_ATUAL.motor}`;
                 
                 document.getElementById('prod-desc').innerHTML = desc || "Sem descrição técnica.";
+
+                // --- NOVO: LÓGICA DOS PRODUTOS RELACIONADOS ---
+        const boxRelacionados = document.getElementById('related-section');
+        const gridRelacionados = document.getElementById('related-grid');
+        
+        // Verifica se o servidor mandou a lista e se ela não está vazia
+        if (PRODUTO_ATUAL.listaRelacionados && PRODUTO_ATUAL.listaRelacionados.length > 0) {
+            boxRelacionados.style.display = 'block'; // Mostra a seção
+            gridRelacionados.innerHTML = ''; // Limpa
+
+            PRODUTO_ATUAL.listaRelacionados.forEach(item => {
+                const preco = parseFloat(item.preco_novo).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+                
+                gridRelacionados.innerHTML += `
+                    <div class="card" style="padding:15px; border:1px solid #eee; border-radius:8px; text-align:center; transition:0.3s;">
+                        <img src="${item.imagem || 'https://placehold.co/150'}" style="width:100px; height:100px; object-fit:contain; margin-bottom:10px;">
+                        <h4 style="font-size:0.9rem; color:#333; height:40px; overflow:hidden;">${item.titulo}</h4>
+                        <div style="color:#27ae60; font-weight:bold; margin:5px 0;">${preco}</div>
+                        <a href="product.html?id=${item.id}" style="display:block; background:#3498db; color:white; padding:5px; border-radius:4px; text-decoration:none; font-size:0.85rem;">Ver Detalhes</a>
+                    </div>
+                `;
+            });
+        } else {
+            boxRelacionados.style.display = 'none'; // Esconde se não tiver nada
+        }
 
                 atualizarPrecoTela();
 

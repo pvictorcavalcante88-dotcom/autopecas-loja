@@ -263,39 +263,69 @@ app.get('/afiliado/dashboard', authenticateToken, async (req, res) => {
 app.post('/finalizar-pedido', async (req, res) => {
     try {
         const { cliente, itens, afiliadoCodigo } = req.body;
+        
         let valorTotal = 0;
+        let comissaoReal = 0; // Nova variável para somar o lucro exato
         let itensTexto = "";
 
-        // Reconstroi total e texto
-        itens.forEach(i => {
+        // USAMOS 'FOR OF' PARA PODER ESPERAR O BANCO DE DADOS (AWAIT)
+        for (const i of itens) {
+            // 1. Calcula totais visuais
             valorTotal += (i.unitario * i.qtd); 
-            itensTexto += `${i.qtd}x ${i.nome} (R$ ${i.unitario.toFixed(2)}) | `;
-        });
+            itensTexto += `${i.qtd}x ${i.nome} (R$ ${parseFloat(i.unitario).toFixed(2)}) | `;
 
+            // 2. Calcula o Lucro Real (Se tiver afiliado)
+            if (afiliadoCodigo) {
+                // Busca o preço original (custo) desse produto no banco
+                const produtoOriginal = await prisma.produto.findUnique({ where: { id: i.id } });
+                
+                if (produtoOriginal) {
+                    const precoCusto = parseFloat(produtoOriginal.preco_novo); // O preço base cadastrado
+                    const precoVenda = parseFloat(i.unitario); // O preço com margem que foi vendido
+                    
+                    // A diferença é o lucro do afiliado
+                    const lucroItem = (precoVenda - precoCusto) * i.qtd;
+                    
+                    // Só soma se for lucro positivo
+                    if (lucroItem > 0) comissaoReal += lucroItem;
+                }
+            }
+        }
+
+        // Monta o objeto do pedido
         let dadosPedido = {
             clienteNome: cliente.nome,
             clienteEmail: cliente.email,
             clienteEndereco: cliente.endereco,
             valorTotal: valorTotal,
-            itens: itensTexto
+            itens: itensTexto,
+            comissaoAfiliado: 0.0 // Começa com 0
         };
 
+        // Se tem afiliado, atualiza saldo e vincula
         if (afiliadoCodigo) {
             const afiliado = await prisma.afiliado.findUnique({ where: { codigo: afiliadoCodigo } });
+            
             if (afiliado) {
                 dadosPedido.afiliadoId = afiliado.id;
-                dadosPedido.comissaoGerada = valorTotal * 0.05; 
+                dadosPedido.comissaoAfiliado = comissaoReal; // <--- AQUI VAI O LUCRO REAL (R$ 250,60)
+                
+                // Atualiza o saldo na carteira dele
                 await prisma.afiliado.update({
                     where: { id: afiliado.id },
-                    data: { saldo: { increment: dadosPedido.comissaoGerada } }
+                    data: { saldo: { increment: comissaoReal } }
                 });
             }
         }
 
+        // Cria o pedido
         const pedido = await prisma.pedido.create({ data: dadosPedido });
         res.json(pedido);
 
-    } catch (error) { res.status(500).json({ erro: "Erro ao processar pedido" }); }
+    } catch (error) { 
+        console.error(error);
+        res.status(500).json({ erro: "Erro ao processar pedido" }); 
+    }
 });
 
 // =========================================================

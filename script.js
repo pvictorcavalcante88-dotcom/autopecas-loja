@@ -91,6 +91,11 @@ document.addEventListener("DOMContentLoaded", async function() {
 // 🛒 CARRINHO COMPLETO (Lucro + Esvaziar + Subtotal)
 // ==============================================================
 async function carregarPaginaCarrinho() {
+    if (!localStorage.getItem('afiliadoLogado')) {
+        alert("Você precisa fazer login para acessar o carrinho.");
+        window.location.href = "login.html";
+        return;
+    }
     const cartItemsContainer = document.getElementById('cart-items');
     const cartTotalElement = document.getElementById('cart-total');
     const cartSubtotalElement = document.getElementById('cart-subtotal');
@@ -244,16 +249,26 @@ function irParaCheckoutAfiliado() { window.location.href = 'checkout.html'; }
 
 
 /* ==============================================================
-   💳 CHECKOUT (MÁGICA DO SALVAMENTO AUTOMÁTICO)
+   CHECKOUT (MÁGICA DO SALVAMENTO AUTOMÁTICO)
    ============================================================== */
 async function carregarPaginaCheckout() {
+    // --- BLOQUEIO DE SEGURANÇA (Se não for afiliado, tchau) ---
+    if (!localStorage.getItem('afiliadoLogado')) {
+        window.location.href = "login.html";
+        return;
+    }
+
     const listaResumo = document.querySelector('.summary-item-list');
     const areaBotoes = document.querySelector('.order-summary-box');
     const totalEl = document.getElementById('cart-total');
+    
     if (!listaResumo) return;
 
     const carrinho = getCarrinho();
-    if (carrinho.length === 0) { listaResumo.innerHTML = '<p>Carrinho vazio.</p>'; return; }
+    if (carrinho.length === 0) { 
+        listaResumo.innerHTML = '<p>Carrinho vazio.</p>'; 
+        return; 
+    }
 
     let subtotal = 0;
     let itensParaProcessar = []; 
@@ -263,36 +278,50 @@ async function carregarPaginaCheckout() {
         try {
             const response = await fetch(`${API_URL}/products/${item.id}`);
             if (!response.ok) continue;
+            
             const p = await response.json();
             const precoBase = parseFloat(p.price || p.preco_novo);
             let margem = (item.customMargin !== undefined) ? item.customMargin : ((FATOR_GLOBAL - 1) * 100);
+            
             const precoFinal = precoBase * (1 + (margem / 100));
             const totalItem = precoFinal * item.quantidade;
             subtotal += totalItem;
             
             itensParaProcessar.push({
-                nome: p.name || p.titulo, qtd: item.quantidade, unitario: precoFinal, total: totalItem, id: p.id, customMargin: margem 
+                nome: p.name || p.titulo, 
+                qtd: item.quantidade, 
+                unitario: precoFinal, 
+                total: totalItem, 
+                id: p.id, 
+                customMargin: margem 
             });
+
             html += `<div class="summary-item" style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #eee;">
-                <span>(${item.quantidade}x) ${p.name || p.titulo}</span><strong>${formatarMoeda(totalItem)}</strong></div>`;
-        } catch (e) {}
+                <span>(${item.quantidade}x) ${p.name || p.titulo}</span>
+                <strong>${formatarMoeda(totalItem)}</strong>
+            </div>`;
+        } catch (e) { console.error(e); }
     }
 
     listaResumo.innerHTML = html;
     if(totalEl) totalEl.textContent = formatarMoeda(subtotal);
 
+    // Remove botões antigos para não duplicar
     const containerAntigo = document.getElementById('container-botoes-dinamicos');
     if(containerAntigo) containerAntigo.remove();
 
+    // Cria container novo
     const container = document.createElement('div');
     container.id = "container-botoes-dinamicos";
     container.style.marginTop = "20px";
-    container.style.display = "flex"; container.style.flexDirection = "column"; container.style.gap = "10px";
+    container.style.display = "flex"; 
+    container.style.flexDirection = "column"; 
+    container.style.gap = "10px";
 
     const afiliadoLogado = JSON.parse(localStorage.getItem('afiliadoLogado'));
 
     if (afiliadoLogado) {
-        // BOTÕES QUE SALVAM AUTOMATICAMENTE
+        // --- BOTÕES DO AFILIADO (WhatsApp + PDF) ---
         container.innerHTML = `
             <button id="btn-zap" onclick="gerarLinkZap('${afiliadoLogado.codigo}', ${subtotal})" class="btn-place-order" style="background:#27ae60;">
                 <i class="ph ph-whatsapp-logo"></i> Mandar no WhatsApp
@@ -301,20 +330,25 @@ async function carregarPaginaCheckout() {
                 <i class="ph ph-file-pdf"></i> Baixar PDF
             </button>
         `;
+        // Salva os itens numa variável global para usar no PDF/Zap
         window.ITENS_CHECKOUT = itensParaProcessar;
     } else {
+        // --- BOTÃO DO CLIENTE FINAL ---
         const btnPagar = document.createElement('button');
         btnPagar.className = "btn-place-order"; 
         btnPagar.innerHTML = `✅ Finalizar Pedido`;
         btnPagar.onclick = () => finalizarPedido(itensParaProcessar); 
         container.appendChild(btnPagar);
     }
+    
     if(areaBotoes) areaBotoes.appendChild(container);
+    
+    // Esconde o botão original do template se ele existir
     const btnOriginal = document.querySelector('.btn-place-order:not(#container-botoes-dinamicos button)');
     if(btnOriginal) btnOriginal.style.display = 'none';
 }
 
-// --- FUNÇÃO "SILENCIOSA" PARA SALVAR ORÇAMENTO ---
+// --- FUNÇÃO "SILENCIOSA" PARA SALVAR ORÇAMENTO --- 
 async function salvarOrcamentoSilencioso(tipo) {
     const afiliado = JSON.parse(localStorage.getItem('afiliadoLogado'));
     if(!afiliado || !afiliado.token) return;

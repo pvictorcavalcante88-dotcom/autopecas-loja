@@ -252,11 +252,19 @@ function irParaCheckoutAfiliado() { window.location.href = 'checkout.html'; }
    CHECKOUT (MÁGICA DO SALVAMENTO AUTOMÁTICO)
    ============================================================== */
 async function carregarPaginaCheckout() {
-    // --- BLOQUEIO DE SEGURANÇA (Se não for afiliado, tchau) ---
-    if (!localStorage.getItem('afiliadoLogado')) {
-        window.location.href = "login.html";
+    // 1. Verifica itens no carrinho
+    const carrinho = getCarrinho();
+    const afiliadoLogado = localStorage.getItem('afiliadoLogado');
+
+    // --- BLOQUEIO DE SEGURANÇA INTELIGENTE ---
+    // Só bloqueia se NÃO for afiliado E o carrinho estiver VAZIO.
+    // (Se o carrinho tem itens, assumimos que é um cliente vindo pelo link)
+    if (!afiliadoLogado && carrinho.length === 0) {
+        // Opcional: alert("Seu carrinho está vazio.");
+        window.location.href = "login.html"; // Ou index.html
         return;
     }
+    // ------------------------------------------
 
     const listaResumo = document.querySelector('.summary-item-list');
     const areaBotoes = document.querySelector('.order-summary-box');
@@ -264,7 +272,7 @@ async function carregarPaginaCheckout() {
     
     if (!listaResumo) return;
 
-    const carrinho = getCarrinho();
+    // Se passou do bloqueio mas tá vazio (bug raro), avisa na tela
     if (carrinho.length === 0) { 
         listaResumo.innerHTML = '<p>Carrinho vazio.</p>'; 
         return; 
@@ -281,6 +289,7 @@ async function carregarPaginaCheckout() {
             
             const p = await response.json();
             const precoBase = parseFloat(p.price || p.preco_novo);
+            // Se tem margem customizada no item, usa. Se não, usa a global.
             let margem = (item.customMargin !== undefined) ? item.customMargin : ((FATOR_GLOBAL - 1) * 100);
             
             const precoFinal = precoBase * (1 + (margem / 100));
@@ -318,22 +327,20 @@ async function carregarPaginaCheckout() {
     container.style.flexDirection = "column"; 
     container.style.gap = "10px";
 
-    const afiliadoLogado = JSON.parse(localStorage.getItem('afiliadoLogado'));
-
     if (afiliadoLogado) {
-        // --- BOTÕES DO AFILIADO (WhatsApp + PDF) ---
+        // --- VISÃO DO AFILIADO (Gerar Links) ---
+        const dadosAfiliado = JSON.parse(afiliadoLogado);
         container.innerHTML = `
-            <button id="btn-zap" onclick="gerarLinkZap('${afiliadoLogado.codigo}', ${subtotal})" class="btn-place-order" style="background:#27ae60;">
+            <button id="btn-zap" onclick="gerarLinkZap('${dadosAfiliado.codigo}', ${subtotal})" class="btn-place-order" style="background:#27ae60;">
                 <i class="ph ph-whatsapp-logo"></i> Mandar no WhatsApp
             </button>
             <button id="btn-pdf" onclick="gerarPDFCustom()" class="btn-place-order" style="background:#34495e;">
                 <i class="ph ph-file-pdf"></i> Baixar PDF
             </button>
         `;
-        // Salva os itens numa variável global para usar no PDF/Zap
         window.ITENS_CHECKOUT = itensParaProcessar;
     } else {
-        // --- BOTÃO DO CLIENTE FINAL ---
+        // --- VISÃO DO CLIENTE (Pagar) ---
         const btnPagar = document.createElement('button');
         btnPagar.className = "btn-place-order"; 
         btnPagar.innerHTML = `✅ Finalizar Pedido`;
@@ -343,7 +350,7 @@ async function carregarPaginaCheckout() {
     
     if(areaBotoes) areaBotoes.appendChild(container);
     
-    // Esconde o botão original do template se ele existir
+    // Esconde o botão original do template (HTML estático) se existir
     const btnOriginal = document.querySelector('.btn-place-order:not(#container-botoes-dinamicos button)');
     if(btnOriginal) btnOriginal.style.display = 'none';
 }

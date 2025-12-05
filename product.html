@@ -240,14 +240,54 @@
                 document.getElementById('product-container').innerHTML = '<h2>Produto não encontrado.</h2>';
             }
         }
-        
-        // ... O RESTO DAS FUNÇÕES (atualizarPrecoTela, mudarQtd, etc) CONTINUA IGUAL ...
+    
 
         // --- 3. LÓGICA DE PREÇO ---
         function atualizarPrecoTela() {
             if(!PRODUTO_ATUAL) return;
 
-            // CORREÇÃO: Usando 'preco_novo'
+            // --- 1. O "PORTEIRO" (Verifica Login) ---
+            const afData = localStorage.getItem('afiliadoLogado');
+            const estaLogado = !!afData; 
+
+            const btnComprar = document.querySelector('.btn-buy-now');
+            const boxPreco = document.getElementById('prod-price');
+            const boxLucro = document.getElementById('affiliate-area'); // Área do afiliado
+            const boxParcelas = document.querySelector('.detail-installments');
+
+            // SE NÃO TIVER LOGADO: Esconde e Bloqueia
+            if (!estaLogado) {
+                // Troca o preço por cadeado
+                boxPreco.innerHTML = '<span style="font-size:1.2rem; color:#7f8c8d;"><i class="ph ph-lock-key"></i> Faça login para ver</span>';
+                
+                // Limpa preço antigo e parcelas
+                document.getElementById('prod-old-price').textContent = "";
+                if(boxParcelas) boxParcelas.style.display = 'none';
+                
+                // Esconde painel de lucro (se existir)
+                if(boxLucro) boxLucro.style.display = 'none';
+
+                // Bloqueia botão de compra
+                if(btnComprar) {
+                    btnComprar.innerHTML = '<i class="ph ph-sign-in"></i> Entrar para Comprar';
+                    btnComprar.style.background = '#95a5a6'; // Cinza
+                    btnComprar.onclick = () => window.location.href = 'login.html';
+                }
+                
+                return; // PARE AQUI! Não calcula mais nada.
+            }
+
+            // --- 2. SE PASSOU PELO PORTEIRO (Seu código original roda aqui) ---
+            
+            // Restaura o botão de compra (caso ele estivesse bloqueado)
+            if(btnComprar) {
+                btnComprar.innerHTML = '<i class="ph ph-shopping-cart-plus"></i> Adicionar ao Carrinho';
+                btnComprar.style.background = ''; // Volta ao original
+                btnComprar.onclick = adicionarAoCarrinhoAtual; // Volta a função de comprar
+            }
+            if(boxParcelas) boxParcelas.style.display = 'block';
+
+            // A MATEMÁTICA QUE VOCÊ JÁ TINHA:
             const precoBase = parseFloat(PRODUTO_ATUAL.preco_novo);
             const qtd = parseInt(document.getElementById('qtd').value) || 1;
 
@@ -255,10 +295,14 @@
             const lucroUnitario = precoUnitarioFinal - precoBase;
             const lucroTotal = lucroUnitario * qtd; 
 
-            document.getElementById('prod-price').textContent = precoUnitarioFinal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
-            document.getElementById('lucro-estimado').innerHTML = `${lucroTotal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} <small style="color:#7f8c8d;">(${qtd} itens)</small>`;
+            boxPreco.textContent = precoUnitarioFinal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
             
-            // Verifica se tem preço antigo para mostrar promoção
+            // Atualiza o lucro se o elemento existir
+            if(document.getElementById('lucro-estimado')) {
+                document.getElementById('lucro-estimado').innerHTML = `${lucroTotal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} <small style="color:#7f8c8d;">(${qtd} itens)</small>`;
+            }
+            
+            // Preço antigo (Promoção)
             if(PRODUTO_ATUAL.preco_antigo && PRODUTO_ATUAL.preco_antigo > precoBase) {
                 document.getElementById('prod-old-price').textContent = parseFloat(PRODUTO_ATUAL.preco_antigo).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
             } else {

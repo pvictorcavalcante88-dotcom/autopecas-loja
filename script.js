@@ -430,6 +430,9 @@ async function executarBusca(q, categoria) {
         const data = await res.json();
         const track = document.getElementById("search-track");
         
+        // VERIFICAÇÃO DE LOGIN (Parte 2)
+        const isLogado = localStorage.getItem('afiliadoLogado');
+        
         if(track) {
             track.innerHTML = '';
             
@@ -439,15 +442,22 @@ async function executarBusca(q, categoria) {
             }
 
             data.forEach(p => {
+                // Se logado: Preço. Se não: Cadeado.
+                const htmlPreco = isLogado 
+                    ? `<p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p>`
+                    : `<p class="price-new" style="font-size:0.9rem; color:#777;"><i class="ph ph-lock-key"></i> Login p/ ver</p>`;
+
+                const textoBotao = isLogado ? 'Ver Detalhes' : 'Entrar';
+
                 track.innerHTML += `
                 <a href="product.html?id=${p.id}" class="product-card">
                     <div class="product-image">
                         <img src="${p.image||p.imagem}" onerror="this.src='https://placehold.co/150'">
                     </div>
                     <h3>${p.name||p.titulo}</h3>
-                    <p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p>
+                    ${htmlPreco}
                     
-                    <div class="btn-card-action">Ver Detalhes</div> 
+                    <div class="btn-card-action">${textoBotao}</div> 
                 </a>`;
             });
         }
@@ -463,24 +473,33 @@ async function buscarProdutosPromocao() {
         const data = await res.json();
         const track = document.getElementById("promocoes-track");
         
+        // VERIFICAÇÃO DE LOGIN (Parte 2)
+        const isLogado = localStorage.getItem('afiliadoLogado');
+        
         if(track) {
             track.innerHTML = '';
             
             // Pega os 4 primeiros produtos
             data.slice(0, 4).forEach(p => {
+                // Se logado: Preço. Se não: Cadeado.
+                const htmlPreco = isLogado 
+                    ? `<p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p>`
+                    : `<p class="price-new" style="font-size:0.9rem; color:#777;"><i class="ph ph-lock-key"></i> Login p/ ver</p>`;
+                
                 track.innerHTML += `
                 <a href="product.html?id=${p.id}" class="product-card">
                     <div class="product-image">
                         <img src="${p.image||p.imagem}" onerror="this.src='https://placehold.co/150'">
                     </div>
                     <h3>${p.name||p.titulo}</h3>
-                    <p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p>
+                    ${htmlPreco}
                     
                     <div class="btn-card-action">Oferta 🔥</div>
                 </a>`;
             });
         }
     } catch(e) { console.error(e); }
+
 }
 async function carregarMargemDoCodigo(c) { try { const res = await fetch(`${API_URL}/afiliado/check/${c}`); if(res.ok) { const d = await res.json(); if(d.margem) FATOR_GLOBAL = 1 + (d.margem/100); } } catch(e) {} }
 function ativarModoParceiro(afiliado) { const btnLogin = document.getElementById('btn-login-header'); if (btnLogin) { btnLogin.innerHTML = `<i class="ph ph-sign-out"></i><span>Sair</span>`; btnLogin.href = "#"; btnLogin.style.color = "#e67e22"; btnLogin.onclick = (e) => { e.preventDefault(); if(confirm(`Sair da conta de parceiro?`)) { localStorage.removeItem('afiliadoLogado'); localStorage.removeItem('minhaMargem'); window.location.reload(); } }; } const barraAntiga = document.getElementById('barra-parceiro'); if (barraAntiga) barraAntiga.remove(); const barra = document.createElement('div'); barra.id = "barra-parceiro"; barra.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 45px; background: linear-gradient(90deg, #1a252f 0%, #2c3e50 100%); color: white; z-index: 999999; display: flex; justify-content: space-between; align-items: center; padding: 0 5%; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-family: sans-serif; box-sizing: border-box;`; barra.innerHTML = `<div style="display:flex; align-items:center; gap: 10px;"><div style="background:rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px; display:flex; align-items:center; gap:6px;"><span style="font-size: 1.1rem;">🦊</span><span style="font-size: 0.9rem; color: #ecf0f1;">Olá, <strong>${afiliado.nome}</strong></span></div><span style="font-size: 0.75rem; background:#27ae60; padding:2px 6px; border-radius:4px; font-weight:bold;">PARCEIRO ATIVO</span></div><a href="afiliado_dashboard.html" style="text-decoration: none; color: white; background: rgba(255,255,255,0.15); padding: 6px 15px; border-radius: 30px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,0.1);"><i class="ph ph-gauge"></i><span>Acessar Meu Painel</span></a>`; document.body.prepend(barra); document.body.style.paddingTop = "45px"; }

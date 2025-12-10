@@ -152,9 +152,6 @@ async function carregarDashboard() {
     }
 }
 
-// ======================================================
-// 📦 FUNÇÃO: CARREGAR PEDIDOS (COMPLETO)
-// ======================================================
 async function carregarPedidos() {
     try {
         const res = await fetch(`${API_URL}/admin/pedidos`, {
@@ -162,13 +159,19 @@ async function carregarPedidos() {
         });
         const lista = await res.json();
         
-        // Tenta achar o corpo da tabela de várias formas para não dar erro
         const tbody = document.querySelector('tbody'); 
         if(!tbody) return;
         tbody.innerHTML = '';
 
         lista.forEach(p => {
             const vendedor = p.afiliado ? `<span style="color:#e67e22">🦊 ${p.afiliado.nome}</span>` : 'Loja Oficial';
+            
+            // Define a cor baseada no status atual
+            let corSelect = '#f39c12'; // Laranja (Pendente)
+            if(p.status === 'APROVADO') corSelect = '#27ae60'; // Verde
+            if(p.status === 'CANCELADO') corSelect = '#c0392b'; // Vermelho
+            if(p.status === 'ENTREGUE') corSelect = '#2980b9'; // Azul
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>#${p.id}</td>
@@ -179,11 +182,46 @@ async function carregarPedidos() {
                 <td>${vendedor}</td>
                 <td>${formatarMoeda(p.valorTotal)}</td>
                 <td>${formatarData(p.createdAt)}</td>
-                <td><span style="background:#2ecc71; color:white; padding:3px 8px; border-radius:4px; font-size:0.8rem;">Pago</span></td>
+                <td>
+                    <select onchange="mudarStatusPedido(${p.id}, this.value)" 
+                            style="padding:5px; border-radius:4px; font-weight:bold; color:white; background-color:${corSelect}; border:none; cursor:pointer;">
+                        <option value="PENDENTE" ${p.status === 'PENDENTE' ? 'selected' : ''}>⏳ Pendente</option>
+                        <option value="APROVADO" ${p.status === 'APROVADO' ? 'selected' : ''}>✅ Aprovado</option>
+                        <option value="ENTREGUE" ${p.status === 'ENTREGUE' ? 'selected' : ''}>🚚 Entregue</option>
+                        <option value="CANCELADO" ${p.status === 'CANCELADO' ? 'selected' : ''}>🚫 Cancelado</option>
+                    </select>
+                </td>
             `;
             tbody.appendChild(tr);
         });
     } catch(e) { console.error(e); }
+}
+
+// Nova função para enviar a mudança pro servidor
+async function mudarStatusPedido(id, novoStatus) {
+    // Muda a cor do select na hora para dar feedback visual
+    const select = event.target;
+    if(novoStatus === 'APROVADO') select.style.backgroundColor = '#27ae60';
+    else if(novoStatus === 'CANCELADO') select.style.backgroundColor = '#c0392b';
+    else if(novoStatus === 'ENTREGUE') select.style.backgroundColor = '#2980b9';
+    else select.style.backgroundColor = '#f39c12';
+
+    try {
+        const token = localStorage.getItem('adminToken');
+        await fetch(`${API_URL}/admin/orders/${id}/status`, {
+            method: 'PUT',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ status: novoStatus })
+        });
+        // Não precisa recarregar a tela toda, pois já mudamos a cor visualmente
+        console.log("Status salvo com sucesso!");
+    } catch (e) {
+        alert("Erro ao salvar status.");
+        console.error(e);
+    }
 }
 
 // ======================================================

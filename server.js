@@ -471,6 +471,53 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
 });
 
 
+// ROTA: ATUALIZAR STATUS DO PEDIDO
+app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        const { status } = req.body; // Ex: "APROVADO", "CANCELADO"
+
+        // Atualiza no banco
+        const pedidoAtualizado = await prisma.pedido.update({
+            where: { id: id },
+            data: { status: status }
+        });
+
+        console.log(`Pedido #${id} atualizado para ${status}`);
+        res.json(pedidoAtualizado);
+
+    } catch (e) {
+        console.error("Erro ao atualizar status:", e);
+        res.status(500).json({ erro: "Erro ao atualizar" });
+    }
+});
+
+// ROTA WEBHOOK (Para receber avisos do Mercado Pago/Gateway)
+app.post('/webhook/pagamento', async (req, res) => {
+    try {
+        const dados = req.body;
+        console.log("Notificação recebida:", dados);
+
+        // Lógica Fictícia (Varia conforme a operadora)
+        // Se a operadora disser "status: approved" e mandar o "external_reference: 14"
+        
+        /* const idPedido = dados.external_reference;
+        const statusPagamento = dados.status; // ex: 'approved'
+
+        if (statusPagamento === 'approved') {
+            await prisma.pedido.update({
+                where: { id: Number(idPedido) },
+                data: { status: 'APROVADO' }
+            });
+        }
+        */
+
+        res.status(200).send("OK"); // Avisa o Gateway que recebeu
+    } catch (e) {
+        console.error(e);
+        res.status(500).send("Erro");
+    }
+});
 
 // 2. LISTA DE PEDIDOS COMPLETA
 app.get('/admin/pedidos', authenticateToken, async (req, res) => {

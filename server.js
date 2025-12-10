@@ -532,19 +532,17 @@ app.post('/webhook/pagamento', async (req, res) => {
     }
 });
 
-// ROTA: MUDAR STATUS (Modo Debug)
+// ROTA: MUDAR STATUS (Versão Fofoqueira / Debug)
 app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         const { status } = req.body;
 
-        console.log(`Tentando mudar pedido ${id} para ${status}`);
+        // Se o ID não for número, já avisa
+        if (isNaN(id)) throw new Error(`O ID recebido (${req.params.id}) não é um número válido.`);
 
-        // Verificação básica
-        if (!status) throw new Error("O status veio vazio (undefined). Verifique o JSON do front.");
-        if (isNaN(id)) throw new Error("O ID do pedido não é um número válido.");
+        console.log(`Tentando atualizar Pedido #${id} para '${status}'`);
 
-        // Atualiza no banco
         const pedido = await prisma.pedido.update({
             where: { id: id },
             data: { status: status }
@@ -553,12 +551,12 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
         res.json(pedido);
 
     } catch (e) {
-        console.error("ERRO GRAVE:", e);
-        // AQUI ESTÁ O TRUQUE: Mandamos o erro exato para você ver no navegador
+        console.error("ERRO REAL:", e);
+        // AQUI ESTÁ O SEGREDO: Enviamos o erro técnico para o Front
         res.status(500).json({ 
-            erro: "Erro interno", 
-            mensagem: e.message, 
-            stack: e.stack // Mostra onde o erro aconteceu
+            erro: "Falha ao salvar", 
+            motivo: e.message, // Vai dizer o que o Prisma reclamou
+            tipo: e.code // Código do erro (ex: P2025)
         });
     }
 });

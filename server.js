@@ -532,28 +532,34 @@ app.post('/webhook/pagamento', async (req, res) => {
     }
 });
 
-// ==========================================
-// ROTA: ATUALIZAR STATUS DO PEDIDO (Manual)
-// ==========================================
+// ROTA: MUDAR STATUS (Modo Debug)
 app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        const { status } = req.body; // Recebe "APROVADO", "ENTREGUE", etc.
+        const { status } = req.body;
 
-        if (!status) return res.status(400).json({ erro: "Status obrigatório" });
+        console.log(`Tentando mudar pedido ${id} para ${status}`);
 
-        // Atualiza no Banco de Dados
-        const pedidoAtualizado = await prisma.pedido.update({
+        // Verificação básica
+        if (!status) throw new Error("O status veio vazio (undefined). Verifique o JSON do front.");
+        if (isNaN(id)) throw new Error("O ID do pedido não é um número válido.");
+
+        // Atualiza no banco
+        const pedido = await prisma.pedido.update({
             where: { id: id },
             data: { status: status }
         });
 
-        console.log(`✅ Pedido #${id} atualizado para: ${status}`);
-        res.json(pedidoAtualizado);
+        res.json(pedido);
 
     } catch (e) {
-        console.error("Erro ao atualizar status:", e);
-        res.status(500).json({ erro: "Erro ao atualizar status" });
+        console.error("ERRO GRAVE:", e);
+        // AQUI ESTÁ O TRUQUE: Mandamos o erro exato para você ver no navegador
+        res.status(500).json({ 
+            erro: "Erro interno", 
+            mensagem: e.message, 
+            stack: e.stack // Mostra onde o erro aconteceu
+        });
     }
 });
 

@@ -308,7 +308,7 @@ app.post('/finalizar-pedido', async (req, res) => {
 
         const pedido = await prisma.pedido.create({ data: dadosPedido });
 
-        / ============================================================
+        // ============================================================
         // 🤖 AVISO AUTOMÁTICO NO WHATSAPP (CallMeBot)
         // ============================================================
         try {

@@ -260,26 +260,36 @@ app.get('/afiliado/dashboard', authenticateToken, async (req, res) => {
     } catch (e) { res.status(500).json({ erro: "Erro" }); }
 });
 
-// ROTA: FINALIZAR PEDIDO (SEM PAGAR COMISSÃO IMEDIATA)
+// ROTA: FINALIZAR PEDIDO (SALVANDO IDs PARA O ESTOQUE)
 app.post('/finalizar-pedido', async (req, res) => {
     try {
         const { cliente, itens, afiliadoCodigo } = req.body;
         
         let valorTotal = 0;
         let comissaoReal = 0;
-        let itensTexto = "";
+        
+        // Vamos criar uma lista estruturada para salvar no banco (com IDs!)
+        let itensParaBanco = [];
+        let itensTextoZap = ""; // Texto apenas para o aviso do WhatsApp
 
-        // 1. Calcula totais e lucro previsto
         for (const i of itens) {
-            valorTotal += (i.unitario * i.qtd); 
-            itensTexto += `${i.qtd}x ${i.nome} (R$ ${parseFloat(i.unitario).toFixed(2)}) | `;
+            valorTotal += (i.unitario * i.qtd);
+            itensTextoZap += `${i.qtd}x ${i.nome} | `;
 
+            // Guarda os dados técnicos na lista
+            itensParaBanco.push({
+                id: parseInt(i.id), // Importante: Salva o ID!
+                nome: i.nome,
+                qtd: parseInt(i.qtd),
+                unitario: i.unitario
+            });
+
+            // Cálculo da Comissão
             if (afiliadoCodigo) {
                 const idProd = parseInt(i.id);
                 const produtoOriginal = await prisma.produto.findUnique({ where: { id: idProd } });
-                
                 if (produtoOriginal) {
-                    const precoCusto = parseFloat(produtoOriginal.preco_novo); 
+                    const precoCusto = parseFloat(produtoOriginal.preco_novo);
                     const precoVenda = parseFloat(i.unitario);
                     const lucroItem = (precoVenda - precoCusto) * i.qtd;
                     if (lucroItem > 0) comissaoReal += lucroItem;
@@ -292,50 +302,35 @@ app.post('/finalizar-pedido', async (req, res) => {
             clienteEmail: cliente.email,
             clienteEndereco: cliente.endereco,
             valorTotal: valorTotal,
-            itens: itensTexto,
+            // AQUI MUDOU: Salvamos como JSON String para manter os IDs
+            itens: JSON.stringify(itensParaBanco), 
             comissaoGerada: 0.0,
-            status: "PENDENTE" // Nasce como pendente
+            status: "PENDENTE"
         };
 
         if (afiliadoCodigo) {
             const afiliado = await prisma.afiliado.findUnique({ where: { codigo: afiliadoCodigo } });
             if (afiliado) {
                 dadosPedido.afiliadoId = afiliado.id;
-                dadosPedido.comissaoGerada = comissaoReal; 
-                // REMOVIDO: Não atualizamos o saldo aqui! Só na aprovação.
+                dadosPedido.comissaoGerada = comissaoReal;
             }
         }
 
         const pedido = await prisma.pedido.create({ data: dadosPedido });
 
-        // ============================================================
-        // 🤖 AVISO AUTOMÁTICO NO WHATSAPP (CallMeBot)
-        // ============================================================
+        // --- ROBÔ DO ZAP (CallMeBot) ---
         try {
-            const SEU_TELEFONE = "558287515891"; // <--- SEU NÚMERO AQUI
-            const API_KEY = "6414164";             // <--- A CHAVE QUE O ROBÔ TE DEU
-
-            // Monta a mensagem bonita
-            const mensagem = `🔔 *Nova Venda Realizada!* 🔔\n\n` +
-                             `🆔 Pedido: #${pedido.id}\n` +
-                             `👤 Cliente: ${cliente.nome}\n` +
-                             `💰 Valor: R$ ${valorTotal.toFixed(2)}\n` +
-                             `📦 Itens: ${itensTexto}\n\n` +
-                             `Acesse o painel para aprovar!`;
-
-            // Codifica a mensagem para URL
-            const textoCodificado = encodeURIComponent(mensagem);
+            const SEU_TELEFONE = "558287515891"; // <--- SEU NÚMERO
+            const API_KEY = "6414164";             // <--- SUA API KEY
             
-            // Chama o robô (Dispara e esquece, não trava a venda se der erro)
-            const urlBot = `https://api.callmebot.com/whatsapp.php?phone=${SEU_TELEFONE}&text=${textoCodificado}&apikey=${API_KEY}`;
-            
-            // Envia a requisição em segundo plano
-            fetch(urlBot).then(r => console.log("Zap enviado pro Admin!")).catch(e => console.error("Erro Zap:", e));
+            const msg = `🔔 *Nova Venda!* (#${pedido.id})\n` +
+                        `💰 R$ ${valorTotal.toFixed(2)}\n` +
+                        `📦 ${itensTextoZap}`; // Usa o texto simples aqui
 
-        } catch (zapErro) {
-            console.error("Falha ao notificar WhatsApp:", zapErro);
-        }
-        // ============================================================
+            const urlBot = `https://api.callmebot.com/whatsapp.php?phone=${SEU_TELEFONE}&text=${encodeURIComponent(msg)}&apikey=${API_KEY}`;
+            fetch(urlBot).catch(e => console.error("Erro Zap", e));
+        } catch (e) {}
+        // -------------------------------
 
         res.json(pedido);
 
@@ -486,65 +481,85 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
 });
 
 
-// ROTA: MUDAR STATUS (Com Estoque e Comissão)
+// ROTA: MUDAR STATUS (COM BAIXA DE ESTOQUE E COMISSÃO)
 app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        const { status } = req.body; // Novo status (ex: "APROVADO")
+        const { status } = req.body;
 
-        // 1. Busca o pedido atual antes de mudar
+        // 1. Busca o pedido antigo
         const pedidoAntigo = await prisma.pedido.findUnique({ 
             where: { id: id },
-            include: { afiliado: true } // Traz dados do afiliado
+            include: { afiliado: true }
         });
 
         if (!pedidoAntigo) return res.status(404).json({ erro: "Pedido não encontrado" });
 
-        console.log(`Alterando Pedido #${id}: De '${pedidoAntigo.status}' para '${status}'`);
+        console.log(`Atualizando Pedido #${id} para ${status}...`);
 
-        // ====================================================
-        // AÇÃO 1: BAIXA NO ESTOQUE (Se virar APROVADO)
-        // ====================================================
+        // =========================================================
+        // AÇÃO 1: BAIXA NO ESTOQUE (Só se virar APROVADO)
+        // =========================================================
         if (status === 'APROVADO' && pedidoAntigo.status !== 'APROVADO') {
-            
-            // Tenta ler os itens do pedido para saber o que baixar
-            // Formato esperado: "2x Amortecedor ... | 1x Mola ..." ou JSON
-            // ATENÇÃO: Se você salvar como JSON no futuro é mais fácil, 
-            // aqui vamos assumir que você vai implementar a lógica de leitura ou 
-            // idealmente, salvar os itens em uma tabela separada 'PedidoItem'.
-            
-            // P.S: Como seu banco atual salva itens como STRING, baixar estoque exato é complexo.
-            // Vou deixar o código pronto para COMISSÃO que é o mais importante agora.
-            // Para estoque funcionar perfeito, precisaríamos mudar o banco para ter tabela "ItensDoPedido".
+            try {
+                // Converte o texto JSON de volta para Lista de Objetos
+                const listaItens = JSON.parse(pedidoAntigo.itens);
+                
+                // Se for uma lista válida, percorre e desconta
+                if (Array.isArray(listaItens)) {
+                    for (const item of listaItens) {
+                        // Desconta do estoque no banco
+                        await prisma.produto.update({
+                            where: { id: item.id },
+                            data: { estoque: { decrement: item.qtd } }
+                        });
+                        console.log(`📉 Baixa de estoque: -${item.qtd} no Produto ID ${item.id}`);
+                    }
+                }
+            } catch (err) {
+                console.log("⚠️ Aviso: Não foi possível baixar estoque (talvez seja um pedido antigo salvo como texto).");
+            }
         }
 
-        // ====================================================
-        // AÇÃO 2: PAGAR COMISSÃO (Se virar APROVADO)
-        // ====================================================
+        // =========================================================
+        // AÇÃO 2: LIBERAR COMISSÃO (Só se virar APROVADO)
+        // =========================================================
         if (status === 'APROVADO' && pedidoAntigo.status !== 'APROVADO') {
             if (pedidoAntigo.afiliadoId && pedidoAntigo.comissaoGerada > 0) {
                 await prisma.afiliado.update({
                     where: { id: pedidoAntigo.afiliadoId },
                     data: { saldo: { increment: pedidoAntigo.comissaoGerada } }
                 });
-                console.log(`💰 Comissão de R$ ${pedidoAntigo.comissaoGerada} liberada para o afiliado!`);
+                console.log("💰 Comissão liberada!");
             }
         }
 
-        // ====================================================
-        // AÇÃO 3: ESTORNAR COMISSÃO (Se cancelar uma venda que já estava aprovada)
-        // ====================================================
+        // =========================================================
+        // AÇÃO 3: ESTORNAR TUDO (Se cancelar depois de aprovado)
+        // =========================================================
         if (status === 'CANCELADO' && pedidoAntigo.status === 'APROVADO') {
+            // Estorna Comissão
             if (pedidoAntigo.afiliadoId && pedidoAntigo.comissaoGerada > 0) {
                 await prisma.afiliado.update({
                     where: { id: pedidoAntigo.afiliadoId },
                     data: { saldo: { decrement: pedidoAntigo.comissaoGerada } }
                 });
-                console.log(`💸 Comissão estornada (Venda Cancelada).`);
             }
+            // Devolve Estoque
+            try {
+                const listaItens = JSON.parse(pedidoAntigo.itens);
+                if (Array.isArray(listaItens)) {
+                    for (const item of listaItens) {
+                        await prisma.produto.update({
+                            where: { id: item.id },
+                            data: { estoque: { increment: item.qtd } } // Devolve (+)
+                        });
+                    }
+                }
+            } catch(e) {}
         }
 
-        // 3. Finalmente atualiza o status do pedido
+        // 3. Salva o novo status
         const pedidoAtualizado = await prisma.pedido.update({
             where: { id: id },
             data: { status: status }

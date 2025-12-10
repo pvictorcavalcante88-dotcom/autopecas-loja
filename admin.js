@@ -73,14 +73,14 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ======================================================
-// 📊 FUNÇÃO: CARREGAR DASHBOARD (SUBSTITUA APENAS ESTA)
+// 📊 FUNÇÃO: CARREGAR DASHBOARD (VERSÃO BLINDADA)
 // ======================================================
 async function carregarDashboard() {
     const token = localStorage.getItem('adminToken');
     if (!token) return;
 
     try {
-        // Chama a rota que criamos no server.js
+        // Chama a rota que conta tudo no banco de dados
         const res = await fetch(`${API_URL}/admin/dashboard-stats`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -88,29 +88,35 @@ async function carregarDashboard() {
         if (!res.ok) throw new Error("Falha ao buscar dados do Dashboard");
 
         const dados = await res.json();
-        console.log("Dados do Dashboard:", dados); // Ajuda a debugar (F12)
+        console.log("Dados do Dashboard recebidos:", dados); // Olhe no F12 para ver os números reais
 
-        // --- 1. PREENCHE OS CARDS (Números Grandes) ---
+        // --- 1. PREENCHE OS CARDS (ESTRATÉGIA DUPLA) ---
+        // Tenta achar pelo ID correto OU pela posição do Card na tela
         
-        // Faturamento (Tenta achar pelo ID ou pela posição do Card)
-        const elFat = document.getElementById('faturamento-total') || document.querySelector('.card:nth-child(1) h2');
+        // Faturamento (1º Card)
+        const elFat = document.getElementById('faturamento-total') || 
+                      document.getElementById('total-vendas') || 
+                      document.querySelector('.card:nth-child(1) h2'); 
+                      // ^ Procura o h2 dentro do primeiro card
         if(elFat) elFat.innerText = formatarMoeda(dados.faturamento);
         
-        // Pedidos
-        const elPed = document.getElementById('total-pedidos') || document.querySelector('.card:nth-child(2) h2');
+        // Total de Pedidos (2º Card)
+        const elPed = document.getElementById('total-pedidos') || 
+                      document.querySelector('.card:nth-child(2) h2');
         if(elPed) elPed.innerText = dados.totalPedidos;
 
-        // Produtos
-        const elProd = document.getElementById('total-produtos') || document.querySelector('.card:nth-child(3) h2');
+        // Total de Produtos (3º Card)
+        const elProd = document.getElementById('total-produtos') || 
+                      document.querySelector('.card:nth-child(3) h2');
         if(elProd) elProd.innerText = dados.produtos;
 
-        // Estoque Baixo
-        const elEst = document.getElementById('estoque-baixo') || document.querySelector('.card:nth-child(4) h2');
+        // Estoque Baixo (4º Card)
+        const elEst = document.getElementById('estoque-baixo') || 
+                      document.querySelector('.card:nth-child(4) h2');
         if(elEst) elEst.innerText = dados.estoqueBaixo;
 
 
         // --- 2. PREENCHE A TABELA DE ÚLTIMOS PEDIDOS ---
-        // Procura o corpo da tabela dentro do dashboard
         const tabela = document.querySelector('.recent-orders table tbody') || document.querySelector('table tbody');
         
         if (tabela) {
@@ -122,7 +128,7 @@ async function carregarDashboard() {
                 dados.ultimosPedidos.forEach(p => {
                     const statusClass = p.status ? p.status.toLowerCase() : 'pendente';
                     
-                    // Se tiver afiliado, mostra o nome dele
+                    // Verifica se veio de afiliado
                     let clienteHtml = `<strong>${p.clienteNome || 'Cliente'}</strong>`;
                     if(p.afiliado) {
                         clienteHtml += `<br><small style="color:#e67e22">Via: ${p.afiliado.nome}</small>`;
@@ -143,11 +149,6 @@ async function carregarDashboard() {
 
     } catch(e) { 
         console.error("Erro ao carregar Dashboard:", e);
-        // Opcional: Mostra um aviso na tela se falhar
-        const main = document.querySelector('main');
-        if(main && !document.getElementById('erro-dash')) {
-            main.insertAdjacentHTML('afterbegin', '<div id="erro-dash" style="background:#e74c3c; color:white; padding:10px; margin-bottom:15px; border-radius:5px;">Não foi possível carregar os dados. Verifique a conexão.</div>');
-        }
     }
 }
 

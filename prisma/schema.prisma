@@ -78,6 +78,7 @@ model Pedido {
   afiliado        Afiliado? @relation(fields: [afiliadoId], references: [id])
   comissaoGerada  Float    @default(0.0)
   notificado_afiliado Boolean @default(false)
+  status          String   @default("PENDENTE")
 
 
   createdAt       DateTime @default(now())

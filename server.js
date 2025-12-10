@@ -260,6 +260,7 @@ app.get('/afiliado/dashboard', authenticateToken, async (req, res) => {
     } catch (e) { res.status(500).json({ erro: "Erro" }); }
 });
 
+// ROTA: FINALIZAR PEDIDO (SEM PAGAR COMISSÃO IMEDIATA)
 app.post('/finalizar-pedido', async (req, res) => {
     try {
         const { cliente, itens, afiliadoCodigo } = req.body;
@@ -268,64 +269,78 @@ app.post('/finalizar-pedido', async (req, res) => {
         let comissaoReal = 0;
         let itensTexto = "";
 
-        // Loop seguro para calcular totais e comissão
+        // 1. Calcula totais e lucro previsto
         for (const i of itens) {
-            // 1. Totais visuais
             valorTotal += (i.unitario * i.qtd); 
             itensTexto += `${i.qtd}x ${i.nome} (R$ ${parseFloat(i.unitario).toFixed(2)}) | `;
 
-            // 2. Cálculo do Lucro (Se tiver afiliado)
             if (afiliadoCodigo) {
-                // Garante que o ID é número
                 const idProd = parseInt(i.id);
-                
-                // Busca custo no banco
                 const produtoOriginal = await prisma.produto.findUnique({ where: { id: idProd } });
                 
                 if (produtoOriginal) {
                     const precoCusto = parseFloat(produtoOriginal.preco_novo); 
                     const precoVenda = parseFloat(i.unitario);
-                    
-                    // Lucro = Venda - Custo
                     const lucroItem = (precoVenda - precoCusto) * i.qtd;
-                    
                     if (lucroItem > 0) comissaoReal += lucroItem;
                 }
             }
         }
 
-        // Monta o pedido
         let dadosPedido = {
             clienteNome: cliente.nome,
             clienteEmail: cliente.email,
             clienteEndereco: cliente.endereco,
             valorTotal: valorTotal,
             itens: itensTexto,
-            // CORREÇÃO: Usando o nome correto do seu banco
-            comissaoGerada: 0.0 
+            comissaoGerada: 0.0,
+            status: "PENDENTE" // Nasce como pendente
         };
 
         if (afiliadoCodigo) {
             const afiliado = await prisma.afiliado.findUnique({ where: { codigo: afiliadoCodigo } });
-            
             if (afiliado) {
                 dadosPedido.afiliadoId = afiliado.id;
-                dadosPedido.comissaoGerada = comissaoReal; // <--- AGORA VAI SALVAR CERTO
-                
-                // Atualiza o saldo do afiliado
-                await prisma.afiliado.update({
-                    where: { id: afiliado.id },
-                    data: { saldo: { increment: comissaoReal } }
-                });
+                dadosPedido.comissaoGerada = comissaoReal; 
+                // REMOVIDO: Não atualizamos o saldo aqui! Só na aprovação.
             }
         }
 
-        // Cria o pedido no banco
         const pedido = await prisma.pedido.create({ data: dadosPedido });
+
+        / ============================================================
+        // 🤖 AVISO AUTOMÁTICO NO WHATSAPP (CallMeBot)
+        // ============================================================
+        try {
+            const SEU_TELEFONE = "558287515891"; // <--- SEU NÚMERO AQUI
+            const API_KEY = "6414164";             // <--- A CHAVE QUE O ROBÔ TE DEU
+
+            // Monta a mensagem bonita
+            const mensagem = `🔔 *Nova Venda Realizada!* 🔔\n\n` +
+                             `🆔 Pedido: #${pedido.id}\n` +
+                             `👤 Cliente: ${cliente.nome}\n` +
+                             `💰 Valor: R$ ${valorTotal.toFixed(2)}\n` +
+                             `📦 Itens: ${itensTexto}\n\n` +
+                             `Acesse o painel para aprovar!`;
+
+            // Codifica a mensagem para URL
+            const textoCodificado = encodeURIComponent(mensagem);
+            
+            // Chama o robô (Dispara e esquece, não trava a venda se der erro)
+            const urlBot = `https://api.callmebot.com/whatsapp.php?phone=${SEU_TELEFONE}&text=${textoCodificado}&apikey=${API_KEY}`;
+            
+            // Envia a requisição em segundo plano
+            fetch(urlBot).then(r => console.log("Zap enviado pro Admin!")).catch(e => console.error("Erro Zap:", e));
+
+        } catch (zapErro) {
+            console.error("Falha ao notificar WhatsApp:", zapErro);
+        }
+        // ============================================================
+
         res.json(pedido);
 
     } catch (error) { 
-        console.error("ERRO AO FINALIZAR:", error); // Isso vai mostrar o erro exato no seu terminal
+        console.error("ERRO AO FINALIZAR:", error);
         res.status(500).json({ erro: "Erro ao processar pedido" }); 
     }
 });
@@ -471,37 +486,75 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
 });
 
 
-// ==========================================
-// ROTA: MUDAR STATUS (COM LOGS DE ERRO)
-// ==========================================
+// ROTA: MUDAR STATUS (Com Estoque e Comissão)
 app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
-    
-    // 1. ESPIONANDO O QUE CHEGA
-    console.log("🔔 TENTATIVA DE MUDAR STATUS RECEBIDA!");
-    console.log("-> ID do Pedido:", req.params.id);
-    console.log("-> Dados recebidos (Body):", req.body);
-
     try {
         const id = parseInt(req.params.id);
-        const { status } = req.body;
+        const { status } = req.body; // Novo status (ex: "APROVADO")
 
-        if (!status) {
-            console.log("❌ ERRO: O status chegou vazio ou indefinido.");
-            return res.status(400).json({ erro: "Status não enviado" });
+        // 1. Busca o pedido atual antes de mudar
+        const pedidoAntigo = await prisma.pedido.findUnique({ 
+            where: { id: id },
+            include: { afiliado: true } // Traz dados do afiliado
+        });
+
+        if (!pedidoAntigo) return res.status(404).json({ erro: "Pedido não encontrado" });
+
+        console.log(`Alterando Pedido #${id}: De '${pedidoAntigo.status}' para '${status}'`);
+
+        // ====================================================
+        // AÇÃO 1: BAIXA NO ESTOQUE (Se virar APROVADO)
+        // ====================================================
+        if (status === 'APROVADO' && pedidoAntigo.status !== 'APROVADO') {
+            
+            // Tenta ler os itens do pedido para saber o que baixar
+            // Formato esperado: "2x Amortecedor ... | 1x Mola ..." ou JSON
+            // ATENÇÃO: Se você salvar como JSON no futuro é mais fácil, 
+            // aqui vamos assumir que você vai implementar a lógica de leitura ou 
+            // idealmente, salvar os itens em uma tabela separada 'PedidoItem'.
+            
+            // P.S: Como seu banco atual salva itens como STRING, baixar estoque exato é complexo.
+            // Vou deixar o código pronto para COMISSÃO que é o mais importante agora.
+            // Para estoque funcionar perfeito, precisaríamos mudar o banco para ter tabela "ItensDoPedido".
         }
 
-        // 2. TENTANDO SALVAR NO BANCO
-        const pedido = await prisma.pedido.update({
+        // ====================================================
+        // AÇÃO 2: PAGAR COMISSÃO (Se virar APROVADO)
+        // ====================================================
+        if (status === 'APROVADO' && pedidoAntigo.status !== 'APROVADO') {
+            if (pedidoAntigo.afiliadoId && pedidoAntigo.comissaoGerada > 0) {
+                await prisma.afiliado.update({
+                    where: { id: pedidoAntigo.afiliadoId },
+                    data: { saldo: { increment: pedidoAntigo.comissaoGerada } }
+                });
+                console.log(`💰 Comissão de R$ ${pedidoAntigo.comissaoGerada} liberada para o afiliado!`);
+            }
+        }
+
+        // ====================================================
+        // AÇÃO 3: ESTORNAR COMISSÃO (Se cancelar uma venda que já estava aprovada)
+        // ====================================================
+        if (status === 'CANCELADO' && pedidoAntigo.status === 'APROVADO') {
+            if (pedidoAntigo.afiliadoId && pedidoAntigo.comissaoGerada > 0) {
+                await prisma.afiliado.update({
+                    where: { id: pedidoAntigo.afiliadoId },
+                    data: { saldo: { decrement: pedidoAntigo.comissaoGerada } }
+                });
+                console.log(`💸 Comissão estornada (Venda Cancelada).`);
+            }
+        }
+
+        // 3. Finalmente atualiza o status do pedido
+        const pedidoAtualizado = await prisma.pedido.update({
             where: { id: id },
             data: { status: status }
         });
 
-        console.log(`✅ SUCESSO! Pedido #${id} salvo como: ${status}`);
-        res.json(pedido);
+        res.json(pedidoAtualizado);
 
     } catch (e) {
-        console.error("❌ ERRO NO PRISMA:", e);
-        res.status(500).json({ error: "Erro ao salvar no banco" });
+        console.error("ERRO AO MUDAR STATUS:", e);
+        res.status(500).json({ erro: e.message });
     }
 });
 

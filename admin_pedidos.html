@@ -7,21 +7,31 @@
     <link rel="stylesheet" href="admin.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
-        /* Estilo dos Cards de Pedido (Mantido) */
+        /* Estilo dos Cards de Pedido (Mantido e Melhorado) */
         .order-card { 
-            background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 15px; overflow: hidden; border-left: 5px solid #e67e22; 
+            background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 15px; overflow: hidden; border-left: 5px solid #bdc3c7; transition: 0.3s;
         }
-        .order-header { padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .order-header { padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; flex-wrap: wrap; gap: 10px; }
         .order-header:hover { background: #f9f9f9; }
-        .order-info h3 { margin: 0; color: #333; font-size: 1rem; }
-        .total-price { font-size: 1.1rem; font-weight: bold; color: #27ae60; }
-        .comissao-tag { font-size: 0.75rem; background: #e67e22; color: white; padding: 3px 8px; border-radius: 10px; margin-left: 10px; }
         
+        .order-info h3 { margin: 0; color: #333; font-size: 1rem; }
+        .order-right-side { display: flex; align-items: center; gap: 15px; }
+
+        .total-price { font-size: 1.1rem; font-weight: bold; color: #2c3e50; }
+        .comissao-tag { font-size: 0.75rem; background: #e67e22; color: white; padding: 3px 8px; border-radius: 10px; margin-left: 5px; }
+        
+        /* Select de Status Bonito */
+        .status-select {
+            padding: 6px 10px; border-radius: 5px; border: none; font-weight: bold; color: white; cursor: pointer; font-size: 0.9rem;
+            appearance: none; -webkit-appearance: none; text-align: center;
+        }
+
         .order-details { display: none; padding: 15px; background: #f8f9fa; border-top: 1px solid #eee; }
         .order-details.open { display: block; }
         
-        .item-row { display: flex; justify-content: space-between; border-bottom: 1px dashed #ddd; padding: 5px 0; font-size: 0.9rem; }
-        .btn-whatsapp { display: inline-block; background: #25D366; color: white; text-decoration: none; padding: 8px 12px; border-radius: 5px; margin-top: 10px; font-weight: bold; font-size: 0.9rem; }
+        .item-row { display: flex; justify-content: space-between; border-bottom: 1px dashed #ddd; padding: 8px 0; font-size: 0.9rem; }
+        .btn-whatsapp { display: inline-flex; align-items: center; gap: 5px; background: #25D366; color: white; text-decoration: none; padding: 10px 15px; border-radius: 5px; margin-top: 15px; font-weight: bold; font-size: 0.9rem; }
+        .btn-whatsapp:hover { background: #20b858; }
     </style>
 </head>
 <body>
@@ -41,18 +51,19 @@
 
         <main class="main-content">
             <header>
-                <h1>Pedidos Realizados</h1>
-                <span>Admin Logado</span>
+                <h1>Gerenciar Pedidos</h1>
+                <input type="text" id="search-orders" placeholder="Buscar cliente..." style="padding:8px; border-radius:4px; border:1px solid #ddd; width:250px;">
             </header>
 
             <div id="order-list-container">
-                <p>Carregando...</p>
+                <p style="padding:20px; text-align:center; color:#666;">Carregando pedidos...</p>
             </div>
         </main>
     </div>
 
     <script>
         const API_URL = ''; 
+        let pedidosCache = []; // Para busca rápida
 
         async function carregarPedidos() {
             const token = localStorage.getItem('adminToken');
@@ -61,6 +72,7 @@
             try {
                 const res = await fetch(`${API_URL}/admin/pedidos`, { headers: { 'Authorization': `Bearer ${token}` } });
                 const pedidos = await res.json();
+                pedidosCache = pedidos;
                 renderizarPedidos(pedidos);
             } catch (error) {
                 document.getElementById('order-list-container').innerHTML = '<p>Erro ao carregar.</p>';
@@ -72,48 +84,118 @@
             container.innerHTML = '';
             
             if(pedidos.length === 0) {
-                container.innerHTML = '<p>Sem pedidos.</p>'; return;
+                container.innerHTML = '<p style="padding:20px; text-align:center;">Nenhum pedido encontrado.</p>'; return;
             }
 
             pedidos.forEach(p => {
                 const total = parseFloat(p.valorTotal).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
-                const comissao = parseFloat(p.comissaoGerada).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+                const comissao = parseFloat(p.comissaoGerada || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
                 const data = new Date(p.createdAt).toLocaleDateString('pt-BR');
                 
-                // Itens
+                // Define cor do status
+                let corStatus = '#95a5a6'; // Cinza
+                let corBorda = '#bdc3c7';
+                
+                if(p.status === 'APROVADO') { corStatus = '#27ae60'; corBorda = '#27ae60'; }
+                if(p.status === 'ENTREGUE') { corStatus = '#2980b9'; corBorda = '#2980b9'; }
+                if(p.status === 'CANCELADO') { corStatus = '#c0392b'; corBorda = '#c0392b'; }
+                if(p.status === 'PENDENTE') { corStatus = '#f39c12'; corBorda = '#f39c12'; }
+
+                // Itens (Lógica segura)
                 let listaItens = '';
                 try {
-                    JSON.parse(p.itens).forEach(i => {
-                        listaItens += `<div class="item-row"><span>${i.qtd}x ${i.nome || 'Item'}</span><span>${(i.unitario*i.qtd).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>`;
-                    });
-                } catch(e) {}
+                    // Tenta ler o JSON ou string simples
+                    let itensObj = [];
+                    if (p.itens.startsWith('[')) itensObj = JSON.parse(p.itens);
+                    else itensObj = [{ nome: p.itens, qtd: 1, unitario: p.valorTotal }]; // Fallback antigo
 
-                // Afiliado
-                let tagAfiliado = p.afiliado ? `<span class="comissao-tag">🦊 ${p.afiliado.nome} (${comissao})</span>` : '';
+                    itensObj.forEach(i => {
+                        const sub = (parseFloat(i.unitario || 0) * (i.qtd || 1)).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+                        listaItens += `<div class="item-row"><span>${i.qtd}x ${i.nome || 'Item'}</span><span>${sub}</span></div>`;
+                    });
+                } catch(e) { listaItens = `<div class="item-row"><span>${p.itens}</span></div>`; }
+
+                // Afiliado Tag
+                let tagAfiliado = p.afiliado ? `<span class="comissao-tag">🦊 ${p.afiliado.nome}</span>` : '';
 
                 const div = document.createElement('div');
                 div.className = 'order-card';
+                div.style.borderLeftColor = corBorda; // Borda colorida
+
                 div.innerHTML = `
-                    <div class="order-header" onclick="this.nextElementSibling.classList.toggle('open')">
+                    <div class="order-header" onclick="toggleDetails(this)">
                         <div class="order-info">
                             <h3>#${p.id} - ${p.clienteNome} ${tagAfiliado}</h3>
-                            <small>${data}</small>
+                            <small style="color:#7f8c8d"><i class="ph ph-calendar-blank"></i> ${data} &bull; ${p.clienteEmail || ''}</small>
                         </div>
-                        <span class="total-price">${total}</span>
+                        
+                        <div class="order-right-side">
+                            <span class="total-price">${total}</span>
+                            
+                            <select class="status-select" 
+                                    style="background-color: ${corStatus};"
+                                    onchange="mudarStatusPedido(${p.id}, this.value, this)"
+                                    onclick="event.stopPropagation()"> <option value="PENDENTE" ${p.status === 'PENDENTE' ? 'selected' : ''}>⏳ Pendente</option>
+                                <option value="APROVADO" ${p.status === 'APROVADO' ? 'selected' : ''}>✅ Aprovado</option>
+                                <option value="ENTREGUE" ${p.status === 'ENTREGUE' ? 'selected' : ''}>🚚 Entregue</option>
+                                <option value="CANCELADO" ${p.status === 'CANCELADO' ? 'selected' : ''}>🚫 Cancelado</option>
+                            </select>
+                        </div>
                     </div>
+                    
                     <div class="order-details">
-                        <strong>Itens:</strong>
-                        ${listaItens}
-                        <br>
-                        <strong>Endereço:</strong> ${p.clienteEndereco}<br>
-                        <a href="https://wa.me/?text=Olá ${p.clienteNome}, sobre o pedido #${p.id}..." target="_blank" class="btn-whatsapp">WhatsApp</a>
+                        <div style="margin-bottom:15px;">
+                            <strong><i class="ph ph-map-pin"></i> Endereço:</strong><br>
+                            ${p.clienteEndereco || 'Não informado'}
+                        </div>
+                        
+                        <div style="background:#fff; padding:10px; border-radius:5px; border:1px solid #eee;">
+                            <strong>Itens do Pedido:</strong>
+                            ${listaItens}
+                        </div>
+
+                        <a href="https://wa.me/?text=Olá ${p.clienteNome}, seu pedido #${p.id} está ${p.status}!" target="_blank" class="btn-whatsapp">
+                            <i class="ph ph-whatsapp-logo"></i> Falar com Cliente
+                        </a>
                     </div>
                 `;
                 container.appendChild(div);
             });
         }
 
+        // Função para abrir/fechar card
+        function toggleDetails(element) {
+            const details = element.nextElementSibling;
+            details.classList.toggle('open');
+        }
+
+        // Função para salvar status
+        async function mudarStatusPedido(id, novoStatus, elementoSelect) {
+            // Muda cor visualmente na hora
+            if(novoStatus === 'APROVADO') { elementoSelect.style.backgroundColor = '#27ae60'; elementoSelect.closest('.order-card').style.borderLeftColor = '#27ae60'; }
+            else if(novoStatus === 'CANCELADO') { elementoSelect.style.backgroundColor = '#c0392b'; elementoSelect.closest('.order-card').style.borderLeftColor = '#c0392b'; }
+            else if(novoStatus === 'ENTREGUE') { elementoSelect.style.backgroundColor = '#2980b9'; elementoSelect.closest('.order-card').style.borderLeftColor = '#2980b9'; }
+            else { elementoSelect.style.backgroundColor = '#f39c12'; elementoSelect.closest('.order-card').style.borderLeftColor = '#f39c12'; }
+
+            try {
+                const token = localStorage.getItem('adminToken');
+                await fetch(`${API_URL}/admin/orders/${id}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ status: novoStatus })
+                });
+            } catch (e) { alert("Erro ao salvar status."); }
+        }
+
+        // Filtro rápido
+        document.getElementById('search-orders').addEventListener('input', (e) => {
+            const termo = e.target.value.toLowerCase();
+            const filtrados = pedidosCache.filter(p => p.clienteNome.toLowerCase().includes(termo) || p.id.toString().includes(termo));
+            renderizarPedidos(filtrados);
+        });
+
         function logout() { localStorage.removeItem('adminToken'); window.location.href = 'admin_login.html'; }
+        
         carregarPedidos();
     </script>
 </body>

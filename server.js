@@ -519,6 +519,31 @@ app.post('/webhook/pagamento', async (req, res) => {
     }
 });
 
+// ==========================================
+// ROTA: ATUALIZAR STATUS DO PEDIDO (Manual)
+// ==========================================
+app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        const { status } = req.body; // Recebe "APROVADO", "ENTREGUE", etc.
+
+        if (!status) return res.status(400).json({ erro: "Status obrigatório" });
+
+        // Atualiza no Banco de Dados
+        const pedidoAtualizado = await prisma.pedido.update({
+            where: { id: id },
+            data: { status: status }
+        });
+
+        console.log(`✅ Pedido #${id} atualizado para: ${status}`);
+        res.json(pedidoAtualizado);
+
+    } catch (e) {
+        console.error("Erro ao atualizar status:", e);
+        res.status(500).json({ erro: "Erro ao atualizar status" });
+    }
+});
+
 // 2. LISTA DE PEDIDOS COMPLETA
 app.get('/admin/pedidos', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);

@@ -471,24 +471,37 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
 });
 
 
-// ROTA: ATUALIZAR STATUS DO PEDIDO
+// ==========================================
+// ROTA: MUDAR STATUS (COM LOGS DE ERRO)
+// ==========================================
 app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
+    
+    // 1. ESPIONANDO O QUE CHEGA
+    console.log("🔔 TENTATIVA DE MUDAR STATUS RECEBIDA!");
+    console.log("-> ID do Pedido:", req.params.id);
+    console.log("-> Dados recebidos (Body):", req.body);
+
     try {
         const id = parseInt(req.params.id);
-        const { status } = req.body; // Ex: "APROVADO", "CANCELADO"
+        const { status } = req.body;
 
-        // Atualiza no banco
-        const pedidoAtualizado = await prisma.pedido.update({
+        if (!status) {
+            console.log("❌ ERRO: O status chegou vazio ou indefinido.");
+            return res.status(400).json({ erro: "Status não enviado" });
+        }
+
+        // 2. TENTANDO SALVAR NO BANCO
+        const pedido = await prisma.pedido.update({
             where: { id: id },
             data: { status: status }
         });
 
-        console.log(`Pedido #${id} atualizado para ${status}`);
-        res.json(pedidoAtualizado);
+        console.log(`✅ SUCESSO! Pedido #${id} salvo como: ${status}`);
+        res.json(pedido);
 
     } catch (e) {
-        console.error("Erro ao atualizar status:", e);
-        res.status(500).json({ erro: "Erro ao atualizar" });
+        console.error("❌ ERRO NO PRISMA:", e);
+        res.status(500).json({ error: "Erro ao salvar no banco" });
     }
 });
 

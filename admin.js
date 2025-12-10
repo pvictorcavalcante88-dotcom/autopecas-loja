@@ -73,53 +73,82 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ======================================================
-// 📊 FUNÇÃO: CARREGAR DASHBOARD (CORRIGIDA)
+// 📊 FUNÇÃO: CARREGAR DASHBOARD (SUBSTITUA APENAS ESTA)
 // ======================================================
 async function carregarDashboard() {
+    const token = localStorage.getItem('adminToken');
+    if (!token) return;
+
     try {
-        const token = localStorage.getItem('adminToken');
+        // Chama a rota que criamos no server.js
         const res = await fetch(`${API_URL}/admin/dashboard-stats`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
-        if(!res.ok) throw new Error("Falha ao buscar dados");
+        if (!res.ok) throw new Error("Falha ao buscar dados do Dashboard");
 
-        const data = await res.json();
+        const dados = await res.json();
+        console.log("Dados do Dashboard:", dados); // Ajuda a debugar (F12)
 
-        // --- AQUI ESTÁ A CORREÇÃO DOS IDs ---
+        // --- 1. PREENCHE OS CARDS (Números Grandes) ---
         
-        // 1. Faturamento (Agora busca 'total-vendas')
-        const elFat = document.getElementById('total-vendas');
-        if(elFat) elFat.innerText = formatarMoeda(data.faturamento);
+        // Faturamento (Tenta achar pelo ID ou pela posição do Card)
+        const elFat = document.getElementById('faturamento-total') || document.querySelector('.card:nth-child(1) h2');
+        if(elFat) elFat.innerText = formatarMoeda(dados.faturamento);
         
-        // 2. Pedidos
-        const elPed = document.getElementById('total-pedidos');
-        if(elPed) elPed.innerText = data.totalPedidos;
+        // Pedidos
+        const elPed = document.getElementById('total-pedidos') || document.querySelector('.card:nth-child(2) h2');
+        if(elPed) elPed.innerText = dados.totalPedidos;
 
-        // 3. Produtos
-        const elProd = document.getElementById('total-produtos');
-        if(elProd) elProd.innerText = data.produtos;
+        // Produtos
+        const elProd = document.getElementById('total-produtos') || document.querySelector('.card:nth-child(3) h2');
+        if(elProd) elProd.innerText = dados.produtos;
 
-        // 4. Estoque
-        const elEst = document.getElementById('estoque-baixo');
-        if(elEst) elEst.innerText = data.estoqueBaixo;
+        // Estoque Baixo
+        const elEst = document.getElementById('estoque-baixo') || document.querySelector('.card:nth-child(4) h2');
+        if(elEst) elEst.innerText = dados.estoqueBaixo;
 
-        // 5. Tabela de Últimos Pedidos (Agora busca 'ultimos-pedidos-list')
-        const tbody = document.getElementById('ultimos-pedidos-list');
-        if(tbody && data.ultimosPedidos) {
-            tbody.innerHTML = '';
-            data.ultimosPedidos.forEach(p => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>#${p.id}</td>
-                    <td>${p.clienteNome || 'Cliente'}</td>
-                    <td>${formatarMoeda(p.valorTotal)}</td>
-                    <td>${formatarData(p.createdAt)}</td>
-                `;
-                tbody.appendChild(tr);
-            });
+
+        // --- 2. PREENCHE A TABELA DE ÚLTIMOS PEDIDOS ---
+        // Procura o corpo da tabela dentro do dashboard
+        const tabela = document.querySelector('.recent-orders table tbody') || document.querySelector('table tbody');
+        
+        if (tabela) {
+            tabela.innerHTML = ''; // Limpa antes de preencher
+            
+            if(!dados.ultimosPedidos || dados.ultimosPedidos.length === 0) {
+                tabela.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#999;">Nenhum pedido recente.</td></tr>';
+            } else {
+                dados.ultimosPedidos.forEach(p => {
+                    const statusClass = p.status ? p.status.toLowerCase() : 'pendente';
+                    
+                    // Se tiver afiliado, mostra o nome dele
+                    let clienteHtml = `<strong>${p.clienteNome || 'Cliente'}</strong>`;
+                    if(p.afiliado) {
+                        clienteHtml += `<br><small style="color:#e67e22">Via: ${p.afiliado.nome}</small>`;
+                    }
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>#${p.id}</td>
+                        <td>${clienteHtml}</td>
+                        <td>${formatarMoeda(p.valorTotal)}</td>
+                        <td>${formatarData(p.createdAt)}</td>
+                        <td><span class="status-badge ${statusClass}">${p.status || 'PENDENTE'}</span></td>
+                    `;
+                    tabela.appendChild(tr);
+                });
+            }
         }
-    } catch(e) { console.error("Erro no Dashboard:", e); }
+
+    } catch(e) { 
+        console.error("Erro ao carregar Dashboard:", e);
+        // Opcional: Mostra um aviso na tela se falhar
+        const main = document.querySelector('main');
+        if(main && !document.getElementById('erro-dash')) {
+            main.insertAdjacentHTML('afterbegin', '<div id="erro-dash" style="background:#e74c3c; color:white; padding:10px; margin-bottom:15px; border-radius:5px;">Não foi possível carregar os dados. Verifique a conexão.</div>');
+        }
+    }
 }
 
 // ======================================================

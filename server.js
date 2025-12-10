@@ -447,9 +447,9 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
         // Cuidado aqui: Se 'quantidade' não for número, pode dar erro
         let estoqueBaixo = 0;
         try {
-            estoqueBaixo = await prisma.produto.count({ where: { quantidade: { lte: 5 } } });
+            estoqueBaixo = await prisma.produto.count({ where: { estoque: { lte: 5 } } });
         } catch (err) {
-            console.log("⚠️ Aviso: Erro ao contar estoque baixo (Campo 'quantidade' existe?)");
+            console.log("⚠️ Aviso: Erro ao contar estoque baixo (Campo 'estoque' existe?)");
         }
         console.log("- Estoque Baixo OK");
 
@@ -469,6 +469,8 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
         res.status(500).json({ erro: "Erro interno no servidor: " + e.message }); 
     }
 });
+
+
 
 // 2. LISTA DE PEDIDOS COMPLETA
 app.get('/admin/pedidos', authenticateToken, async (req, res) => {

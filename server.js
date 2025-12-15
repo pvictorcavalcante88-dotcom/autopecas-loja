@@ -573,6 +573,60 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
     }
 });
 
+// ============================================================
+// ROTA: BUSCAR CLIENTES DO AFILIADO (Baseado nas vendas)
+// ============================================================
+app.get('/afiliado/meus-clientes', authenticateToken, async (req, res) => {
+    try {
+        // Pega o ID do afiliado logado (assumindo que o token guardou o ID do afiliado)
+        // Se o seu token de afiliado for diferente do admin, ajuste aqui.
+        // Vamos buscar pelo código do afiliado se o token tiver o código, ou ID.
+        
+        // Buscando afiliado pelo token (Exemplo)
+        const afiliadoId = req.user.id; 
+
+        // Busca todas as vendas desse afiliado
+        const vendas = await prisma.pedido.findMany({
+            where: { afiliadoId: afiliadoId },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        // Agrupa clientes por email para não repetir
+        const clientesMap = new Map();
+
+        vendas.forEach(venda => {
+            if (!clientesMap.has(venda.clienteEmail)) {
+                clientesMap.set(venda.clienteEmail, {
+                    nome: venda.clienteNome,
+                    email: venda.clienteEmail,
+                    telefone: venda.clienteTelefone || "Não informado", // Se tiver salvo
+                    totalGasto: 0,
+                    ultimaCompra: venda.createdAt,
+                    pedidos: []
+                });
+            }
+            
+            const cliente = clientesMap.get(venda.clienteEmail);
+            cliente.totalGasto += venda.valorTotal;
+            cliente.pedidos.push({
+                id: venda.id,
+                data: venda.createdAt,
+                valor: venda.valorTotal,
+                status: venda.status
+            });
+        });
+
+        // Converte o mapa em lista
+        const listaClientes = Array.from(clientesMap.values());
+
+        res.json(listaClientes);
+
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ erro: "Erro ao buscar clientes" });
+    }
+});
+
 // ROTA WEBHOOK (Para receber avisos do Mercado Pago/Gateway)
 app.post('/webhook/pagamento', async (req, res) => {
     try {

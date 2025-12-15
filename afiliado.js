@@ -174,10 +174,29 @@ async function carregarMeusOrcamentos() {
     }
 }
 
-// Funções de Ação do Orçamento
+// ATUALIZE ESTA FUNÇÃO NO SEU ARQUIVO afiliado.js
+
 function restaurarOrcamento(itensEncoded) {
-    if(!confirm("Isso vai substituir o carrinho atual. Continuar?")) return;
-    window.location.href = `index.html?restore=${itensEncoded}`;
+    if(!confirm("Isso vai substituir o carrinho atual pelo deste orçamento. Continuar?")) return;
+
+    try {
+        // 1. Decodifica os dados que vieram do banco
+        const itensString = decodeURIComponent(itensEncoded);
+
+        // 2. Verifica se é um JSON válido (só pra garantir)
+        JSON.parse(itensString);
+
+        // 3. Salva DIRETAMENTE no navegador (LocalStorage)
+        // Assim, quando a página carregar, os itens já estarão lá.
+        localStorage.setItem('nossoCarrinho', itensString);
+
+        // 4. Redireciona direto para o CARRINHO
+        window.location.href = 'cart.html'; 
+
+    } catch(e) {
+        console.error("Erro ao restaurar:", e);
+        alert("Erro ao processar os itens deste orçamento.");
+    }
 }
 
 async function excluirOrcamento(id) {

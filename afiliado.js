@@ -41,6 +41,7 @@ function verificarLogin() {
     carregarMeusOrcamentos();
     // A lista de clientes é carregada quando clica na aba, mas vamos carregar logo pra garantir
     carregarMeusClientes();
+    carregarMeusSaques();
     iniciarNotificacoes();
 }
 
@@ -353,5 +354,54 @@ async function solicitarSaque() {
             btn.disabled = false;
             btn.style.opacity = "1";
         }
+    }
+}
+
+// ============================================================
+// 4. CARREGAR MEUS SAQUES (HISTÓRICO)
+// ============================================================
+async function carregarMeusSaques() {
+    const tbody = document.getElementById('lista-saques');
+    if(!tbody) return;
+
+    try {
+        const res = await fetch(`${API_URL}/afiliado/saques`, {
+            headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` }
+        });
+        const saques = await res.json();
+
+        tbody.innerHTML = '';
+
+        if (!saques || saques.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" align="center" style="color:#777; padding:15px;">Nenhum saque solicitado.</td></tr>';
+            return;
+        }
+
+        saques.forEach(s => {
+            const dataSol = new Date(s.dataSolicitacao).toLocaleDateString('pt-BR');
+            const dataPag = s.dataPagamento ? new Date(s.dataPagamento).toLocaleDateString('pt-BR') : '-';
+            const valor = parseFloat(s.valor).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+            
+            // Status Bonito
+            let statusBadge = '';
+            if(s.status === 'PAGO') {
+                statusBadge = `<span style="background:#d4edda; color:#155724; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">PAGO ✅</span>`;
+            } else {
+                statusBadge = `<span style="background:#fff3cd; color:#856404; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">PENDENTE ⏳</span>`;
+            }
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${dataSol}</td>
+                <td><strong>${valor}</strong></td>
+                <td>${dataPag}</td>
+                <td>${statusBadge}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+    } catch(e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="4" align="center" style="color:red">Erro ao carregar saques.</td></tr>';
     }
 }

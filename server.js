@@ -621,6 +621,49 @@ app.post('/afiliado/saque', authenticateToken, async (req, res) => {
     }
 });
 
+// ============================================================
+// 🏦 ROTAS DE SAQUE (HISTÓRICO E PAGAMENTO)
+// ============================================================
+
+// 1. AFILIADO: VER MEUS SAQUES
+app.get('/afiliado/saques', authenticateToken, async (req, res) => {
+    try {
+        const saques = await prisma.saque.findMany({
+            where: { afiliadoId: req.user.id },
+            orderBy: { dataSolicitacao: 'desc' }
+        });
+        res.json(saques);
+    } catch (e) { res.status(500).json({ erro: "Erro ao buscar saques" }); }
+});
+
+// 2. ADMIN: MARCAR COMO PAGO (Para você usar depois no seu painel ou Postman)
+app.put('/admin/saques/:id/pagar', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    try {
+        await prisma.saque.update({
+            where: { id: parseInt(req.params.id) },
+            data: { 
+                status: "PAGO", 
+                dataPagamento: new Date() 
+            }
+        });
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ erro: "Erro ao confirmar pagamento" }); }
+});
+
+// 3. ADMIN: VER TODOS OS SAQUES PENDENTES
+app.get('/admin/saques-pendentes', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    try {
+        const saques = await prisma.saque.findMany({
+            where: { status: 'PENDENTE' },
+            include: { afiliado: true },
+            orderBy: { dataSolicitacao: 'asc' }
+        });
+        res.json(saques);
+    } catch (e) { res.status(500).json({ erro: "Erro" }); }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);

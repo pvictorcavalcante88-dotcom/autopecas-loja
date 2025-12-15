@@ -145,6 +145,23 @@
                     <button onclick="salvarDadosBancarios()" style="padding:10px; background:var(--primary); color:white; border:none; border-radius:4px; cursor:pointer;">Salvar</button>
                 </div>
             </div>
+            <div class="card" style="margin-top:20px;">
+                <h3><i class="ph ph-clock-counter-clockwise"></i> Histórico de Saques</h3>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Data Solicitação</th>
+                            <th>Valor</th>
+                            <th>Data Pagamento</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lista-saques">
+                        <tr><td colspan="4" align="center">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
         </div>
 
         <div id="vendas" class="tab-content">

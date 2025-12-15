@@ -565,6 +565,62 @@ app.post('/admin/sugestoes/:id/rejeitar', authenticateToken, async (req, res) =>
     res.json({ success: true });
 });
 
+
+// ============================================================
+// 💸 ROTA: SOLICITAR SAQUE
+// ============================================================
+app.post('/afiliado/saque', authenticateToken, async (req, res) => {
+    try {
+        const id = req.user.id;
+
+        // 1. Busca o afiliado para ver o saldo
+        const afiliado = await prisma.afiliado.findUnique({ where: { id } });
+
+        if (!afiliado) return res.status(404).json({ erro: "Afiliado não encontrado" });
+        if (afiliado.saldo <= 0) return res.status(400).json({ erro: "Saldo insuficiente para saque." });
+
+        const valorSaque = afiliado.saldo;
+
+        // 2. Transação Atômica (Segurança: Faz tudo ou não faz nada)
+        // Cria o registro do saque E zera o saldo ao mesmo tempo
+        await prisma.$transaction([
+            prisma.saque.create({
+                data: {
+                    valor: valorSaque,
+                    afiliadoId: id,
+                    status: "PENDENTE"
+                }
+            }),
+            prisma.afiliado.update({
+                where: { id },
+                data: { saldo: 0 } // Zera a carteira
+            })
+        ]);
+
+        // 3. AVISA O ADMIN NO WHATSAPP (CallMeBot)
+        try {
+            const SEU_TELEFONE = "558287515891"; // <--- CONFIRME SEU NÚMERO
+            const API_KEY = "6414164";           // <--- CONFIRME SUA API KEY
+            
+            const msg = `💸 *Solicitação de Saque!* 💸\n\n` +
+                        `👤 Parceiro: ${afiliado.nome}\n` +
+                        `💰 Valor: R$ ${valorSaque.toFixed(2)}\n` +
+                        `🏦 Pix: ${afiliado.chavePix || "Não cadastrado"}\n\n` +
+                        `Acesse o banco para pagar.`;
+
+            const urlBot = `https://api.callmebot.com/whatsapp.php?phone=${SEU_TELEFONE}&text=${encodeURIComponent(msg)}&apikey=${API_KEY}`;
+            fetch(urlBot).catch(e => console.error("Erro Zap Saque", e));
+
+        } catch (e) {}
+
+        res.json({ success: true, valor: valorSaque });
+
+    } catch (e) {
+        console.error("Erro Saque:", e);
+        res.status(500).json({ erro: "Erro ao processar saque." });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);

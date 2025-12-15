@@ -301,3 +301,57 @@ function iniciarNotificacoes() {
         } catch(e) {}
     }, 30000);
 }
+
+// ============================================================
+// FUNÇÃO DE SOLICITAR SAQUE
+// ============================================================
+async function solicitarSaque() {
+    // 1. Confirmação
+    if(!confirm("Deseja solicitar o saque de todo o saldo disponível?")) return;
+
+    // 2. Efeito Visual (Pega o botão pelo ID novo)
+    const btn = document.getElementById('btn-saque'); 
+    const textoOriginal = btn ? btn.innerText : "Solicitar Saque";
+    
+    if(btn) {
+        btn.innerText = "Processando...";
+        btn.disabled = true; // Impede clicar 2 vezes
+        btn.style.opacity = "0.7";
+    }
+
+    try {
+        // 3. Chama o servidor
+        const res = await fetch(`${API_URL}/afiliado/saque`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` }
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+            // SUCESSO
+            alert(
+                "✅ Solicitação Enviada com Sucesso!\n\n" +
+                `Valor Solicitado: R$ ${parseFloat(data.valor).toFixed(2)}\n\n` +
+                "🕒 O pagamento será realizado em até 3 dias úteis."
+            );
+            
+            // Recarrega a tela para zerar o saldo
+            carregarDashboardCompleto();
+        } else {
+            // ERRO (Ex: Saldo zero)
+            alert("Atenção: " + (data.erro || "Falha ao solicitar."));
+        }
+
+    } catch (e) {
+        alert("Erro de conexão com o servidor.");
+        console.error(e);
+    } finally {
+        // 4. Volta o botão ao normal
+        if(btn) {
+            btn.innerText = textoOriginal;
+            btn.disabled = false;
+            btn.style.opacity = "1";
+        }
+    }
+}

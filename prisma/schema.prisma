@@ -36,6 +36,7 @@ model Afiliado {
   orcamentos Orcamento[]
   mensagens Mensagem[]
   sugestoes   Sugestao[]
+  saques      Saque[]
 
   createdAt DateTime @default(now())
 }
@@ -62,6 +63,7 @@ model Produto {
   tags        String?
   sugestoes   Sugestao[]
 
+
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 }
@@ -74,6 +76,8 @@ model Pedido {
   clienteTelefone String?
   valorTotal      Float
   itens           String
+
+
   
   afiliadoId      Int?     
   afiliado        Afiliado? @relation(fields: [afiliadoId], references: [id])
@@ -123,4 +127,16 @@ model Sugestao {
   afiliado   Afiliado @relation(fields: [afiliadoId], references: [id])
   
   createdAt DateTime @default(now())
+}
+
+
+model Saque {
+  id              Int      @id @default(autoincrement())
+  valor           Float
+  status          String   @default("PENDENTE") // PENDENTE ou PAGO
+  dataSolicitacao DateTime @default(now())
+  dataPagamento   DateTime?
+
+  afiliadoId      Int
+  afiliado        Afiliado @relation(fields: [afiliadoId], references: [id])
 }

@@ -1,9 +1,5 @@
-/* =======================================================
-   SCRIPT DO PAINEL DO AFILIADO (Versão Fusão: CRM + Orçamentos)
-   ======================================================= */
-
 const API_URL = ''; 
-let AFILIADO_DADOS = null;
+let AFILIADO_DADOS = null; // Vai guardar o token e o nome
 
 // INICIALIZAÇÃO
 document.addEventListener("DOMContentLoaded", () => {
@@ -11,30 +7,48 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function verificarLogin() {
-    const dados = localStorage.getItem('afiliadoLogado');
-    if (!dados) {
+    // 1. Tenta pegar do jeito antigo (JSON completo)
+    const dadosAntigos = localStorage.getItem('afiliadoLogado');
+    
+    // 2. Tenta pegar do jeito novo (Só o token)
+    const tokenSimples = localStorage.getItem('afiliadoToken');
+
+    if (dadosAntigos) {
+        // Se achou o JSON (Seu caso atual no print)
+        AFILIADO_DADOS = JSON.parse(dadosAntigos);
+    } else if (tokenSimples) {
+        // Se achou só o token (Caso futuro)
+        AFILIADO_DADOS = { token: tokenSimples, nome: "Parceiro" };
+    } else {
+        // Se não achou nada
         alert("Sessão expirada. Faça login novamente.");
-        window.location.href = 'index.html'; // Ou afiliado_login.html
+        window.location.href = 'index.html'; // Mude para seu arquivo de login
         return;
     }
-    AFILIADO_DADOS = JSON.parse(dados);
     
-    // Configura o botão de Sair
-    const btnLogout = document.getElementById('logout-btn') || document.querySelector('.btn-sair'); // Tenta pegar dos dois jeitos
+    // --- Configurações Iniciais ---
+
+    // Preenche o nome no topo (se o elemento existir)
+    const elNome = document.getElementById('nome-afiliado') || document.getElementById('afiliado-nome');
+    if(elNome && AFILIADO_DADOS.nome) elNome.textContent = `Olá, ${AFILIADO_DADOS.nome}!`;
+
+    // Configura botão Sair
+    const btnLogout = document.getElementById('logout-btn') || document.querySelector('.btn-sair');
     if(btnLogout) {
         btnLogout.onclick = (e) => {
             e.preventDefault();
             localStorage.removeItem('afiliadoLogado');
-            localStorage.removeItem('minhaMargem'); // Se usar margem personalizada
+            localStorage.removeItem('afiliadoToken'); // Limpa os dois pra garantir
             window.location.href = 'index.html';
         };
     }
 
-    // Carrega tudo
+    // Carrega o resto do painel
     carregarDashboardCompleto();
-    carregarMeusOrcamentos();
-    iniciarNotificacoes();
+    if(typeof carregarMeusOrcamentos === 'function') carregarMeusOrcamentos();
+    if(typeof iniciarNotificacoes === 'function') iniciarNotificacoes();
 }
+
 
 // Navegação entre abas (Para o novo HTML)
 function mudarAba(abaId) {

@@ -169,23 +169,74 @@
             details.classList.toggle('open');
         }
 
-        // Função para salvar status
-        async function mudarStatusPedido(id, novoStatus, elementoSelect) {
-            // Muda cor visualmente na hora
-            if(novoStatus === 'APROVADO') { elementoSelect.style.backgroundColor = '#27ae60'; elementoSelect.closest('.order-card').style.borderLeftColor = '#27ae60'; }
-            else if(novoStatus === 'CANCELADO') { elementoSelect.style.backgroundColor = '#c0392b'; elementoSelect.closest('.order-card').style.borderLeftColor = '#c0392b'; }
-            else if(novoStatus === 'ENTREGUE') { elementoSelect.style.backgroundColor = '#2980b9'; elementoSelect.closest('.order-card').style.borderLeftColor = '#2980b9'; }
-            else { elementoSelect.style.backgroundColor = '#f39c12'; elementoSelect.closest('.order-card').style.borderLeftColor = '#f39c12'; }
+// ATUALIZE ESTA FUNÇÃO NO SEU HTML/JS
+async function mudarStatusPedido(id, novoStatus, elementoSelect) {
+    
+    // 1. Guarda o status anterior (caso a pessoa clique em cancelar e desista)
+    const statusAnterior = elementoSelect.getAttribute('data-prev') || 'PENDENTE';
 
-            try {
-                const token = localStorage.getItem('adminToken');
-                await fetch(`${API_URL}/admin/orders/${id}/status`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ status: novoStatus })
-                });
-            } catch (e) { alert("Erro ao salvar status."); }
+    // 2. BLOQUEIO DE SEGURANÇA PARA CANCELAMENTO
+    if (novoStatus === 'CANCELADO') {
+        const confirmacao = confirm(
+            "⚠️ PERIGO: CANCELAMENTO DE VENDA ⚠️\n\n" +
+            "Ao confirmar isso:\n" +
+            "1. Os produtos voltarão automaticamente para o estoque.\n" +
+            "2. A comissão do afiliado será descontada (estornada).\n\n" +
+            "Tem certeza absoluta que deseja cancelar?"
+        );
+
+        // Se o usuário clicar em "Cancelar" na janelinha, volta o select ao normal e para tudo.
+        if (!confirmacao) {
+            elementoSelect.value = statusAnterior;
+            atualizarCorSelect(elementoSelect, statusAnterior);
+            return; 
         }
+    }
+
+    // 3. BLOQUEIO DE SEGURANÇA PARA APROVAÇÃO (Opcional, mas bom)
+    if (novoStatus === 'APROVADO' && statusAnterior !== 'APROVADO') {
+        if(!confirm("Confirma o recebimento do pagamento? Isso vai baixar o estoque e pagar a comissão.")) {
+            elementoSelect.value = statusAnterior;
+            atualizarCorSelect(elementoSelect, statusAnterior);
+            return;
+        }
+    }
+
+    // 4. Se passou pelos confirm, muda a cor e envia pro servidor
+    atualizarCorSelect(elementoSelect, novoStatus);
+
+    try {
+        const token = localStorage.getItem('adminToken');
+        
+        const res = await fetch(`${API_URL}/admin/orders/${id}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ status: novoStatus })
+        });
+
+        if (res.ok) {
+            // Salva o novo status como sendo o "atual" para a próxima vez
+            elementoSelect.setAttribute('data-prev', novoStatus);
+            // alert("Status atualizado com sucesso!"); // Opcional
+        } else {
+            throw new Error("Erro no servidor");
+        }
+
+    } catch (e) { 
+        alert("Erro ao salvar status. Tente novamente.");
+        // Volta ao status anterior visualmente se der erro
+        elementoSelect.value = statusAnterior;
+        atualizarCorSelect(elementoSelect, statusAnterior);
+    }
+}
+
+// Função auxiliar só para mudar as cores (deixa o código mais limpo)
+function atualizarCorSelect(elemento, status) {
+    if(status === 'APROVADO') { elemento.style.backgroundColor = '#27ae60'; elemento.closest('.order-card').style.borderLeftColor = '#27ae60'; }
+    else if(status === 'CANCELADO') { elemento.style.backgroundColor = '#c0392b'; elemento.closest('.order-card').style.borderLeftColor = '#c0392b'; }
+    else if(status === 'ENTREGUE') { elemento.style.backgroundColor = '#2980b9'; elemento.closest('.order-card').style.borderLeftColor = '#2980b9'; }
+    else { elemento.style.backgroundColor = '#f39c12'; elemento.closest('.order-card').style.borderLeftColor = '#f39c12'; }
+}
 
         // Filtro rápido
         document.getElementById('search-orders').addEventListener('input', (e) => {

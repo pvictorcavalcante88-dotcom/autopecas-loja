@@ -627,6 +627,46 @@ app.get('/afiliado/meus-clientes', authenticateToken, async (req, res) => {
     }
 });
 
+// ============================================================
+// ROTA OBRIGATÓRIA: DASHBOARD DO AFILIADO
+// ============================================================
+app.get('/afiliado/dashboard', authenticateToken, async (req, res) => {
+    try {
+        // Pega o ID do afiliado que está no Token
+        // Se o token foi gerado com { id: afiliado.id }, usamos req.user.id
+        const id = req.user.id; 
+
+        // Busca os dados dele no banco
+        const afiliado = await prisma.afiliado.findUnique({
+            where: { id: id },
+            include: {
+                pedidos: { // Traz os pedidos para montar o histórico e saldo
+                    orderBy: { createdAt: 'desc' },
+                    take: 20 // Limite de 20 para não pesar
+                }
+            }
+        });
+
+        if (!afiliado) return res.status(404).json({ erro: "Afiliado não encontrado" });
+
+        // Manda de volta tudo que o painel precisa
+        res.json({
+            nome: afiliado.nome,
+            codigo: afiliado.codigo, // Importante para o link!
+            saldo: afiliado.saldo,
+            chavePix: afiliado.chavePix,
+            banco: afiliado.banco,
+            agencia: afiliado.agencia,
+            conta: afiliado.conta,
+            vendas: afiliado.pedidos
+        });
+
+    } catch (e) {
+        console.error("Erro Dashboard Afiliado:", e);
+        res.status(500).json({ erro: "Erro ao buscar dados" });
+    }
+});
+
 // ROTA WEBHOOK (Para receber avisos do Mercado Pago/Gateway)
 app.post('/webhook/pagamento', async (req, res) => {
     try {

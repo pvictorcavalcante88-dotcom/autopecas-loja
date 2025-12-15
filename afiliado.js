@@ -1,315 +1,164 @@
-const API_URL = ''; 
-let AFILIADO_DADOS = null; // Vai guardar o token e o nome
+const API_URL = ''; // Deixe vazio se estiver no mesmo domínio
 
+// ============================================================
 // INICIALIZAÇÃO
+// ============================================================
 document.addEventListener("DOMContentLoaded", () => {
     verificarLogin();
 });
 
+let AFILIADO_TOKEN = null;
+
 function verificarLogin() {
-    // 1. Tenta pegar do jeito antigo (JSON completo)
+    // Tenta pegar o login do jeito antigo (JSON completo)
     const dadosAntigos = localStorage.getItem('afiliadoLogado');
     
-    // 2. Tenta pegar do jeito novo (Só o token)
+    // Tenta pegar do jeito novo (Só o token)
     const tokenSimples = localStorage.getItem('afiliadoToken');
 
     if (dadosAntigos) {
-        // Se achou o JSON (Seu caso atual no print)
-        AFILIADO_DADOS = JSON.parse(dadosAntigos);
+        // Se achou o JSON (Seu caso no print)
+        const dados = JSON.parse(dadosAntigos);
+        AFILIADO_TOKEN = dados.token;
     } else if (tokenSimples) {
-        // Se achou só o token (Caso futuro)
-        AFILIADO_DADOS = { token: tokenSimples, nome: "Parceiro" };
+        // Se achou só o token
+        AFILIADO_TOKEN = tokenSimples;
     } else {
-        // Se não achou nada
+        // Se não achou nada, manda pro login
         alert("Sessão expirada. Faça login novamente.");
-        window.location.href = 'index.html'; // Mude para seu arquivo de login
+        window.location.href = 'index.html'; // Ou afiliado_login.html
         return;
     }
-    
-    // --- Configurações Iniciais ---
 
-    // Preenche o nome no topo (se o elemento existir)
-    const elNome = document.getElementById('nome-afiliado') || document.getElementById('afiliado-nome');
-    if(elNome && AFILIADO_DADOS.nome) elNome.textContent = `Olá, ${AFILIADO_DADOS.nome}!`;
-
-    // Configura botão Sair
-    const btnLogout = document.getElementById('logout-btn') || document.querySelector('.btn-sair');
-    if(btnLogout) {
-        btnLogout.onclick = (e) => {
+    // Configura Botão Sair
+    const btnSair = document.getElementById('logout-btn') || document.querySelector('.btn-sair') || document.querySelector('a[href="#sair"]');
+    if(btnSair) {
+        btnSair.onclick = (e) => {
             e.preventDefault();
             localStorage.removeItem('afiliadoLogado');
-            localStorage.removeItem('afiliadoToken'); // Limpa os dois pra garantir
+            localStorage.removeItem('afiliadoToken');
             window.location.href = 'index.html';
-        };
+        }
     }
 
-    // Carrega o resto do painel
+    // Carrega os dados
     carregarDashboardCompleto();
-    if(typeof carregarMeusOrcamentos === 'function') carregarMeusOrcamentos();
-    if(typeof iniciarNotificacoes === 'function') iniciarNotificacoes();
 }
-
-
-// Navegação entre abas (Para o novo HTML)
-function mudarAba(abaId) {
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('nav a').forEach(el => el.classList.remove('active'));
-
-    const tab = document.getElementById(abaId);
-    const nav = document.getElementById('nav-' + abaId);
-
-    if(tab) tab.classList.add('active');
-    if(nav) nav.classList.add('active');
-
-    if(abaId === 'clientes') carregarMeusClientes();
-}
-
 
 // ============================================================
-// 1. DASHBOARD GERAL (Saldo, Nome, Vendas Recentes)
+// 1. CARREGAR DADOS DO DASHBOARD
 // ============================================================
 async function carregarDashboardCompleto() {
     try {
+        // Busca os dados no servidor
         const res = await fetch(`${API_URL}/afiliado/dashboard`, {
-            headers: { 'Authorization': `Bearer ${AFILIADO_DADOS.token}` }
+            headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` }
         });
 
-        if (!res.ok) throw new Error("Erro ao buscar dados do dashboard");
+        if (!res.ok) {
+            if(res.status === 404) throw new Error("Rota /afiliado/dashboard não encontrada no servidor!");
+            throw new Error("Erro ao buscar dados");
+        }
 
-        const data = await res.json();
-        
-        // --- PREENCHE O HTML NOVO ---
+        const dados = await res.json();
 
-        // 1. Nome e Saldo
-        const elNome = document.getElementById('nome-afiliado') || document.getElementById('afiliado-nome');
-        if(elNome) elNome.textContent = `Olá, ${data.nome}!`;
+        // --- PREENCHE O HTML NOVO (IDs do seu print 5) ---
 
+        // 1. Nome do Parceiro
+        // Procura pelo ID novo 'nome-afiliado' ou antigo 'afiliado-nome'
+        const elNome = document.getElementById('nome-afiliado') || document.querySelector('.welcome h1') || document.getElementById('afiliado-nome');
+        if(elNome) elNome.innerText = `Olá, ${dados.nome}!`;
+
+        // 2. Saldo
         const elSaldo = document.getElementById('saldo-total') || document.getElementById('afiliado-saldo');
-        if(elSaldo) elSaldo.textContent = parseFloat(data.saldo).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+        if(elSaldo) elSaldo.innerText = parseFloat(dados.saldo).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
 
-        // 2. Contador de Vendas
+        // 3. Vendas Aprovadas (Contador)
         const elQtd = document.getElementById('qtd-vendas');
-        if(elQtd) elQtd.innerText = data.vendas ? data.vendas.length : 0;
+        if(elQtd && dados.vendas) {
+            const aprovadas = dados.vendas.filter(v => v.status === 'APROVADO').length;
+            elQtd.innerText = aprovadas;
+        }
 
-        // 3. Preencher Tabelas de Vendas
-        // Tabela Resumida (Aba Dashboard)
-        renderizarTabelaVendas('lista-ultimas-vendas', data.vendas.slice(0, 5));
-        // Tabela Completa (Aba Vendas)
-        renderizarTabelaVendas('lista-todas-vendas', data.vendas);
+        // 4. Link de Divulgação
+        const elLink = document.getElementById('link-afiliado');
+        if(elLink) {
+            if(dados.codigo) {
+                // Monta o link: site.com/index.html?ref=CODIGO
+                elLink.value = `${window.location.origin}/index.html?ref=${dados.codigo}`;
+            } else {
+                elLink.value = "Código não encontrado";
+            }
+        }
 
-        // 4. Preenche Inputs de Banco (Se existirem na tela)
-        if(document.getElementById('input-pix')) document.getElementById('input-pix').value = data.chavePix || '';
-        if(document.getElementById('input-banco')) document.getElementById('input-banco').value = data.banco || '';
-        if(document.getElementById('input-agencia')) document.getElementById('input-agencia').value = data.agencia || '';
-        if(document.getElementById('input-conta')) document.getElementById('input-conta').value = data.conta || '';
+        // 5. Tabelas
+        renderizarTabela(dados.vendas);
+
+        // 6. Dados Bancários (se existirem na tela)
+        if(document.getElementById('input-pix')) document.getElementById('input-pix').value = dados.chavePix || '';
 
     } catch (error) {
-        console.error("Erro Dashboard:", error);
+        console.error("Erro Fatal:", error);
+        // Mostra o erro na tela para ajudar a debugar
+        const header = document.querySelector('header');
+        if(header) {
+            const aviso = document.createElement('div');
+            aviso.style.background = 'red';
+            aviso.style.color = 'white';
+            aviso.style.padding = '10px';
+            aviso.style.textAlign = 'center';
+            aviso.innerText = `Erro: ${error.message}. Verifique se adicionou a rota no server.js!`;
+            header.insertAdjacentElement('afterend', aviso);
+        }
     }
 }
 
-// Função Auxiliar para Desenhar Tabelas de Vendas
-function renderizarTabelaVendas(elementId, vendas) {
-    const tbody = document.getElementById(elementId);
+// ============================================================
+// AUXILIAR: DESENHAR TABELA
+// ============================================================
+function renderizarTabela(vendas) {
+    // Tenta achar qualquer ID de tabela que você possa estar usando
+    const tbody = document.getElementById('lista-ultimas-vendas') || document.getElementById('vendas-list') || document.querySelector('tbody');
+    
     if(!tbody) return;
-
     tbody.innerHTML = '';
+
     if (!vendas || vendas.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:15px;">Nenhuma venda realizada.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">Nenhuma venda encontrada.</td></tr>';
         return;
     }
-    
-    // Ordena por data (mais recente primeiro)
-    vendas.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     vendas.forEach(v => {
-        const tr = document.createElement('tr');
+        const data = new Date(v.createdAt).toLocaleDateString('pt-BR');
+        const valor = parseFloat(v.valorTotal).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+        const comissao = parseFloat(v.comissaoGerada || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
         
-        // Cores dos Status
-        let statusClass = 'pendente'; // css class
-        let corStatus = '#f39c12'; // fallback color
-        
-        if(v.status === 'APROVADO') { statusClass = 'aprovado'; corStatus = '#27ae60'; }
-        if(v.status === 'CANCELADO') { statusClass = 'cancelado'; corStatus = '#c0392b'; }
+        // Status Colorido
+        let statusStyle = "background:#eee; color:#333;";
+        if(v.status === 'APROVADO') statusStyle = "background:#d4edda; color:#155724;";
+        if(v.status === 'PENDENTE') statusStyle = "background:#fff3cd; color:#856404;";
+        if(v.status === 'CANCELADO') statusStyle = "background:#f8d7da; color:#721c24;";
 
-        // HTML compatível com o novo layout
+        const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${new Date(v.createdAt).toLocaleDateString('pt-BR')}</td>
+            <td>${data}</td>
             <td>${v.clienteNome || 'Cliente'}</td>
-            <td>${parseFloat(v.valorTotal).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</td>
-            <td style="color:#27ae60; font-weight:bold;">+ ${parseFloat(v.comissaoGerada || 0).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</td>
-            <td><span class="status ${statusClass}" style="color:${corStatus}">${v.status || 'PENDENTE'}</span></td>
+            <td>${valor}</td>
+            <td><span style="color:#27ae60; font-weight:bold;">+ ${comissao}</span></td>
+            <td><span style="padding:4px 8px; border-radius:4px; font-size:0.8rem; font-weight:bold; ${statusStyle}">${v.status || 'PENDENTE'}</span></td>
         `;
         tbody.appendChild(tr);
     });
 }
 
-
-// ============================================================
-// 2. MEUS CLIENTES (NOVIDADE CRM)
-// ============================================================
-async function carregarMeusClientes() {
-    const tbody = document.getElementById('lista-clientes');
-    if(!tbody) return; // Se não tiver a tabela na tela, sai
-
-    tbody.innerHTML = '<tr><td colspan="5" align="center">Carregando...</td></tr>';
+// Navegação de Abas (Se tiver)
+function mudarAba(abaId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('nav a').forEach(el => el.classList.remove('active'));
     
-    try {
-        const res = await fetch(`${API_URL}/afiliado/meus-clientes`, {
-            headers: { 'Authorization': `Bearer ${AFILIADO_DADOS.token}` }
-        });
-        const clientes = await res.json();
-
-        tbody.innerHTML = '';
-        if(clientes.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" align="center">Nenhum cliente na sua carteira ainda. Gere orçamentos!</td></tr>';
-            return;
-        }
-
-        clientes.forEach(c => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><strong>${c.nome}</strong></td>
-                <td>
-                    ${c.email}<br>
-                    <a href="https://wa.me/?text=Olá ${c.nome}, tudo bem?" target="_blank" style="color:#27ae60; font-size:0.8rem; text-decoration:none;">
-                        <i class="ph ph-whatsapp-logo"></i> Contatar
-                    </a>
-                </td>
-                <td>${parseFloat(c.totalGasto).toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</td>
-                <td>${new Date(c.ultimaCompra).toLocaleDateString('pt-BR')}</td>
-                <td>
-                    <button onclick="alert('Total gasto: ' + '${parseFloat(c.totalGasto).toFixed(2)}')" style="cursor:pointer; padding:5px;">Ver</button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-
-    } catch(e) {
-        console.error(e);
-        tbody.innerHTML = '<tr><td colspan="5" align="center" style="color:red">Erro ao carregar clientes.</td></tr>';
-    }
-}
-
-
-// ============================================================
-// 3. MEUS ORÇAMENTOS (MANTIDO DO ANTIGO)
-// ============================================================
-async function carregarMeusOrcamentos() {
-    try {
-        const res = await fetch(`${API_URL}/afiliado/orcamentos`, {
-            headers: { 'Authorization': `Bearer ${AFILIADO_DADOS.token}` }
-        });
-        
-        const lista = await res.json();
-        const tbody = document.getElementById('lista-orcamentos-salvos');
-        if(!tbody) return;
-
-        tbody.innerHTML = '';
-
-        if (lista.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#7f8c8d;">Nenhum orçamento salvo.<br><small>Faça um orçamento na Loja e ele aparecerá aqui.</small></td></tr>';
-            return;
-        }
-
-        lista.forEach(orc => {
-            const data = new Date(orc.createdAt).toLocaleDateString('pt-BR');
-            // Tenta pegar o total se existir, senão mostra texto
-            const totalDisplay = orc.total > 0 ? parseFloat(orc.total).toLocaleString('pt-BR', {style:'currency', currency:'BRL'}) : "Ver detalhes";
-            
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><strong>${orc.nome}</strong></td>
-                <td>${data}</td>
-                <td style="color:#27ae60;">${totalDisplay}</td>
-                <td>
-                    <button onclick="restaurarOrcamento('${encodeURIComponent(orc.itens)}')" style="background:#3498db; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;" title="Abrir na Loja">
-                        <i class="ph ph-shopping-cart"></i> Abrir
-                    </button>
-                    <button onclick="excluirOrcamento(${orc.id})" style="background:#c0392b; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; margin-left:5px;" title="Excluir">
-                        <i class="ph ph-trash"></i>
-                    </button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-
-    } catch (e) { console.error("Erro Orçamentos:", e); }
-}
-
-function restaurarOrcamento(itensJsonEncoded) {
-    if(!confirm("Isso vai substituir o carrinho atual pelo deste orçamento. Continuar?")) return;
-    window.location.href = `index.html?restore=${itensJsonEncoded}`; // Ajustei para index.html pois é lá que carrega a loja
-}
-
-async function excluirOrcamento(id) {
-    if(!confirm("Tem certeza que deseja apagar este orçamento?")) return;
-    try {
-        const res = await fetch(`${API_URL}/orcamentos/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${AFILIADO_DADOS.token}` }
-        });
-        if(res.ok) carregarMeusOrcamentos();
-    } catch(e) { alert("Erro ao excluir"); }
-}
-
-
-// ============================================================
-// 4. DADOS BANCÁRIOS E NOTIFICAÇÕES (MANTIDOS)
-// ============================================================
-async function salvarDadosBancarios() {
-    const dados = {
-        chavePix: document.getElementById('input-pix').value,
-        banco: document.getElementById('input-banco').value,
-        agencia: document.getElementById('input-agencia').value,
-        conta: document.getElementById('input-conta').value
-    };
-
-    try {
-        const res = await fetch(`${API_URL}/afiliado/perfil`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${AFILIADO_DADOS.token}` },
-            body: JSON.stringify(dados)
-        });
-
-        if(res.ok) alert("✅ Dados salvos com sucesso!");
-        else alert("Erro ao salvar dados.");
-
-    } catch(e) { alert("Erro de conexão."); }
-}
-
-// --- NOTIFICAÇÕES ---
-function iniciarNotificacoes() {
-    verificarNotificacoes();
-    setInterval(verificarNotificacoes, 30000); // Checa a cada 30s
-}
-
-async function verificarNotificacoes() {
-    try {
-        if(!AFILIADO_DADOS) return;
-        
-        const res = await fetch(`${API_URL}/afiliado/notificacoes`, {
-            headers: { 'Authorization': `Bearer ${AFILIADO_DADOS.token}` }
-        });
-        const dados = await res.json();
-        
-        const total = dados.mensagens.length + dados.vendas.length;
-        const badge = document.querySelector('.badge-dot'); // ID novo do HTML
-        
-        // Lógica visual para o novo HTML (badge-dot) ou antigo (badge)
-        if(badge) {
-            badge.style.display = total > 0 ? 'block' : 'none';
-        } else {
-            // Tenta achar pelo ID antigo caso use layout misto
-            const oldBadge = document.getElementById('notif-badge');
-            if(oldBadge) {
-                oldBadge.style.display = total > 0 ? 'flex' : 'none';
-                oldBadge.innerText = total;
-            }
-        }
-        
-        // Nota: A lista de notificações não é renderizada aqui automaticamente para não atrapalhar
-        // Ela só aparece quando o usuário clica no sino (pode adicionar lógica de click aqui se quiser)
-
-    } catch(e) { console.error("Erro notif:", e); }
+    const tab = document.getElementById(abaId);
+    if(tab) tab.classList.add('active');
+    
+    const nav = document.getElementById('nav-' + abaId);
+    if(nav) nav.classList.add('active');
 }

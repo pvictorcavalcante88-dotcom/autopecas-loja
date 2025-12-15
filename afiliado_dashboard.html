@@ -198,7 +198,7 @@
         }
 
         async function carregarDadosAfiliado() {
-            const token = localStorage.getItem('afiliadoToken'); // Mude se usar outro nome
+            const token = localStorage.getItem('afiliadoLogado'); // Mude se usar outro nome
             if(!token) return window.location.href = 'afiliado_login.html';
 
             try {
@@ -237,7 +237,7 @@
             const tbody = document.getElementById('lista-clientes');
             tbody.innerHTML = '<tr><td colspan="5" align="center">Carregando...</td></tr>';
             
-            const token = localStorage.getItem('afiliadoToken');
+            const token = localStorage.getItem('afiliadoLogado');
 
             try {
                 const res = await fetch(`${API_URL}/afiliado/meus-clientes`, {

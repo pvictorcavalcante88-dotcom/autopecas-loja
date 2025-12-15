@@ -327,6 +327,7 @@ app.post('/finalizar-pedido', async (req, res) => {
         let dadosPedido = {
             clienteNome: cliente.nome,
             clienteEmail: cliente.email,
+            clienteTelefone: cliente.whatsapp || cliente.telefone,
             clienteEndereco: cliente.endereco,
             valorTotal: valorTotal,
             itens: JSON.stringify(itensParaBanco), 

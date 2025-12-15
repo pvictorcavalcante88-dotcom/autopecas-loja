@@ -71,6 +71,7 @@ model Pedido {
   clienteNome     String
   clienteEmail    String
   clienteEndereco String
+  clienteTelefone String?
   valorTotal      Float
   itens           String
   

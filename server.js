@@ -80,6 +80,48 @@ app.post('/afiliado/login', async (req, res) => {
     } catch (error) { res.status(500).json({ erro: "Erro no servidor" }); }
 });
 
+// ============================================================
+// 📝 ROTA: CADASTRO DE NOVO AFILIADO
+// ============================================================
+app.post('/afiliado/cadastro', async (req, res) => {
+    try {
+        const { nome, telefone, codigo, senha, chavePix } = req.body;
+
+        // 1. Validações Básicas
+        if (!nome || !telefone || !codigo || !senha) {
+            return res.status(400).json({ erro: "Preencha os campos obrigatórios." });
+        }
+
+        // 2. Verifica se já existe esse telefone
+        const existeTel = await prisma.afiliado.findUnique({ where: { telefone } });
+        if (existeTel) return res.status(400).json({ erro: "Este telefone já está cadastrado." });
+
+        // 3. Verifica se já existe esse código
+        const existeCod = await prisma.afiliado.findUnique({ where: { codigo } });
+        if (existeCod) return res.status(400).json({ erro: "Este código já está em uso. Escolha outro." });
+
+        // 4. Cria o Afiliado (aprovado = false para você aprovar depois)
+        await prisma.afiliado.create({
+            data: {
+                nome,
+                telefone,
+                codigo,
+                senha,
+                chavePix,
+                aprovado: false, // <--- IMPORTANTE: Entra como pendente
+                saldo: 0.0,
+                margem: 0.0
+            }
+        });
+
+        res.json({ success: true, mensagem: "Cadastro realizado! Aguarde aprovação." });
+
+    } catch (e) {
+        console.error("Erro Cadastro:", e);
+        res.status(500).json({ erro: "Erro ao criar conta. Tente novamente." });
+    }
+});
+
 // =================================================================
 // 🔍 BUSCA DE PRODUTOS
 // =================================================================

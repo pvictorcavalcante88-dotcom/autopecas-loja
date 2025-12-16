@@ -3,106 +3,130 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Afiliados - Admin</title>
-    <link rel="stylesheet" href="admin.css"> 
+    <title>Financeiro & Afiliados - Admin</title>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .table-container { overflow-x: auto; }
+        :root { --primary: #2c3e50; --accent: #e67e22; --bg: #f4f6f8; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; display: flex; }
         
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th { text-align: left; padding: 12px; border-bottom: 2px solid #eee; color: #444; }
-        td { padding: 12px; border-bottom: 1px solid #eee; color: #666; vertical-align: middle; }
+        /* LAYOUT BÁSICO */
+        aside { width: 250px; background: var(--primary); color: white; min-height: 100vh; position: fixed; }
+        aside h3 { text-align: center; padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); margin: 0; }
+        aside nav a { display: flex; align-items: center; gap: 10px; padding: 15px 20px; color: #bdc3c7; text-decoration: none; transition: 0.3s; }
+        aside nav a:hover, aside nav a.active { background: rgba(255,255,255,0.1); color: var(--accent); border-left: 4px solid var(--accent); }
         
-        .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: bold; }
-        .status-pending { background: #fff3cd; color: #856404; }
-        .status-active { background: #d4edda; color: #155724; }
-
-        .btn-action { border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; color: white; }
-        .btn-approve { background: #27ae60; }
-        .btn-pay { background: #3498db; }
+        main { margin-left: 250px; padding: 30px; width: 100%; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
         
-        .pix-key { font-size: 0.8rem; background: #eee; padding: 2px 6px; border-radius: 4px; color: #555; }
-
-        /* Barra de Ações */
-        .action-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: #f8f9fa; padding: 10px; border-radius: 6px; border: 1px solid #eee; }
-        .btn-msg { background: #8e44ad; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 5px;}
-        .btn-msg:hover { background: #732d91; }
-
-        /* Modal */
+        /* CARDS E TABELAS */
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 30px; }
+        .card h2 { margin-top: 0; color: var(--primary); font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th { text-align: left; padding: 12px; border-bottom: 2px solid #eee; color: #555; background: #f9f9f9; }
+        td { padding: 12px; border-bottom: 1px solid #eee; color: #666; }
+        
+        /* BOTÕES E BADGES */
+        .btn-action { border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; }
+        .btn-pagar { background: #27ae60; }
+        .btn-msg { background: #8e44ad; }
+        
+        .pix-tag { background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; color: #333; font-family: monospace; }
+        
+        /* MODAL */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-box { background: white; padding: 25px; width: 500px; max-width: 90%; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-        .modal-box textarea { width: 100%; height: 100px; margin: 15px 0 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-family: sans-serif; resize: vertical; }
-        .file-input-wrapper { margin-bottom: 20px; border: 1px dashed #ccc; padding: 15px; text-align: center; border-radius: 5px; background: #f9f9f9; }
-        .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; }
-        .btn-cancel { background: #ccc; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; color: #333; }
-        .btn-confirm { background: #8e44ad; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .modal-box { background: white; padding: 25px; width: 450px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .file-area { border: 2px dashed #ccc; padding: 20px; text-align: center; margin: 20px 0; border-radius: 6px; background: #fafafa; }
+        .modal-btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
     </style>
 </head>
 <body>
 
-    <div class="admin-container">
-        <aside class="sidebar">
-            <h3>Admin AutoPeças</h3>
-            <nav>
-                <a href="admin_dashboard.html"><i class="ph ph-gauge"></i> Dashboard</a>
-                <a href="admin_produtos.html"><i class="ph ph-package"></i> Produtos</a>
-                <a href="admin_pedidos.html"><i class="ph ph-shopping-cart-simple"></i> Pedidos</a>
-                <a href="admin_afiliados.html" class="active"><i class="ph ph-users"></i> Afiliados</a>
-                <a href="#" onclick="logout()" style="margin-top: 20px; color: #e74c3c;"><i class="ph ph-sign-out"></i> Sair</a>
-            </nav>
-        </aside>
+    <aside>
+        <h3>Admin AutoPeças</h3>
+        <nav>
+            <a href="admin_dashboard.html"><i class="ph ph-gauge"></i> Dashboard</a>
+            <a href="admin_produtos.html"><i class="ph ph-package"></i> Produtos</a>
+            <a href="admin_pedidos.html"><i class="ph ph-shopping-cart-simple"></i> Pedidos</a>
+            <a href="admin_afiliados.html" class="active"><i class="ph ph-users"></i> Afiliados & Financeiro</a>
+            <a href="admin_sugestoes.html"><i class="ph ph-users"></i> Sugestões</a>
+            <a href="#" onclick="logout()" style="color: #e74c3c;"><i class="ph ph-sign-out"></i> Sair</a>
+        </nav>
+    </aside>
 
-        <main class="main-content">
-            <header>
-                <h1>Gestão de Parceiros</h1>
-                <span>Admin Logado</span>
-            </header>
+    <main>
+        <header>
+            <h1>Gestão Financeira</h1>
+        </header>
 
-            <section class="card">
-                <div class="action-bar">
-                    <span id="contador-selecionados" style="font-size: 0.9rem; color: #666;">Nenhum selecionado</span>
-                    <button onclick="abrirModalMensagem()" class="btn-msg">
-                        <i class="ph ph-paper-plane-tilt"></i> Enviar Mensagem
-                    </button>
-                </div>
+        <section class="card" style="border-left: 5px solid #f1c40f;">
+            <h2><i class="ph ph-hand-coins" style="color:#f1c40f;"></i> Solicitações de Saque Pendentes</h2>
+            <p style="color:#666; font-size:0.9rem;">Afiliados aguardando pagamento.</p>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Afiliado</th>
+                        <th>Chave Pix</th>
+                        <th>Valor</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
+                <tbody id="lista-saques">
+                    <tr><td colspan="5" align="center">Carregando saques...</td></tr>
+                </tbody>
+            </table>
+        </section>
 
-                <div class="table-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th style="width: 40px;"><input type="checkbox" id="check-all" onclick="toggleSelecionarTodos()"></th>
-                                <th>Parceiro / Pix</th>
-                                <th>Código</th>
-                                <th>Status</th>
-                                <th>Vendas Totais</th>
-                                <th>Saldo</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="afiliados-list">
-                            <tr><td colspan="7" style="text-align:center;">Carregando...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-        </main>
-    </div>
+        <section class="card">
+            <h2><i class="ph ph-users"></i> Todos os Parceiros</h2>
+            <div style="text-align: right; margin-bottom: 10px;">
+                <button onclick="alert('Use a tabela acima para pagar saques!')" class="btn-action btn-msg">
+                    <i class="ph ph-paper-plane-tilt"></i> Enviar Mensagem Avulsa
+                </button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Telefone</th>
+                        <th>Código</th>
+                        <th>Vendas Totais</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="lista-afiliados">
+                    <tr><td colspan="5" align="center">Carregando...</td></tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
 
-    <div id="modal-msg" class="modal-overlay">
+    <div id="modal-pagamento" class="modal-overlay">
         <div class="modal-box">
-            <h3 style="color: #2c3e50;">Enviar Mensagem / Comprovante</h3>
+            <h3 style="margin-top:0;">Confirmar Pagamento 💸</h3>
+            <p>Você está pagando <strong id="modal-valor" style="color:#27ae60; font-size:1.2rem;">R$ 0,00</strong> para <strong id="modal-nome">...</strong></p>
             
-            <textarea id="texto-mensagem" placeholder="Digite uma mensagem (Opcional)..."></textarea>
-            
-            <div class="file-input-wrapper">
-                <label style="display:block; margin-bottom:5px; font-weight:bold; font-size:0.9rem; color:#555;">Anexar Arquivo (PDF, JPG, PNG)</label>
-                <input type="file" id="arquivo-msg" accept=".pdf, .jpg, .jpeg, .png">
+            <p style="font-size:0.9rem; background:#f8f9fa; padding:10px; border-radius:4px;">
+                🔑 Chave Pix: <span id="modal-pix" class="pix-tag">...</span>
+            </p>
+
+            <input type="hidden" id="modal-id-saque">
+
+            <div class="file-area">
+                <label for="comprovante" style="cursor:pointer; display:block;">
+                    <i class="ph ph-upload-simple" style="font-size:2rem; color:#aaa;"></i><br>
+                    <span style="font-weight:bold; color:#555;">Anexar Comprovante</span><br>
+                    <small style="color:#888;">PDF ou Imagem</small>
+                </label>
+                <input type="file" id="comprovante" style="display:none;" onchange="verificarArquivo()">
+                <div id="nome-arquivo" style="margin-top:10px; color:#27ae60; font-weight:bold; font-size:0.85rem;"></div>
             </div>
 
-            <div class="modal-buttons">
-                <button onclick="fecharModal()" class="btn-cancel">Cancelar</button>
-                <button onclick="enviarMensagemMassa()" class="btn-confirm">Enviar Agora 🚀</button>
+            <div class="modal-btns">
+                <button onclick="fecharModal()" style="padding:10px; border:none; background:#ccc; border-radius:4px; cursor:pointer;">Cancelar</button>
+                <button onclick="confirmarPagamento()" class="btn-action btn-pagar">Confirmar e Enviar</button>
             </div>
         </div>
     </div>
@@ -110,120 +134,141 @@
     <script>
         const API_URL = ''; 
 
-        async function carregarAfiliados() {
+        document.addEventListener("DOMContentLoaded", () => {
+            carregarSaquesPendentes();
+            carregarTodosAfiliados();
+        });
+
+        // 1. CARREGAR SAQUES PENDENTES
+        async function carregarSaquesPendentes() {
             const token = localStorage.getItem('adminToken');
             if(!token) return window.location.href = 'admin_login.html';
+
             try {
-                const res = await fetch(`${API_URL}/admin/afiliados`, {
+                const res = await fetch(`${API_URL}/admin/saques-pendentes`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const afiliados = await res.json();
-                renderizarTabela(afiliados);
-            } catch (error) { document.getElementById('afiliados-list').innerHTML = '<tr><td colspan="7">Erro ao carregar lista.</td></tr>'; }
-        }
-
-        function renderizarTabela(lista) {
-            const tbody = document.getElementById('afiliados-list');
-            tbody.innerHTML = '';
-            if(lista.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Nenhum afiliado.</td></tr>'; return; }
-
-            lista.forEach(a => {
-                const totalVendido = a.vendasTotais || 0;
-                const saldo = parseFloat(a.saldo || 0);
-                const statusHtml = a.aprovado 
-                    ? `<span class="status-badge status-active">Ativo</span>`
-                    : `<span class="status-badge status-pending">Pendente</span>`;
-
-                let btnAprovar = !a.aprovado ? `<button onclick="aprovar(${a.id})" class="btn-action btn-approve" title="Aprovar"><i class="ph ph-check"></i></button>` : '';
-                let btnPagar = saldo > 0 
-                    ? `<button onclick="alert('Use a caixa de seleção para enviar o comprovante!')" class="btn-action btn-pay" title="Pagar"><i class="ph ph-money"></i></button>` 
-                    : '';
-
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td><input type="checkbox" class="check-afiliado" value="${a.id}" onchange="atualizarContador()"></td>
-                    <td><strong>${a.nome}</strong><br><span class="pix-key">Pix: ${a.chavePix || '-'}</span></td>
-                    <td><strong>${a.codigo}</strong></td>
-                    <td>${statusHtml}</td>
-                    <td>${totalVendido.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</td>
-                    <td><strong style="color:${saldo>0?'#e67e22':'#666'}">${saldo.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</strong></td>
-                    <td><div style="display:flex; gap:5px;">${btnAprovar} ${btnPagar}</div></td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function toggleSelecionarTodos() {
-            const master = document.getElementById('check-all');
-            document.querySelectorAll('.check-afiliado').forEach(c => c.checked = master.checked);
-            atualizarContador();
-        }
-
-        function atualizarContador() {
-            document.getElementById('contador-selecionados').innerText = document.querySelectorAll('.check-afiliado:checked').length + ' selecionado(s)';
-        }
-
-        function abrirModalMensagem() {
-            if (document.querySelectorAll('.check-afiliado:checked').length === 0) return alert("Selecione alguém na tabela.");
-            document.getElementById('modal-msg').style.display = 'flex';
-        }
-
-        function fecharModal() { document.getElementById('modal-msg').style.display = 'none'; }
-
-        async function enviarMensagemMassa() {
-            const texto = document.getElementById('texto-mensagem').value;
-            const arquivoInput = document.getElementById('arquivo-msg');
-            const checks = document.querySelectorAll('.check-afiliado:checked');
-            
-            if (!texto.trim() && !arquivoInput.files[0]) return alert("Digite uma mensagem ou anexe um arquivo.");
-
-            const token = localStorage.getItem('adminToken');
-            const btn = document.querySelector('.btn-confirm');
-            btn.innerText = "Enviando..."; btn.disabled = true;
-
-            let enviados = 0;
-
-            for (const checkbox of checks) {
-                const id = checkbox.value;
+                const saques = await res.json();
                 
-                // CRIA O PACOTE DE DADOS (FormData é necessário para enviar arquivos)
-                const formData = new FormData();
-                formData.append('afiliadoId', id);
-                formData.append('texto', texto);
-                if (arquivoInput.files[0]) {
-                    formData.append('arquivo', arquivoInput.files[0]);
+                const tbody = document.getElementById('lista-saques');
+                tbody.innerHTML = '';
+
+                if(saques.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" align="center" style="padding:20px; color:#999;">Nenhuma solicitação pendente.</td></tr>';
+                    return;
                 }
 
-                try {
-                    // NÃO coloque header 'Content-Type': 'application/json' aqui! O navegador resolve sozinho.
-                    await fetch(`${API_URL}/admin/mensagens`, {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bearer ${token}` }, 
-                        body: formData
-                    });
-                    enviados++;
-                } catch (e) { console.error("Erro ID " + id); }
+                saques.forEach(s => {
+                    const data = new Date(s.dataSolicitacao).toLocaleDateString('pt-BR');
+                    const valor = parseFloat(s.valor).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+                    
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${data}</td>
+                        <td><strong>${s.afiliado.nome}</strong></td>
+                        <td><span class="pix-tag">${s.afiliado.chavePix || 'Sem Pix'}</span></td>
+                        <td style="color:#c0392b; font-weight:bold;">${valor}</td>
+                        <td>
+                            <button onclick="abrirModalPagamento(${s.id}, '${s.afiliado.nome}', '${s.afiliado.chavePix}', ${s.valor})" class="btn-action btn-pagar">
+                                <i class="ph ph-check-circle"></i> Pagar
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch(e) { console.error(e); }
+        }
+
+        // 2. CARREGAR LISTA GERAL
+        async function carregarTodosAfiliados() {
+            const token = localStorage.getItem('adminToken');
+            try {
+                const res = await fetch(`${API_URL}/admin/afiliados`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const lista = await res.json();
+                const tbody = document.getElementById('lista-afiliados');
+                tbody.innerHTML = '';
+
+                lista.forEach(a => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${a.nome}</td>
+                        <td>${a.telefone}</td>
+                        <td>${a.codigo}</td>
+                        <td>${parseFloat(a.vendasTotais || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</td>
+                        <td>${a.aprovado ? '<span style="color:green; font-weight:bold;">Ativo</span>' : '<span style="color:orange;">Pendente</span>'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch(e) {}
+        }
+
+        // 3. LÓGICA DO MODAL
+        function abrirModalPagamento(id, nome, pix, valor) {
+            document.getElementById('modal-pagamento').style.display = 'flex';
+            document.getElementById('modal-id-saque').value = id;
+            document.getElementById('modal-nome').innerText = nome;
+            document.getElementById('modal-pix').innerText = pix || "Não informado";
+            document.getElementById('modal-valor').innerText = valor.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+            
+            // Limpa o arquivo anterior
+            document.getElementById('comprovante').value = "";
+            document.getElementById('nome-arquivo').innerText = "";
+        }
+
+        function fecharModal() {
+            document.getElementById('modal-pagamento').style.display = 'none';
+        }
+
+        function verificarArquivo() {
+            const file = document.getElementById('comprovante').files[0];
+            if(file) document.getElementById('nome-arquivo').innerText = "📎 " + file.name;
+        }
+
+        // 4. CONFIRMAR PAGAMENTO E ENVIAR
+        async function confirmarPagamento() {
+            const id = document.getElementById('modal-id-saque').value;
+            const fileInput = document.getElementById('comprovante');
+            const btn = document.querySelector('.btn-pagar');
+
+            if (!fileInput.files[0]) {
+                if(!confirm("Tem certeza que quer marcar como pago SEM anexar comprovante?")) return;
             }
 
-            alert(`✅ Mensagem/Arquivo enviado para ${enviados} afiliado(s)!`);
-            btn.innerText = "Enviar Agora 🚀"; btn.disabled = false;
-            fecharModal();
-            document.getElementById('check-all').checked = false;
-            document.querySelectorAll('.check-afiliado').forEach(c => c.checked = false);
-            atualizarContador();
+            const formData = new FormData();
+            if (fileInput.files[0]) {
+                formData.append('comprovante', fileInput.files[0]);
+            }
+
+            btn.innerText = "Enviando...";
+            btn.disabled = true;
+
+            try {
+                const token = localStorage.getItem('adminToken');
+                const res = await fetch(`${API_URL}/admin/saques/${id}/confirmar`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }, // Não coloque Content-Type aqui!
+                    body: formData
+                });
+
+                if (res.ok) {
+                    alert("✅ Pagamento confirmado e comprovante enviado!");
+                    fecharModal();
+                    carregarSaquesPendentes(); // Atualiza a lista
+                } else {
+                    alert("Erro ao confirmar.");
+                }
+            } catch (e) {
+                alert("Erro de conexão.");
+            } finally {
+                btn.innerText = "Confirmar e Enviar";
+                btn.disabled = false;
+            }
         }
 
-        async function aprovar(id) {
-            if(!confirm("Aprovar parceiro?")) return;
-            const token = localStorage.getItem('adminToken');
-            await fetch(`${API_URL}/admin/afiliados/${id}/status`, { 
-                method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ aprovado: true })
-            });
-            carregarAfiliados();
+        function logout() {
+            localStorage.removeItem('adminToken');
+            window.location.href = 'admin_login.html';
         }
-
-        function logout() { localStorage.removeItem('adminToken'); window.location.href = 'admin_login.html'; }
-        carregarAfiliados();
     </script>
 </body>
 </html>

@@ -636,19 +636,46 @@ app.get('/afiliado/saques', authenticateToken, async (req, res) => {
     } catch (e) { res.status(500).json({ erro: "Erro ao buscar saques" }); }
 });
 
-// 2. ADMIN: MARCAR COMO PAGO (Para você usar depois no seu painel ou Postman)
-app.put('/admin/saques/:id/pagar', authenticateToken, async (req, res) => {
+// ============================================================
+// 💰 ROTA ADMIN: CONFIRMAR PAGAMENTO COM COMPROVANTE
+// ============================================================
+app.post('/admin/saques/:id/confirmar', authenticateToken, upload.single('comprovante'), async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
+
     try {
+        const idSaque = parseInt(req.params.id);
+        const arquivoPath = req.file ? req.file.path : null;
+
+        // 1. Busca o saque para saber quem é o dono
+        const saque = await prisma.saque.findUnique({ where: { id: idSaque } });
+        if (!saque) return res.status(404).json({ erro: "Saque não encontrado" });
+
+        // 2. Atualiza o Saque para PAGO
         await prisma.saque.update({
-            where: { id: parseInt(req.params.id) },
+            where: { id: idSaque },
             data: { 
                 status: "PAGO", 
                 dataPagamento: new Date() 
             }
         });
+
+        // 3. Cria a mensagem automática com o comprovante
+        if (arquivoPath) {
+            await prisma.mensagem.create({
+                data: {
+                    texto: `✅ Seu saque de R$ ${saque.valor.toFixed(2)} foi pago! Segue o comprovante em anexo.`,
+                    arquivo: arquivoPath,
+                    afiliadoId: saque.afiliadoId
+                }
+            });
+        }
+
         res.json({ success: true });
-    } catch(e) { res.status(500).json({ erro: "Erro ao confirmar pagamento" }); }
+
+    } catch (e) {
+        console.error("Erro ao pagar:", e);
+        res.status(500).json({ erro: "Erro ao processar pagamento." });
+    }
 });
 
 // 3. ADMIN: VER TODOS OS SAQUES PENDENTES

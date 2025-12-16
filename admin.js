@@ -224,46 +224,71 @@ async function mudarStatusPedido(id, novoStatus) {
     }
 }
 
-// ======================================================
-// 🦊 FUNÇÃO: CARREGAR AFILIADOS
-// ======================================================
-async function carregarAfiliados() {
-    try {
-        const res = await fetch(`${API_URL}/admin/afiliados`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
-        });
-        const lista = await res.json();
-        
-        const tbody = document.querySelector('tbody');
-        if(!tbody) return;
-        tbody.innerHTML = '';
+// 2. CARREGAR LISTA GERAL (COM BOTÃO DE APROVAR)
+        async function carregarTodosAfiliados() {
+            const token = localStorage.getItem('adminToken');
+            try {
+                const res = await fetch(`${API_URL}/admin/afiliados`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const lista = await res.json();
+                const tbody = document.getElementById('lista-afiliados');
+                tbody.innerHTML = '';
 
-        lista.forEach(af => {
-            let infoBancaria = `<span style="color:#bdc3c7; font-size:0.8rem;">Pendente</span>`;
-            if (af.chavePix || af.banco) {
-                infoBancaria = `Pix: ${af.chavePix || '-'} | Banco: ${af.banco || '-'}`;
+                lista.forEach(a => {
+                    // Lógica do Status
+                    const statusHtml = a.aprovado 
+                        ? '<span style="color:green; font-weight:bold; background:#d4edda; padding:2px 6px; border-radius:4px;">Ativo</span>' 
+                        : '<span style="color:#856404; font-weight:bold; background:#fff3cd; padding:2px 6px; border-radius:4px;">Pendente</span>';
+
+                    // Lógica do Botão
+                    let btnAcao = '';
+                    if (!a.aprovado) {
+                        // Se não aprovado, mostra botão VERDE de Aprovar
+                        btnAcao = `<button onclick="alterarStatusAfiliado(${a.id}, true)" class="btn-action" style="background:#27ae60; cursor:pointer;">✔ Aprovar</button>`;
+                    } else {
+                        // Se já aprovado, mostra botão VERMELHO de Bloquear (Opcional)
+                        btnAcao = `<button onclick="alterarStatusAfiliado(${a.id}, false)" class="btn-action" style="background:#c0392b; cursor:pointer;">✖ Bloquear</button>`;
+                    }
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${a.nome}</td>
+                        <td>${a.telefone}</td>
+                        <td><strong>${a.codigo}</strong></td>
+                        <td>${parseFloat(a.vendasTotais || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</td>
+                        <td>${statusHtml}</td>
+                        <td>${btnAcao}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch(e) { console.error(e); }
+        }
+
+        // NOVA FUNÇÃO: CHAMAR O SERVIDOR PARA APROVAR
+        async function alterarStatusAfiliado(id, novoStatus) {
+            const acao = novoStatus ? "Aprovar" : "Bloquear";
+            if(!confirm(`Tem certeza que deseja ${acao} este afiliado?`)) return;
+
+            try {
+                const token = localStorage.getItem('adminToken');
+                const res = await fetch(`${API_URL}/admin/afiliados/${id}/status`, {
+                    method: 'PUT',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ aprovado: novoStatus })
+                });
+
+                if(res.ok) {
+                    alert(`Afiliado ${novoStatus ? 'ativado' : 'bloqueado'} com sucesso!`);
+                    carregarTodosAfiliados(); // Atualiza a lista na hora
+                } else {
+                    alert("Erro ao atualizar status.");
+                }
+            } catch(e) {
+                alert("Erro de conexão.");
             }
-
-            const statusLabel = af.aprovado 
-                ? `<span style="color:#27ae60; background:#e8f5e9; padding:2px 6px; border-radius:4px;">Ativo</span>` 
-                : `<span style="color:#e74c3c; background:#fadbd8; padding:2px 6px; border-radius:4px;">Bloqueado</span>`;
-
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${af.nome}<br><small>${af.telefone}</small></td>
-                <td>${infoBancaria}</td>
-                <td><b>${af.codigo}</b></td>
-                <td>${statusLabel}</td>
-                <td>${formatarMoeda(af.vendasTotais)}</td>
-                <td><strong>${formatarMoeda(af.saldo)}</strong></td>
-                <td>
-                    ${!af.aprovado ? `<button onclick="alterarStatusAfiliado(${af.id}, true)">✅</button>` : `<button onclick="alterarStatusAfiliado(${af.id}, false)">🚫</button>`}
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-    } catch (e) { console.error(e); }
-}
+        }
 
 async function alterarStatusAfiliado(id, novoStatus) {
     if(!confirm("Alterar status?")) return;

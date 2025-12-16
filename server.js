@@ -637,33 +637,33 @@ app.get('/afiliado/saques', authenticateToken, async (req, res) => {
 });
 
 // ============================================================
-// 💰 ROTA ADMIN: CONFIRMAR PAGAMENTO COM COMPROVANTE
+// 💰 ROTA ADMIN: CONFIRMAR PAGAMENTO (ATUALIZADA)
 // ============================================================
 app.post('/admin/saques/:id/confirmar', authenticateToken, upload.single('comprovante'), async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
 
     try {
         const idSaque = parseInt(req.params.id);
-        const arquivoPath = req.file ? req.file.path : null;
+        const arquivoPath = req.file ? req.file.path : null; // Pega o caminho do arquivo
 
-        // 1. Busca o saque para saber quem é o dono
-        const saque = await prisma.saque.findUnique({ where: { id: idSaque } });
-        if (!saque) return res.status(404).json({ erro: "Saque não encontrado" });
-
-        // 2. Atualiza o Saque para PAGO
+        // 1. Atualiza o Saque para PAGO e SALVA O COMPROVANTE
         await prisma.saque.update({
             where: { id: idSaque },
             data: { 
                 status: "PAGO", 
-                dataPagamento: new Date() 
+                dataPagamento: new Date(),
+                comprovante: arquivoPath // <--- AQUI ESTÁ A MÁGICA
             }
         });
 
-        // 3. Cria a mensagem automática com o comprovante
+        // 2. Também manda mensagem avisando (Opcional, mas legal manter)
         if (arquivoPath) {
+            // Busca o afiliadoId do saque para saber pra quem mandar
+            const saque = await prisma.saque.findUnique({ where: { id: idSaque } });
+            
             await prisma.mensagem.create({
                 data: {
-                    texto: `✅ Seu saque de R$ ${saque.valor.toFixed(2)} foi pago! Segue o comprovante em anexo.`,
+                    texto: `✅ Seu saque de R$ ${saque.valor.toFixed(2)} foi pago!`,
                     arquivo: arquivoPath,
                     afiliadoId: saque.afiliadoId
                 }

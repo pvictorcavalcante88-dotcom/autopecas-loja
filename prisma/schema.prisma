@@ -136,6 +136,7 @@ model Saque {
   status          String   @default("PENDENTE") // PENDENTE ou PAGO
   dataSolicitacao DateTime @default(now())
   dataPagamento   DateTime?
+  comprovante     String?
 
   afiliadoId      Int
   afiliado        Afiliado @relation(fields: [afiliadoId], references: [id])

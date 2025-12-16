@@ -358,7 +358,7 @@ async function solicitarSaque() {
 }
 
 // ============================================================
-// 4. CARREGAR MEUS SAQUES (HISTÓRICO)
+// 4. CARREGAR MEUS SAQUES (COM BOTÃO DE COMPROVANTE)
 // ============================================================
 async function carregarMeusSaques() {
     const tbody = document.getElementById('lista-saques');
@@ -373,7 +373,7 @@ async function carregarMeusSaques() {
         tbody.innerHTML = '';
 
         if (!saques || saques.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" align="center" style="color:#777; padding:15px;">Nenhum saque solicitado.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" align="center" style="color:#777; padding:15px;">Nenhum saque solicitado.</td></tr>';
             return;
         }
 
@@ -382,12 +382,22 @@ async function carregarMeusSaques() {
             const dataPag = s.dataPagamento ? new Date(s.dataPagamento).toLocaleDateString('pt-BR') : '-';
             const valor = parseFloat(s.valor).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
             
-            // Status Bonito
-            let statusBadge = '';
+            // Status Badge
+            let statusBadge = `<span style="background:#fff3cd; color:#856404; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.7rem;">PENDENTE ⏳</span>`;
             if(s.status === 'PAGO') {
-                statusBadge = `<span style="background:#d4edda; color:#155724; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">PAGO ✅</span>`;
-            } else {
-                statusBadge = `<span style="background:#fff3cd; color:#856404; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">PENDENTE ⏳</span>`;
+                statusBadge = `<span style="background:#d4edda; color:#155724; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.7rem;">PAGO ✅</span>`;
+            }
+
+            // Botão Comprovante
+            let btnComprovante = '-';
+            if (s.comprovante) {
+                // Corrige barras invertidas do Windows se houver
+                const link = s.comprovante.replace(/\\/g, '/');
+                btnComprovante = `
+                    <a href="${API_URL}/${link}" target="_blank" style="background:#3498db; color:white; padding:4px 8px; border-radius:4px; text-decoration:none; font-size:0.8rem; display:inline-flex; align-items:center; gap:3px;">
+                        <i class="ph ph-file-text"></i> Ver
+                    </a>
+                `;
             }
 
             const tr = document.createElement('tr');
@@ -396,12 +406,13 @@ async function carregarMeusSaques() {
                 <td><strong>${valor}</strong></td>
                 <td>${dataPag}</td>
                 <td>${statusBadge}</td>
+                <td>${btnComprovante}</td> 
             `;
             tbody.appendChild(tr);
         });
 
     } catch(e) {
         console.error(e);
-        tbody.innerHTML = '<tr><td colspan="4" align="center" style="color:red">Erro ao carregar saques.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" align="center" style="color:red">Erro ao carregar saques.</td></tr>';
     }
 }

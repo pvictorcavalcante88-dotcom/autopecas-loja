@@ -180,7 +180,7 @@
             } catch(e) { console.error(e); }
         }
 
-        // 2. CARREGAR LISTA GERAL
+// 2. CARREGAR LISTA GERAL (COM BOTÃO DE APROVAR)
         async function carregarTodosAfiliados() {
             const token = localStorage.getItem('adminToken');
             try {
@@ -190,17 +190,60 @@
                 tbody.innerHTML = '';
 
                 lista.forEach(a => {
+                    // Lógica do Status
+                    const statusHtml = a.aprovado 
+                        ? '<span style="color:green; font-weight:bold; background:#d4edda; padding:2px 6px; border-radius:4px;">Ativo</span>' 
+                        : '<span style="color:#856404; font-weight:bold; background:#fff3cd; padding:2px 6px; border-radius:4px;">Pendente</span>';
+
+                    // Lógica do Botão
+                    let btnAcao = '';
+                    if (!a.aprovado) {
+                        // Se não aprovado, mostra botão VERDE de Aprovar
+                        btnAcao = `<button onclick="alterarStatusAfiliado(${a.id}, true)" class="btn-action" style="background:#27ae60; cursor:pointer;">✔ Aprovar</button>`;
+                    } else {
+                        // Se já aprovado, mostra botão VERMELHO de Bloquear (Opcional)
+                        btnAcao = `<button onclick="alterarStatusAfiliado(${a.id}, false)" class="btn-action" style="background:#c0392b; cursor:pointer;">✖ Bloquear</button>`;
+                    }
+
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>${a.nome}</td>
                         <td>${a.telefone}</td>
-                        <td>${a.codigo}</td>
+                        <td><strong>${a.codigo}</strong></td>
                         <td>${parseFloat(a.vendasTotais || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</td>
-                        <td>${a.aprovado ? '<span style="color:green; font-weight:bold;">Ativo</span>' : '<span style="color:orange;">Pendente</span>'}</td>
+                        <td>${statusHtml}</td>
+                        <td>${btnAcao}</td>
                     `;
                     tbody.appendChild(tr);
                 });
-            } catch(e) {}
+            } catch(e) { console.error(e); }
+        }
+
+        // NOVA FUNÇÃO: CHAMAR O SERVIDOR PARA APROVAR
+        async function alterarStatusAfiliado(id, novoStatus) {
+            const acao = novoStatus ? "Aprovar" : "Bloquear";
+            if(!confirm(`Tem certeza que deseja ${acao} este afiliado?`)) return;
+
+            try {
+                const token = localStorage.getItem('adminToken');
+                const res = await fetch(`${API_URL}/admin/afiliados/${id}/status`, {
+                    method: 'PUT',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ aprovado: novoStatus })
+                });
+
+                if(res.ok) {
+                    alert(`Afiliado ${novoStatus ? 'ativado' : 'bloqueado'} com sucesso!`);
+                    carregarTodosAfiliados(); // Atualiza a lista na hora
+                } else {
+                    alert("Erro ao atualizar status.");
+                }
+            } catch(e) {
+                alert("Erro de conexão.");
+            }
         }
 
         // 3. LÓGICA DO MODAL

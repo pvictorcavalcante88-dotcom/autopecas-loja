@@ -288,20 +288,114 @@ async function salvarDadosBancarios() {
     } catch(e) { alert("Erro de conexão."); }
 }
 
+// ============================================================
+// 5. SISTEMA DE NOTIFICAÇÕES (ADAPTADO DO SEU INDEX)
+// ============================================================
+
 function iniciarNotificacoes() {
-    // Lógica simples para mostrar badge se tiver algo (opcional)
-    setInterval(async () => {
-        try {
-            const res = await fetch(`${API_URL}/afiliado/notificacoes`, {
-                headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` }
-            });
-            const dados = await res.json();
-            const total = dados.mensagens.length + dados.vendas.length;
-            const badge = document.querySelector('.badge-dot');
-            if(badge) badge.style.display = total > 0 ? 'block' : 'none';
-        } catch(e) {}
-    }, 30000);
+    verificarNotificacoes(); // Chama na hora que abre
+    setInterval(verificarNotificacoes, 15000); // Verifica a cada 15 segundos
 }
+
+async function verificarNotificacoes() {
+    if(!AFILIADO_TOKEN) return;
+
+    try {
+        const res = await fetch(`${API_URL}/afiliado/notificacoes`, {
+            headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` }
+        });
+        
+        if(!res.ok) return; // Se der erro silencioso, ignora
+
+        const dados = await res.json();
+        
+        const total = dados.mensagens.length + dados.vendas.length;
+        const badge = document.getElementById('notif-badge');
+        const lista = document.getElementById('notif-list');
+
+        // Atualiza a bolinha
+        if(badge) {
+            if(total > 0) {
+                badge.style.display = 'block';
+                badge.innerText = total > 9 ? '9+' : total;
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        // Se o menu não existir na tela, para por aqui (evita erro)
+        if(!lista) return;
+
+        lista.innerHTML = '';
+        if(total === 0) {
+            lista.innerHTML = '<div style="padding:15px; text-align:center; color:#999; font-size:0.9rem;">Sem novidades por enquanto. 💤</div>';
+            return;
+        }
+
+        // Renderiza Vendas (Verde)
+        dados.vendas.forEach(v => {
+            const valor = parseFloat(v.valorTotal).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+            lista.innerHTML += `
+                <div class="notif-item" style="border-left: 4px solid #27ae60;">
+                    <i class="ph ph-currency-circle-dollar" style="color:#27ae60; font-size:1.5rem; margin-top:2px;"></i>
+                    <div>
+                        <strong>Nova Venda!</strong><br>
+                        <span style="color:#555;">${valor}</span>
+                    </div>
+                </div>`;
+        });
+
+        // Renderiza Mensagens (Azul)
+        dados.mensagens.forEach(m => {
+            lista.innerHTML += `
+                <div class="notif-item" style="border-left: 4px solid #3498db;">
+                    <i class="ph ph-chat-centered-text" style="color:#3498db; font-size:1.5rem; margin-top:2px;"></i>
+                    <div>
+                        <strong>Admin diz:</strong><br>
+                        <span style="color:#555;">${m.texto.substring(0, 40)}${m.texto.length>40?'...':''}</span>
+                        ${m.arquivo ? '<br><small style="color:#e67e22;">📎 Contém anexo</small>' : ''}
+                    </div>
+                </div>`;
+        });
+
+    } catch(e) { console.error("Erro no sino:", e); }
+}
+
+// Abrir/Fechar o Menu
+function abrirNotificacoes() {
+    const dropdown = document.getElementById('notif-dropdown');
+    if(!dropdown) return;
+
+    if(dropdown.style.display === 'block') {
+        dropdown.style.display = 'none';
+    } else {
+        dropdown.style.display = 'block';
+        marcarLidas(); // Marca como lido ao abrir
+    }
+}
+
+// Marcar tudo como lido no servidor
+async function marcarLidas() {
+    if(!AFILIADO_TOKEN) return;
+    try {
+        await fetch(`${API_URL}/afiliado/notificacoes/ler`, {
+            method: 'POST', headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` }
+        });
+        // Esconde a bolinha visualmente na hora
+        const badge = document.getElementById('notif-badge');
+        if(badge) badge.style.display = 'none';
+    } catch(e) { console.error("Erro ao marcar lidas", e); }
+}
+
+// Fecha ao clicar fora (UX Importante)
+window.addEventListener('click', (e) => {
+    const container = document.getElementById('box-sino');
+    const dropdown = document.getElementById('notif-dropdown');
+    // Se clicou fora do container e o dropdown existe
+    if (container && dropdown && !container.contains(e.target)) {
+        dropdown.style.display = 'none';
+    }
+});
 
 // ============================================================
 // FUNÇÃO DE SOLICITAR SAQUE

@@ -64,6 +64,60 @@
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
+/* Adicione isso dentro da tag <style> */
+
+/* Container do Sino */
+.notification-container { position: relative; display: inline-block; }
+
+/* Bolinha Vermelha */
+.badge-dot {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #e74c3c;
+    color: white;
+    border-radius: 50%;
+    padding: 2px 5px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    border: 2px solid white;
+}
+
+/* O Menu Dropdown (Escondido por padrão) */
+.dropdown-content {
+    display: none; /* Escondido */
+    position: absolute;
+    right: 0;
+    top: 40px;
+    background-color: #fff;
+    min-width: 300px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    border-radius: 8px;
+    z-index: 1000;
+    border: 1px solid #eee;
+}
+
+.dropdown-header {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    font-weight: bold;
+    color: #2c3e50;
+    background: #f8f9fa;
+    border-radius: 8px 8px 0 0;
+}
+
+/* Itens da lista */
+.notif-item {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: start;
+    gap: 10px;
+}
+.notif-item:last-child { border-bottom: none; }
+.notif-item:hover { background-color: #f1f1f1; }
+
     </style>
 </head>
 <body>
@@ -87,11 +141,20 @@
     <div class="header-actions">
         <a href="index.html" class="btn-loja"><i class="ph ph-storefront"></i> Voltar para Loja</a>
         
-        <button class="notification-btn" onclick="alert('Sistema de notificações ativo.')">
+        <div class="notification-container" id="box-sino" style="position: relative;">
+        <button class="notification-btn" onclick="abrirNotificacoes()">
             <i class="ph ph-bell"></i>
-            <span class="badge-dot"></span>
+            <span class="badge-dot" id="notif-badge" style="display:none">0</span>
         </button>
-        <button id="logout-btn" class="btn-sair"><i class="ph ph-sign-out"></i> Sair</button>
+        
+        <div id="notif-dropdown" class="dropdown-content">
+            <div class="dropdown-header">Notificações</div>
+            <div id="notif-list">
+                </div>
+        </div>
+    </div>
+
+    <button id="logout-btn" class="btn-sair"><i class="ph ph-sign-out"></i> Sair</button>
     </div>
 </header>
 

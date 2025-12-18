@@ -511,6 +511,28 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
     } catch (e) { res.status(500).json({ erro: e.message }); }
 });
 
+// ============================================================
+// 💰 ROTA: SOMATÓRIA TOTAL DE COMISSÕES (SALDOS DOS AFILIADOS)
+// ============================================================
+app.get('/admin/comissoes-totais', autenticarAdmin, async (req, res) => {
+    try {
+        // Soma o campo 'saldo' de todos os afiliados
+        const agredado = await prisma.afiliado.aggregate({
+            _sum: {
+                saldo: true
+            }
+        });
+
+        // Se não tiver ninguém, retorna 0
+        const total = agredado._sum.saldo || 0;
+
+        res.json({ total });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ erro: "Erro ao calcular total." });
+    }
+});
+
 // CRUD PRODUTOS
 app.post('/admin/produtos', authenticateToken, async (req, res) => {
     if(req.user.role !== 'admin') return res.sendStatus(403);

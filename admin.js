@@ -301,3 +301,31 @@ async function alterarStatusAfiliado(id, novoStatus) {
         carregarAfiliados();
     } catch(e) { alert("Erro ao atualizar."); }
 }
+
+// Adicione esta chamada dentro do seu "document.addEventListener" ou "carregarDashboard"
+    carregarTotalComissoes();
+
+    // --- FUNÇÃO PARA BUSCAR O TOTAL DE COMISSÕES ---
+    async function carregarTotalComissoes() {
+        const token = localStorage.getItem('adminToken');
+        try {
+            const res = await fetch(`${API_URL}/admin/comissoes-totais`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if(res.ok) {
+                const data = await res.json();
+                
+                // Formata para Real (R$ 1.250,00)
+                const valorFormatado = parseFloat(data.total).toLocaleString('pt-BR', {
+                    style: 'currency', 
+                    currency: 'BRL'
+                });
+
+                document.getElementById('total-comissoes').innerText = valorFormatado;
+            }
+        } catch(e) {
+            console.error("Erro ao carregar comissões:", e);
+            document.getElementById('total-comissoes').innerText = "Erro";
+        }
+    }

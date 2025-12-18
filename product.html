@@ -321,16 +321,9 @@
  function adicionarAoCarrinhoAtual() {
     if(!PRODUTO_ATUAL) return;
 
-    // 1. PEGA O TERMO DA PESQUISA NA URL (Igual fizemos antes)
+    // 1. PEGA O TERMO DA PESQUISA NA URL
     const urlParams = new URLSearchParams(window.location.search);
-    const termoBusca = urlParams.get('q') || urlParams.get('search'); // Tenta 'q' ou 'search'
-
-    // 2. CRIA O NOME PERSONALIZADO
-    let nomeParaSalvar = PRODUTO_ATUAL.titulo;
-    if (termoBusca) {
-        // Ex: "Pastilha de Freio (Ref: Voyage 2010)"
-        nomeParaSalvar = `${PRODUTO_ATUAL.titulo} (Ref: ${termoBusca})`;
-    }
+    const termoBusca = urlParams.get('q') || urlParams.get('search') || ''; 
 
     const qtd = parseInt(document.getElementById('qtd').value);
     
@@ -340,32 +333,42 @@
     // Verifica se o produto já existe no carrinho
     const index = carrinho.findIndex(i => i.id == PRODUTO_ATUAL.id);
     
+    // PREPARA OS DADOS EXTRAS (Isso era o que estava faltando!)
+    // Precisamos salvar isso cru para formatar depois no carrinho
+    const dadosExtras = {
+        tituloOriginal: PRODUTO_ATUAL.titulo,       // Título puro
+        referencia: PRODUTO_ATUAL.referencia || '', // Ex: "PD-1020"
+        listaCarros: PRODUTO_ATUAL.carros || '',    // Ex: "Gol, Voyage"
+        termoPesquisa: termoBusca                   // O que ele digitou (Ex: "Voyage")
+    };
+
     if (index > -1) {
         // SE JÁ EXISTE: Aumenta a quantidade
         carrinho[index].quantidade += qtd;
         carrinho[index].customMargin = MARGEM_ATUAL;
         
-        // Opcional: Atualiza o nome para a pesquisa mais recente
-        carrinho[index].nome = nomeParaSalvar; 
+        // Atualiza a pesquisa para a mais recente (importante!)
+        carrinho[index].termoPesquisa = termoBusca; 
     } else {
-        // SE NÃO EXISTE: Adiciona novo
+        // SE NÃO EXISTE: Adiciona novo com TODOS os dados
         carrinho.push({ 
             id: PRODUTO_ATUAL.id, 
             quantidade: qtd, 
             customMargin: MARGEM_ATUAL,
-            // AQUI ESTÁ O SEGREDO: Salvamos os dados visuais aqui
-            nome: nomeParaSalvar,
-            preco: PRODUTO_ATUAL.preco_novo, // Importante salvar o preço também
-            imagem: PRODUTO_ATUAL.imagem
+            preco: PRODUTO_ATUAL.preco_novo, 
+            imagem: PRODUTO_ATUAL.imagem,
+            
+            // AQUI ESTÃO OS CAMPOS QUE FALTAVAM:
+            ...dadosExtras 
         });
     }
     
     localStorage.setItem('nossoCarrinho', JSON.stringify(carrinho));
     
-    // Atualiza visual
+    // Atualiza visual do ícone do carrinho
     if(typeof atualizarIconeCarrinho === 'function') atualizarIconeCarrinho();
     
-    // Feedback no botão
+    // Feedback visual no botão
     const btn = document.querySelector('.btn-buy-now');
     const textoOriginal = btn.innerHTML; // Salva o original para restaurar
     
@@ -373,7 +376,7 @@
     btn.style.background = '#27ae60';
     
     setTimeout(() => {
-        btn.innerHTML = textoOriginal; // Volta ao texto original (pode ser "Comprar Agora")
+        btn.innerHTML = textoOriginal; 
         btn.style.background = ''; 
     }, 2000);
 }

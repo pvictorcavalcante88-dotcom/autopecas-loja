@@ -114,6 +114,9 @@ document.addEventListener("DOMContentLoaded", async function() {
 // ==============================================================
 // 🛒 CARRINHO COMPLETO (Lucro + Esvaziar + Subtotal)
 // ==============================================================
+// ==============================================================
+// 🛒 CARRINHO COMPLETO (ATUALIZADO COM NOME DINÂMICO)
+// ==============================================================
 async function carregarPaginaCarrinho() {
     if (!localStorage.getItem('afiliadoLogado')) {
         alert("Você precisa fazer login para acessar o carrinho.");
@@ -124,7 +127,7 @@ async function carregarPaginaCarrinho() {
     const cartTotalElement = document.getElementById('cart-total');
     const cartSubtotalElement = document.getElementById('cart-subtotal');
     
-    // Elementos do Lucro (HTML novo)
+    // Elementos do Lucro
     const rowLucro = document.getElementById('row-afiliado-lucro');
     const valorLucro = document.getElementById('afiliado-lucro-valor');
 
@@ -157,6 +160,10 @@ async function carregarPaginaCarrinho() {
             if (!response.ok) continue;
             const p = await response.json();
 
+            // --- NOVIDADE AQUI: MONTAGEM DO NOME PERSONALIZADO ---
+            const nomeExibir = montarNomeCompleto(item, p);
+            // -----------------------------------------------------
+
             // Preços
             const precoBase = parseFloat(p.price || p.preco_novo);
             let margemAplicada = (item.customMargin !== undefined) ? item.customMargin : ((FATOR_GLOBAL - 1) * 100);
@@ -164,7 +171,7 @@ async function carregarPaginaCarrinho() {
             
             // Cálculos
             const subtotalItem = precoFinal * item.quantidade;
-            const lucroItem = (precoFinal - precoBase) * item.quantidade; // Lucro neste item
+            const lucroItem = (precoFinal - precoBase) * item.quantidade; 
 
             totalVenda += subtotalItem;
             totalLucro += lucroItem;
@@ -182,12 +189,11 @@ async function carregarPaginaCarrinho() {
                 `;
             }
 
-            // Desenha a linha
+            // Desenha a linha (AGORA USANDO nomeExibir)
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td><img src="${p.image||p.imagem}" width="60" onerror="this.src='https://placehold.co/100'"></td>
-                <td><strong>${p.name || p.titulo}</strong>${htmlMargem}</td>
-                <td>${formatarMoeda(precoFinal)}</td>
+                <td><strong>${nomeExibir}</strong>${htmlMargem}</td> <td>${formatarMoeda(precoFinal)}</td>
                 <td>
                     <div style="display: flex; align-items: center; gap: 10px; justify-content: center;">
                         <button onclick="alterarQuantidade(${item.id}, -1)">-</button>
@@ -202,7 +208,7 @@ async function carregarPaginaCarrinho() {
         } catch (e) {}
     }
     
-    // 3. Botão Esvaziar Carrinho (Adicionado no final)
+    // 3. Botão Esvaziar Carrinho
     const rowLimpar = document.createElement('tr');
     rowLimpar.innerHTML = `
         <td colspan="6" style="text-align: right; padding-top: 15px;">
@@ -226,7 +232,6 @@ async function carregarPaginaCarrinho() {
 
     if(isAfiliado) renderizarBotoesAfiliadoCarrinho();
 }
-
 // --- FUNÇÃO NOVA: LIMPAR TUDO ---
 function limparCarrinho() {
     if(confirm("Tem certeza que deseja esvaziar todo o carrinho?")) {
@@ -281,10 +286,7 @@ async function carregarPaginaCheckout() {
     const afiliadoLogado = localStorage.getItem('afiliadoLogado');
 
     // --- BLOQUEIO DE SEGURANÇA INTELIGENTE ---
-    // Só bloqueia se NÃO for afiliado E o carrinho estiver VAZIO.
-    // (Se o carrinho tem itens, assumimos que é um cliente vindo pelo link)
     if (!afiliadoLogado && carrinho.length === 0) {
-        // Opcional: alert("Seu carrinho está vazio.");
         window.location.href = "login.html"; // Ou index.html
         return;
     }
@@ -296,7 +298,6 @@ async function carregarPaginaCheckout() {
     
     if (!listaResumo) return;
 
-    // Se passou do bloqueio mas tá vazio (bug raro), avisa na tela
     if (carrinho.length === 0) { 
         listaResumo.innerHTML = '<p>Carrinho vazio.</p>'; 
         return; 
@@ -313,6 +314,7 @@ async function carregarPaginaCheckout() {
             
             const p = await response.json();
             const precoBase = parseFloat(p.price || p.preco_novo);
+            
             // Se tem margem customizada no item, usa. Se não, usa a global.
             let margem = (item.customMargin !== undefined) ? item.customMargin : ((FATOR_GLOBAL - 1) * 100);
             
@@ -320,8 +322,13 @@ async function carregarPaginaCheckout() {
             const totalItem = precoFinal * item.quantidade;
             subtotal += totalItem;
             
+            // 🔥 AQUI ESTÁ A MUDANÇA PRINCIPAL 🔥
+            // Usamos a função auxiliar para criar o nome completo com o carro
+            const nomeExibir = montarNomeCompleto(item, p); 
+            // -----------------------------------------------------------
+
             itensParaProcessar.push({
-                nome: p.name || p.titulo, 
+                nome: nomeExibir, // <--- Salvamos o nome completo aqui para o PDF/Zap
                 qtd: item.quantidade, 
                 unitario: precoFinal, 
                 total: totalItem, 
@@ -330,8 +337,7 @@ async function carregarPaginaCheckout() {
             });
 
             html += `<div class="summary-item" style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #eee;">
-                <span>(${item.quantidade}x) ${p.name || p.titulo}</span>
-                <strong>${formatarMoeda(totalItem)}</strong>
+                <span>(${item.quantidade}x) ${nomeExibir}</span> <strong>${formatarMoeda(totalItem)}</strong>
             </div>`;
         } catch (e) { console.error(e); }
     }
@@ -530,6 +536,43 @@ async function executarBusca(q, categoria) {
         console.error("Erro busca:", e);
     }
 }
+
+// --- FUNÇÃO AUXILIAR PARA MONTAR O NOME (REF + TÍTULO + CARRO) ---
+function montarNomeCompleto(itemDoLocalStorage, produtoDaApi) {
+    // 1. Tenta pegar do LocalStorage (Contexto da compra), senão pega da API
+    const ref = itemDoLocalStorage.referencia || produtoDaApi.referencia || '';
+    const titulo = itemDoLocalStorage.tituloOriginal || produtoDaApi.name || produtoDaApi.titulo;
+    const listaCarros = itemDoLocalStorage.listaCarros || produtoDaApi.carros || '';
+    const termoBusca = itemDoLocalStorage.termoPesquisa || '';
+
+    // 2. Lógica para escolher o Carro (Pesquisado OU o Primeiro da lista)
+    let carroAplicavel = '';
+
+    if (termoBusca && termoBusca.trim() !== '') {
+        // Prioridade 1: O que o cliente pesquisou (Ex: "Voyage")
+        carroAplicavel = termoBusca; 
+    } else if (listaCarros) {
+        // Prioridade 2: O primeiro carro da lista (Ex: "Gol")
+        // Assume que a lista vem separada por vírgula
+        carroAplicavel = listaCarros.split(',')[0].trim();
+    }
+
+    // 3. Montagem Final
+    let nomeFinal = titulo;
+
+    // Adiciona Referência no início
+    if (ref) {
+        nomeFinal = `${ref} - ${nomeFinal}`;
+    }
+
+    // Adiciona o Carro no final
+    if (carroAplicavel) {
+        nomeFinal += ` - Aplicável: ${carroAplicavel.toUpperCase()}`;
+    }
+
+    return nomeFinal;
+}
+
 function setupProductPage() { const pId = new URLSearchParams(window.location.search).get('id'); if(pId) { buscarProdutoPorId(pId); const btn = document.querySelector('.btn-add-cart'); const qtd = document.getElementById('quantity-input'); if(btn) { const n = btn.cloneNode(true); btn.parentNode.replaceChild(n, btn); n.addEventListener('click', () => { adicionarAoCarrinho(pId, qtd ? parseInt(qtd.value) : 1); }); } } }
 async function buscarProdutoPorId(id) { try { const res = await fetch(`${API_URL}/products/${id}`); const p = await res.json(); document.getElementById('product-title').textContent = p.name || p.titulo; document.getElementById('main-product-image').src = p.image || p.imagem; document.getElementById('product-price-new').textContent = formatarMoeda(parseFloat(p.price || p.preco_novo)); } catch(e) {} }
 async function buscarProdutosPromocao() {

@@ -318,32 +318,65 @@
             atualizarPrecoTela();
         }
 
-        function adicionarAoCarrinhoAtual() {
-            if(!PRODUTO_ATUAL) return;
-            const qtd = parseInt(document.getElementById('qtd').value);
-            
-            let carrinho = JSON.parse(localStorage.getItem('nossoCarrinho') || '[]');
-            const index = carrinho.findIndex(i => i.id == PRODUTO_ATUAL.id);
-            
-            if (index > -1) {
-                carrinho[index].quantidade += qtd;
-                carrinho[index].customMargin = MARGEM_ATUAL; 
-            } else {
-                carrinho.push({ id: PRODUTO_ATUAL.id, quantidade: qtd, customMargin: MARGEM_ATUAL });
-            }
-            
-            localStorage.setItem('nossoCarrinho', JSON.stringify(carrinho));
-            atualizarIconeCarrinho();
-            
-            const btn = document.querySelector('.btn-buy-now');
-            btn.innerHTML = '<i class="ph ph-check"></i> Adicionado!';
-            btn.style.background = '#27ae60';
-            setTimeout(() => {
-                btn.innerHTML = '<i class="ph ph-shopping-cart-plus"></i> Adicionar ao Carrinho';
-                btn.style.background = ''; 
-            }, 2000);
-        }
+ function adicionarAoCarrinhoAtual() {
+    if(!PRODUTO_ATUAL) return;
 
+    // 1. PEGA O TERMO DA PESQUISA NA URL (Igual fizemos antes)
+    const urlParams = new URLSearchParams(window.location.search);
+    const termoBusca = urlParams.get('q') || urlParams.get('search'); // Tenta 'q' ou 'search'
+
+    // 2. CRIA O NOME PERSONALIZADO
+    let nomeParaSalvar = PRODUTO_ATUAL.titulo;
+    if (termoBusca) {
+        // Ex: "Pastilha de Freio (Ref: Voyage 2010)"
+        nomeParaSalvar = `${PRODUTO_ATUAL.titulo} (Ref: ${termoBusca})`;
+    }
+
+    const qtd = parseInt(document.getElementById('qtd').value);
+    
+    // Pega o carrinho ou cria array vazio
+    let carrinho = JSON.parse(localStorage.getItem('nossoCarrinho') || '[]');
+    
+    // Verifica se o produto já existe no carrinho
+    const index = carrinho.findIndex(i => i.id == PRODUTO_ATUAL.id);
+    
+    if (index > -1) {
+        // SE JÁ EXISTE: Aumenta a quantidade
+        carrinho[index].quantidade += qtd;
+        carrinho[index].customMargin = MARGEM_ATUAL;
+        
+        // Opcional: Atualiza o nome para a pesquisa mais recente
+        carrinho[index].nome = nomeParaSalvar; 
+    } else {
+        // SE NÃO EXISTE: Adiciona novo
+        carrinho.push({ 
+            id: PRODUTO_ATUAL.id, 
+            quantidade: qtd, 
+            customMargin: MARGEM_ATUAL,
+            // AQUI ESTÁ O SEGREDO: Salvamos os dados visuais aqui
+            nome: nomeParaSalvar,
+            preco: PRODUTO_ATUAL.preco_novo, // Importante salvar o preço também
+            imagem: PRODUTO_ATUAL.imagem
+        });
+    }
+    
+    localStorage.setItem('nossoCarrinho', JSON.stringify(carrinho));
+    
+    // Atualiza visual
+    if(typeof atualizarIconeCarrinho === 'function') atualizarIconeCarrinho();
+    
+    // Feedback no botão
+    const btn = document.querySelector('.btn-buy-now');
+    const textoOriginal = btn.innerHTML; // Salva o original para restaurar
+    
+    btn.innerHTML = '<i class="ph ph-check"></i> Adicionado!';
+    btn.style.background = '#27ae60';
+    
+    setTimeout(() => {
+        btn.innerHTML = textoOriginal; // Volta ao texto original (pode ser "Comprar Agora")
+        btn.style.background = ''; 
+    }, 2000);
+}
         // --- 4. SUGESTÕES ---
         function abrirModalSugestao() {
             document.getElementById('modal-sugestao').style.display = 'flex';

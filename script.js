@@ -501,7 +501,7 @@ async function executarBusca(q, categoria) {
         const data = await res.json();
         const track = document.getElementById("search-track");
         
-        // VERIFICAÇÃO DE LOGIN (Parte 2)
+        // VERIFICAÇÃO DE LOGIN
         const isLogado = localStorage.getItem('afiliadoLogado');
         
         if(track) {
@@ -520,8 +520,12 @@ async function executarBusca(q, categoria) {
 
                 const textoBotao = isLogado ? 'Ver Detalhes' : 'Entrar';
 
+                // 🔥 CORREÇÃO AQUI: Passar o termo pesquisado para o link 🔥
+                // Se 'q' existir, adiciona "&q=..." ao final do link
+                const termoParaLink = q ? `&q=${encodeURIComponent(q)}` : '';
+
                 track.innerHTML += `
-                <a href="product.html?id=${p.id}" class="product-card">
+                <a href="product.html?id=${p.id}${termoParaLink}" class="product-card">
                     <div class="product-image">
                         <img src="${p.image||p.imagem}" onerror="this.src='https://placehold.co/150'">
                     </div>

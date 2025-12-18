@@ -541,27 +541,49 @@ async function executarBusca(q, categoria) {
     }
 }
 
-// --- FUNÇÃO AUXILIAR PARA MONTAR O NOME (REF + TÍTULO + CARRO) ---
+// --- FUNÇÃO AUXILIAR: MONTA O NOME COM CONTEXTO (REF + TÍTULO + CARRO LIMPO) ---
 function montarNomeCompleto(itemDoLocalStorage, produtoDaApi) {
-    // 1. Tenta pegar do LocalStorage (Contexto da compra), senão pega da API
+    // 1. Pega os dados básicos
     const ref = itemDoLocalStorage.referencia || produtoDaApi.referencia || '';
     const titulo = itemDoLocalStorage.tituloOriginal || produtoDaApi.name || produtoDaApi.titulo;
-    const listaCarros = itemDoLocalStorage.listaCarros || produtoDaApi.carros || '';
+    const listaCarrosBanco = itemDoLocalStorage.listaCarros || produtoDaApi.carros || '';
     const termoBusca = itemDoLocalStorage.termoPesquisa || '';
 
-    // 2. Lógica para escolher o Carro (Pesquisado OU o Primeiro da lista)
+    // 2. Lógica Inteligente para extrair SÓ O CARRO da pesquisa
     let carroAplicavel = '';
 
     if (termoBusca && termoBusca.trim() !== '') {
-        // Prioridade 1: O que o cliente pesquisou (Ex: "Voyage")
-        carroAplicavel = termoBusca; 
-    } else if (listaCarros) {
-        // Prioridade 2: O primeiro carro da lista (Ex: "Gol")
-        // Assume que a lista vem separada por vírgula
-        carroAplicavel = listaCarros.split(',')[0].trim();
+        // LISTA DE PALAVRAS PARA IGNORAR (Adicione mais se precisar)
+        const palavrasIgnoradas = [
+            "pastilha", "pastilhas", "freio", "freios", "disco", "discos",
+            "kit", "jogo", "par", "lado", "esquerdo", "direito",
+            "dianteiro", "traseiro", "amortecedor", "mola", "suspenção",
+            "oleo", "filtro", "ar", "combustivel", "motor", "cabeçote",
+            "de", "do", "da", "para", "com", "sem", "e", "a", "o"
+        ];
+
+        // Quebra a pesquisa em palavras e remove as "proibidas"
+        const palavrasDigitadas = termoBusca.toLowerCase().split(' ');
+        const palavrasUteis = palavrasDigitadas.filter(palavra => {
+            // Só deixa passar se NÃO estiver na lista de ignoradas e tiver mais de 1 letra
+            return !palavrasIgnoradas.includes(palavra) && palavra.length > 1;
+        });
+
+        // Junta o que sobrou (Ex: sobrou só "Voyage" ou "Gol G5")
+        const resultadoLimpo = palavrasUteis.join(' ').trim();
+
+        if (resultadoLimpo.length > 0) {
+            carroAplicavel = resultadoLimpo;
+        }
+    } 
+    
+    // 3. Fallback: Se a limpeza removeu tudo (ex: pesquisou só "Pastilha") 
+    // ou se não pesquisou nada, pega o primeiro carro do banco de dados.
+    if (!carroAplicavel && listaCarrosBanco) {
+        carroAplicavel = listaCarrosBanco.split(',')[0].trim();
     }
 
-    // 3. Montagem Final
+    // 4. Montagem Final do Texto
     let nomeFinal = titulo;
 
     // Adiciona Referência no início
@@ -569,14 +591,13 @@ function montarNomeCompleto(itemDoLocalStorage, produtoDaApi) {
         nomeFinal = `${ref} - ${nomeFinal}`;
     }
 
-    // Adiciona o Carro no final
+    // Adiciona o Carro no final (se tiver achado algum)
     if (carroAplicavel) {
         nomeFinal += ` - Aplicável: ${carroAplicavel.toUpperCase()}`;
     }
 
     return nomeFinal;
 }
-
 function setupProductPage() { const pId = new URLSearchParams(window.location.search).get('id'); if(pId) { buscarProdutoPorId(pId); const btn = document.querySelector('.btn-add-cart'); const qtd = document.getElementById('quantity-input'); if(btn) { const n = btn.cloneNode(true); btn.parentNode.replaceChild(n, btn); n.addEventListener('click', () => { adicionarAoCarrinho(pId, qtd ? parseInt(qtd.value) : 1); }); } } }
 async function buscarProdutoPorId(id) { try { const res = await fetch(`${API_URL}/products/${id}`); const p = await res.json(); document.getElementById('product-title').textContent = p.name || p.titulo; document.getElementById('main-product-image').src = p.image || p.imagem; document.getElementById('product-price-new').textContent = formatarMoeda(parseFloat(p.price || p.preco_novo)); } catch(e) {} }
 async function buscarProdutosPromocao() {

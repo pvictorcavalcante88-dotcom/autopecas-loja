@@ -84,6 +84,30 @@ document.addEventListener("DOMContentLoaded", async function() {
     setupGlobalSearch();
     if (document.getElementById("promocoes-track")) buscarProdutosPromocao();
     if (typeof iniciarSlider === 'function') iniciarSlider();
+
+    // 1. Pega os parâmetros da URL (ex: ?q=pastilha)
+    const params = new URLSearchParams(window.location.search);
+    const termoPesquisado = params.get('q'); // Ou 'search', dependendo de como você nomeou no input
+    const categoria = params.get('categoria');
+
+    // 2. Pega o elemento do título
+    const tituloEl = document.getElementById('titulo-busca');
+
+    // 3. Atualiza o texto conforme o que tiver na URL
+    if (tituloEl) {
+        if (termoPesquisado) {
+            tituloEl.innerText = `Resultados para: "${termoPesquisado}"`;
+            tituloEl.style.display = 'block';
+        } else if (categoria) {
+            tituloEl.innerText = `Categoria: "${categoria}"`;
+            tituloEl.style.display = 'block';
+        } else {
+            // Se não tiver pesquisa, esconde o título ou muda para "Destaques"
+            tituloEl.innerText = "Destaques da Loja";
+            // ou tituloEl.style.display = 'none';
+        }
+    }
+
 });
 
 

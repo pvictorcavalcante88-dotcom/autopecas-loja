@@ -514,7 +514,7 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
 // ============================================================
 // 💰 ROTA: SOMATÓRIA TOTAL DE COMISSÕES (SALDOS DOS AFILIADOS)
 // ============================================================
-app.get('/admin/comissoes-totais', autenticarAdmin, async (req, res) => {
+app.get('/admin/comissoes-totais', authenticateToken, async (req, res) => {
     try {
         // Soma o campo 'saldo' de todos os afiliados
         const agredado = await prisma.afiliado.aggregate({

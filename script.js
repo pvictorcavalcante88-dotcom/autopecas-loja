@@ -481,7 +481,10 @@ async function gerarPDFCustom() {
     doc.setFontSize(9);
     doc.text("CNPJ: 00.000.000/0001-00", 195, 15, { align: "right" });
     doc.text("contato@autopecasveloz.com.br", 195, 20, { align: "right" });
-    doc.text("WhatsApp: (82) 99999-9999", 195, 25, { align: "right" });
+    let telefoneFormatado = afiliado.telefone || "Não informado";
+    if (telefoneFormatado.length >= 10) {
+        telefoneFormatado = `(${telefoneFormatado.slice(0,2)}) ${telefoneFormatado.slice(2,7)}-${telefoneFormatado.slice(7)}`;
+    }
 
     // --- 2. INFORMAÇÕES DO ORÇAMENTO ---
     y = 55;

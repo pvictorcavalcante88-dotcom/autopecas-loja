@@ -76,6 +76,7 @@ app.post('/afiliado/login', async (req, res) => {
             nome: afiliado.nome, 
             codigo: afiliado.codigo,
             margem: afiliado.margem 
+            telefone: afiliado.telefone,
         });
     } catch (error) { res.status(500).json({ erro: "Erro no servidor" }); }
 });

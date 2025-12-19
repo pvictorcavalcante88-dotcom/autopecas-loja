@@ -444,17 +444,129 @@ async function gerarLinkZap(codigo, total) {
 }
 
 async function gerarPDFCustom() {
-    // 1. Salva Primeiro
+    // 1. Salva Primeiro (Manteve sua lógica original)
     await salvarOrcamentoSilencioso('PDF');
 
-    // 2. Gera depois
-    if (!window.jspdf) return alert("Erro JS PDF");
-    const doc = new window.jspdf.jsPDF(); const afiliado = JSON.parse(localStorage.getItem('afiliadoLogado')); const itens = window.ITENS_CHECKOUT;
-    doc.setFontSize(20); doc.text("AutoPeças Veloz", 20, 20); doc.setFontSize(12); doc.text(`Consultor: ${afiliado.nome}`, 20, 30);
-    let y = 50; let total = 0; itens.forEach(i => { doc.text(`${i.qtd}x ${i.nome} - ${formatarMoeda(i.total)}`, 20, y); total += i.total; y += 10; });
-    doc.text(`TOTAL: ${formatarMoeda(total)}`, 20, y+10);
-    const payload = gerarPayloadUrl(); const baseUrl = window.location.origin + window.location.pathname.replace('checkout.html', '') + 'checkout.html'; const link = `${baseUrl}?restore=${payload}&ref=${afiliado.codigo}`;
-    y += 30; doc.setTextColor(0,0,255); doc.textWithLink("CLIQUE AQUI PARA PAGAR", 20, y, {url: link}); doc.save("Orcamento.pdf");
+    // 2. Verifica bibliotecas
+    if (!window.jspdf || !window.jspdf.jsPDF) return alert("Erro: Biblioteca PDF não carregada.");
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    const afiliado = JSON.parse(localStorage.getItem('afiliadoLogado'));
+    const itens = window.ITENS_CHECKOUT || []; // Pega os itens já formatados (com nome do carro)
+
+    // --- CONFIGURAÇÕES DE DESIGN ---
+    const corPrimaria = [44, 62, 80];   // Azul Escuro (#2c3e50)
+    const corSecundaria = [230, 126, 34]; // Laranja (#e67e22)
+    const marginX = 15;
+    let y = 0; // Cursor vertical
+
+    // --- 1. CABEÇALHO (Fundo Azul) ---
+    doc.setFillColor(...corPrimaria);
+    doc.rect(0, 0, 210, 40, 'F'); // Retângulo no topo
+
+    // Nome da Loja (Branco)
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont("helvetica", "bold");
+    doc.text("AutoPeças Veloz", marginX, 20);
+
+    // Subtítulo
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("O melhor para o seu carro está aqui.", marginX, 28);
+
+    // Dados da Empresa (Direita do Topo)
+    doc.setFontSize(9);
+    doc.text("CNPJ: 00.000.000/0001-00", 195, 15, { align: "right" });
+    doc.text("contato@autopecasveloz.com.br", 195, 20, { align: "right" });
+    doc.text("WhatsApp: (82) 99999-9999", 195, 25, { align: "right" });
+
+    // --- 2. INFORMAÇÕES DO ORÇAMENTO ---
+    y = 55;
+    doc.setTextColor(0, 0, 0); // Volta para preto
+
+    // Coluna Esquerda: Consultor
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("CONSULTOR:", marginX, y);
+    doc.setFont("helvetica", "normal");
+    doc.text((afiliado.nome || "Vendedor").toUpperCase(), marginX, y + 6);
+    doc.text(`Código: ${afiliado.codigo}`, marginX, y + 11);
+
+    // Coluna Direita: Dados do Pedido
+    const dataHoje = new Date().toLocaleDateString('pt-BR');
+    const validade = new Date(); validade.setDate(validade.getDate() + 5); // Validade +5 dias
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("DETALHES DO ORÇAMENTO:", 120, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Data de Emissão: ${dataHoje}`, 120, y + 6);
+    doc.text(`Validade: ${validade.toLocaleDateString('pt-BR')}`, 120, y + 11);
+
+    // --- 3. TABELA DE PRODUTOS (Mágica do AutoTable) ---
+    const colunas = ["QTD", "DESCRIÇÃO / PRODUTO", "UNITÁRIO", "TOTAL"];
+    
+    // Prepara os dados para a tabela
+    const linhas = itens.map(item => [
+        item.qtd,
+        item.nome, // Já vem com "Ref: Carro" graças à sua função anterior!
+        formatarMoeda(item.unitario),
+        formatarMoeda(item.total)
+    ]);
+
+    // Calcula Total Geral
+    const totalGeral = itens.reduce((acc, item) => acc + item.total, 0);
+
+    doc.autoTable({
+        startY: y + 20,
+        head: [colunas],
+        body: linhas,
+        theme: 'striped', // Estilo zebrado (cinza/branco)
+        headStyles: { fillColor: corPrimaria, textColor: [255, 255, 255], fontStyle: 'bold' },
+        styles: { fontSize: 9, cellPadding: 3 },
+        columnStyles: {
+            0: { halign: 'center', cellWidth: 15 }, // Qtd
+            2: { halign: 'right', cellWidth: 35 },  // Unit
+            3: { halign: 'right', cellWidth: 35 }   // Total
+        }
+    });
+
+    // Pega a posição Y onde a tabela terminou
+    const finalY = doc.lastAutoTable.finalY + 10;
+
+    // --- 4. TOTALIZADORES ---
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...corPrimaria);
+    doc.text(`TOTAL A PAGAR: ${formatarMoeda(totalGeral)}`, 195, finalY, { align: "right" });
+
+    // --- 5. LINK DE PAGAMENTO ---
+    const payload = gerarPayloadUrl();
+    const baseUrl = window.location.origin + window.location.pathname.replace('checkout.html', '') + 'checkout.html';
+    const linkPagamento = `${baseUrl}?restore=${payload}&ref=${afiliado.codigo}`;
+
+    // Desenha um "Botão" no PDF
+    const btnY = finalY + 15;
+    doc.setFillColor(...corSecundaria); // Laranja
+    doc.roundedRect(marginX, btnY, 180, 12, 3, 3, 'F'); // Caixa do botão
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(10);
+    doc.text("CLIQUE AQUI PARA FINALIZAR A COMPRA ONLINE", 105, btnY + 8, { align: "center" });
+    
+    // Adiciona o link real sobre a área do botão
+    doc.link(marginX, btnY, 180, 12, { url: linkPagamento });
+
+    // --- 6. RODAPÉ ---
+    doc.setTextColor(150, 150, 150);
+    doc.setFontSize(8);
+    doc.text("Este orçamento não garante reserva de estoque até a confirmação do pagamento.", 105, 285, { align: "center" });
+    
+    // Salva o arquivo
+    const nomeArquivo = `Orcamento_${afiliado.nome.split(' ')[0]}_${Date.now()}.pdf`;
+    doc.save(nomeArquivo);
 }
 
 function gerarPayloadUrl() {

@@ -462,29 +462,39 @@ async function gerarPDFCustom() {
     const marginX = 15;
     let y = 0; // Cursor vertical
 
-    // --- 1. CABEÇALHO (Fundo Azul) ---
-    doc.setFillColor(...corPrimaria);
-    doc.rect(0, 0, 210, 40, 'F'); // Retângulo no topo
+   // --- DENTRO DE gerarPDFCustom NO SCRIPT.JS ---
 
-    // Nome da Loja (Branco)
+    // ... (Parte do Fundo Azul continua igual) ...
+    doc.setFillColor(...corPrimaria);
+    doc.rect(0, 0, 210, 40, 'F'); 
+
+    // Lado Esquerdo (Fixo da Loja)
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
     doc.text("AutoPeças Veloz", marginX, 20);
 
-    // Subtítulo
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text("O melhor para o seu carro está aqui.", marginX, 28);
+    doc.text("Orçamento Personalizado", marginX, 28);
 
-    // Dados da Empresa (Direita do Topo)
-    doc.setFontSize(9);
-    doc.text("CNPJ: 00.000.000/0001-00", 195, 15, { align: "right" });
-    doc.text("contato@autopecasveloz.com.br", 195, 20, { align: "right" });
+    // --- LADO DIREITO (DADOS DO AFILIADO/VENDEDOR) ---
+    // Formata o telefone (ex: 8299999999 -> (82) 99999-9999)
     let telefoneFormatado = afiliado.telefone || "Não informado";
     if (telefoneFormatado.length >= 10) {
         telefoneFormatado = `(${telefoneFormatado.slice(0,2)}) ${telefoneFormatado.slice(2,7)}-${telefoneFormatado.slice(7)}`;
     }
+
+    doc.setFontSize(9);
+    // Aqui colocamos o Nome como "Contato" e o Telefone abaixo
+    doc.text(`Consultor: ${afiliado.nome}`, 195, 15, { align: "right" });
+    doc.text(`WhatsApp: ${telefoneFormatado}`, 195, 20, { align: "right" });
+    
+    // Se quiser inventar um e-mail baseado no código, descomente a linha abaixo:
+    // doc.text(`Email: ${afiliado.codigo}@autopecasveloz.com.br`, 195, 25, { align: "right" });
+    
+    // CNPJ Fixo da Empresa (bom manter para credibilidade)
+    doc.text("CNPJ: 00.000.000/0001-00", 195, 30, { align: "right" });
 
     // --- 2. INFORMAÇÕES DO ORÇAMENTO ---
     y = 55;

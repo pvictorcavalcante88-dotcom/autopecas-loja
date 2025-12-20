@@ -5,6 +5,25 @@
 const API_URL = ''; 
 let FATOR_GLOBAL = 1.0; 
 
+// LISTA DE CARROS ACEITOS (WHITELIST)
+// Adicione mais carros aqui conforme necessário.
+// A ordem importa pouco, mas nomes compostos (ex: Grand Siena) funcionam melhor.
+const LISTA_CARROS = [
+    "GOL", "PALIO", "UNO", "CELTA", "CORSA", "VOYAGE", "SAVEIRO", "STRADA", "PARATI",
+    "SIENA", "GRAND SIENA", "FOX", "SPACEFOX", "KA", "FIESTA", "ECOSPORT", "FOCUS",
+    "ONIX", "PRISMA", "COBALT", "SPIN", "TRACKER", "S10", "MONTANA", "MERIVA", "ZAFIRA",
+    "HB20", "HB20S", "CRETA", "TUCSON", "I30", "IX35", "HR",
+    "SANDERO", "LOGAN", "DUSTER", "KWID", "CLIO", "CAPTUR", "OROCH", "MASTER",
+    "CIVIC", "CITY", "FIT", "HRV", "WRV", "CRV",
+    "COROLLA", "ETIOS", "YARIS", "HILUX", "SW4", "RAV4",
+    "RENEGADE", "COMPASS", "TORO", "COMMANDER",
+    "POLO", "VIRTUS", "JETTA", "GOLF", "AMAROK", "T-CROSS", "NIVUS", "UP",
+    "MOBI", "ARGO", "CRONOS", "PULSE", "FASTBACK", "FIORINO", "DUCATO",
+    "RANGER", "L200", "TRITON", "PAJERO", "ASX", "LANCER",
+    "KICKS", "VERSA", "SENTRA", "FRONTIER", "MARCH",
+    "206", "207", "208", "2008", "3008", "C3", "C4", "CACTUS", "AIRCROSS"
+];
+
 // --- FUNÇÕES UTILITÁRIAS ---
 function formatarMoeda(valor) {
     if (valor == null || isNaN(valor)) return 'R$ 0,00';
@@ -666,63 +685,49 @@ async function executarBusca(q, categoria) {
     }
 }
 
-// --- FUNÇÃO AUXILIAR: MONTA O NOME COM CONTEXTO (REF + TÍTULO + CARRO LIMPO) ---
+// --- FUNÇÃO AUXILIAR: MONTA O NOME COM CONTEXTO (WHITELIST DE CARROS) ---
 function montarNomeCompleto(itemDoLocalStorage, produtoDaApi) {
     // 1. Pega os dados básicos
     const ref = itemDoLocalStorage.referencia || produtoDaApi.referencia || '';
     const titulo = itemDoLocalStorage.tituloOriginal || produtoDaApi.name || produtoDaApi.titulo;
     const listaCarrosBanco = itemDoLocalStorage.listaCarros || produtoDaApi.carros || '';
-    const termoBusca = itemDoLocalStorage.termoPesquisa || '';
+    
+    // O que o cliente digitou (ex: "Pastilha freio Gol G5")
+    const termoBusca = (itemDoLocalStorage.termoPesquisa || '').toUpperCase(); 
 
-    // 2. Lógica Inteligente para extrair SÓ O CARRO da pesquisa
+    // 2. Lógica Inteligente (Busca na Lista de Carros)
     let carroAplicavel = '';
 
     if (termoBusca && termoBusca.trim() !== '') {
-        // LISTA DE PALAVRAS PARA IGNORAR (Adicione mais se precisar)
-        const palavrasIgnoradas = [
-            "pastilha", "pastilhas", "freio", "freios", "disco", "discos",
-            "kit", "jogo", "par", "lado", "esquerdo", "direito",
-            "dianteiro", "traseiro", "amortecedor", "mola", "suspenção",
-            "oleo", "filtro", "ar", "combustivel", "motor", "cabeçote",
-            "de", "do", "da", "para", "com", "sem", "e", "a", "o"
-        ];
+        // Verifica se algum carro da nossa lista está dentro da pesquisa
+        // Ex: Se pesquisou "Kit Embreagem Palio 1.0", vai achar "PALIO"
+        const carroEncontrado = LISTA_CARROS.find(carro => termoBusca.includes(carro));
 
-        // Quebra a pesquisa em palavras e remove as "proibidas"
-        const palavrasDigitadas = termoBusca.toLowerCase().split(' ');
-        const palavrasUteis = palavrasDigitadas.filter(palavra => {
-            // Só deixa passar se NÃO estiver na lista de ignoradas e tiver mais de 1 letra
-            return !palavrasIgnoradas.includes(palavra) && palavra.length > 1;
-        });
-
-        // Junta o que sobrou (Ex: sobrou só "Voyage" ou "Gol G5")
-        const resultadoLimpo = palavrasUteis.join(' ').trim();
-
-        if (resultadoLimpo.length > 0) {
-            carroAplicavel = resultadoLimpo;
+        if (carroEncontrado) {
+            carroAplicavel = carroEncontrado;
+            
+            // Opcional: Se quiser pegar detalhes extras digitados (ex: G5, 1.4, 2010)
+            // Você pode tentar extrair o ano ou versão, mas só o modelo já resolve 90%
         }
     } 
     
-    // 3. Fallback: Se a limpeza removeu tudo (ex: pesquisou só "Pastilha") 
-    // ou se não pesquisou nada, pega o primeiro carro do banco de dados.
+    // 3. Fallback: Se não achou carro na pesquisa, pega o primeiro do banco
     if (!carroAplicavel && listaCarrosBanco) {
-        carroAplicavel = listaCarrosBanco.split(',')[0].trim();
+        carroAplicavel = listaCarrosBanco.split(',')[0].trim().toUpperCase();
     }
 
     // 4. Montagem Final do Texto
     let nomeFinal = titulo;
 
-    // Adiciona Referência no início
-    if (ref) {
-        nomeFinal = `${ref} - ${nomeFinal}`;
-    }
-
-    // Adiciona o Carro no final (se tiver achado algum)
+    if (ref) nomeFinal = `${ref} - ${nomeFinal}`;
+    
     if (carroAplicavel) {
-        nomeFinal += ` - Aplicável: ${carroAplicavel.toUpperCase()}`;
+        nomeFinal += ` : ${carroAplicavel}`;
     }
 
     return nomeFinal;
 }
+
 function setupProductPage() { const pId = new URLSearchParams(window.location.search).get('id'); if(pId) { buscarProdutoPorId(pId); const btn = document.querySelector('.btn-add-cart'); const qtd = document.getElementById('quantity-input'); if(btn) { const n = btn.cloneNode(true); btn.parentNode.replaceChild(n, btn); n.addEventListener('click', () => { adicionarAoCarrinho(pId, qtd ? parseInt(qtd.value) : 1); }); } } }
 async function buscarProdutoPorId(id) { try { const res = await fetch(`${API_URL}/products/${id}`); const p = await res.json(); document.getElementById('product-title').textContent = p.name || p.titulo; document.getElementById('main-product-image').src = p.image || p.imagem; document.getElementById('product-price-new').textContent = formatarMoeda(parseFloat(p.price || p.preco_novo)); } catch(e) {} }
 async function buscarProdutosPromocao() {

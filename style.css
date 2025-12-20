@@ -995,3 +995,172 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
 .notif-list { max-height: 300px; overflow-y: auto; }
 .notif-item { padding: 12px 15px; border-bottom: 1px solid #f1f1f1; font-size: 0.85rem; display: flex; gap: 10px; align-items: start; color: #333; }
 .notif-item:hover { background: #f9f9f9; }
+
+/* ============================================================
+   📱 ESTILOS PARA CELULAR (RESPONSIVIDADE)
+   ============================================================ */
+
+@media (max-width: 768px) {
+
+    /* --- GERAL --- */
+    body {
+        padding-bottom: 80px; /* Espaço para não cortar conteúdo no fim */
+    }
+
+    /* Aumenta tamanho da fonte para leitura fácil */
+    body, button, input, select {
+        font-size: 16px; 
+    }
+
+    /* --- LOGIN E CADASTRO --- */
+    .login-container {
+        width: 90%;
+        padding: 20px;
+        margin-top: 20px;
+    }
+
+    /* --- CABEÇALHO (HEADER) --- */
+    header {
+        padding: 10px;
+        flex-direction: column; /* Empilha logo e busca */
+        gap: 10px;
+        height: auto; /* Remove altura fixa se tiver */
+    }
+
+    .header-content {
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+    }
+
+    /* Barra de busca ocupa largura total */
+    .search-bar {
+        width: 100%;
+        margin: 10px 0;
+    }
+    
+    .search-bar input {
+        width: 100%;
+    }
+
+    /* --- LOJA (GRID DE PRODUTOS) --- */
+    .product-grid, #search-track, #promocoes-track {
+        display: grid;
+        grid-template-columns: 1fr 1fr; /* 2 Colunas no celular (padrão Shopee/Mercado Livre) */
+        gap: 10px;
+        padding: 10px;
+    }
+
+    .product-card {
+        min-width: 0; /* Evita estourar a tela */
+    }
+
+    .product-card img {
+        height: 140px; /* Imagem um pouco menor */
+        object-fit: contain;
+    }
+
+    .product-card h3 {
+        font-size: 0.9rem;
+        height: 40px; /* Limita altura do título */
+        overflow: hidden;
+    }
+
+    /* --- CARRINHO E CHECKOUT --- */
+    /* Transforma a tabela em cartões para não quebrar */
+    .cart-table thead {
+        display: none; /* Esconde o cabeçalho da tabela */
+    }
+
+    .cart-table, .cart-table tbody, .cart-table tr, .cart-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .cart-table tr {
+        margin-bottom: 15px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 10px;
+        background: white;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    .cart-table td {
+        text-align: right;
+        padding-left: 50%;
+        position: relative;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .cart-table td::before {
+        /* Pega o nome da coluna via CSS se precisar, ou deixa simples */
+        content: attr(data-label); 
+        font-weight: bold;
+        text-align: left;
+    }
+
+    .cart-total-box {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background: white;
+        padding: 15px;
+        box-shadow: 0 -5px 15px rgba(0,0,0,0.1);
+        z-index: 1000;
+        border-top: 1px solid #eee;
+    }
+    
+    /* Espaço extra no final pro botão fixo não cobrir nada */
+    .container {
+        padding-bottom: 100px; 
+    }
+
+    /* --- DASHBOARD (ADMIN E AFILIADO) --- */
+    .dashboard-container {
+        flex-direction: column; /* Sidebar vai pra cima */
+    }
+
+    .sidebar {
+        width: 100%;
+        height: auto;
+        flex-direction: row;
+        overflow-x: auto; /* Rolagem lateral no menu se tiver muitos itens */
+        padding: 10px;
+        position: relative;
+    }
+
+    .main-content {
+        width: 100%;
+        padding: 15px;
+    }
+
+    /* Cards do Dashboard (Faturamento, etc) */
+    .stats-grid {
+        grid-template-columns: 1fr; /* 1 Card por linha */
+    }
+
+    /* Tabelas do Dashboard com rolagem */
+    .table-responsive {
+        overflow-x: auto;
+        display: block;
+        width: 100%;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Modal */
+    .modal-content {
+        width: 95%;
+        margin: 20% auto;
+    }
+    
+    /* Botões grandes para dedo */
+    button, .btn-action {
+        padding: 12px;
+        min-height: 44px; /* Tamanho mínimo do toque Apple/Android */
+    }
+}

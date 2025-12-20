@@ -181,6 +181,9 @@
                 <span>Últimas Vendas</span>
                 <a onclick="mudarAba('vendas')" style="font-size:0.9rem; color:var(--accent); cursor:pointer;">Ver todas</a>
             </div>
+
+            <div class="table-responsive"></div>
+
             <table class="data-table">
                 <thead>
                     <tr>
@@ -195,6 +198,8 @@
                     <tr><td colspan="5" align="center">Carregando...</td></tr>
                 </tbody>
             </table>
+
+            </div>
             
             <br>
             
@@ -210,6 +215,8 @@
             </div>
             <div class="card" style="margin-top:20px;">
                 <h3><i class="ph ph-clock-counter-clockwise"></i> Histórico de Saques</h3>
+
+                <div class="table-responsive">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -224,12 +231,15 @@
                         <tr><td colspan="4" align="center">Carregando...</td></tr>
                     </tbody>
                 </table>
+
+                </div>
             </div>
 
         </div>
 
         <div id="vendas" class="tab-content">
             <h2 class="section-title">Histórico Completo de Vendas</h2>
+            <div class="table-responsive">
             <table class="data-table">
                 <thead>
                     <tr>
@@ -244,6 +254,7 @@
                     <tr><td colspan="5" align="center">Carregando...</td></tr>
                 </tbody>
             </table>
+            </div>
         </div>
 
         <div id="orcamentos" class="tab-content">
@@ -251,6 +262,7 @@
                 Meus Orçamentos Salvos
                 <small style="font-weight:normal; font-size:0.9rem; margin-left:10px; color:#666;">(Salvos quando você cria um carrinho na loja)</small>
             </h2>
+            <div class="table-responsive">
             <table class="data-table">
                 <thead>
                     <tr>
@@ -264,12 +276,15 @@
                     <tr><td colspan="4" align="center">Carregando orçamentos...</td></tr>
                 </tbody>
             </table>
+            </div>
         </div>
 
         <div id="clientes" class="tab-content">
             <h2 class="section-title">Carteira de Clientes</h2>
             <p style="color:#666; font-size:0.9rem;">Lista automática baseada nas vendas confirmadas.</p>
             
+            <div class="table-responsive">
+
             <table class="data-table">
                 <thead>
                     <tr>
@@ -284,6 +299,7 @@
                     <tr><td colspan="5" align="center">Buscando clientes...</td></tr>
                 </tbody>
             </table>
+            </div>
         </div>
 
     </main>

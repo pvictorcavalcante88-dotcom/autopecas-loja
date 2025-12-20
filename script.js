@@ -21,7 +21,9 @@ const LISTA_CARROS = [
     "MOBI", "ARGO", "CRONOS", "PULSE", "FASTBACK", "FIORINO", "DUCATO",
     "RANGER", "L200", "TRITON", "PAJERO", "ASX", "LANCER",
     "KICKS", "VERSA", "SENTRA", "FRONTIER", "MARCH",
-    "206", "207", "208", "2008", "3008", "C3", "C4", "CACTUS", "AIRCROSS"
+    "206", "207", "208", "2008", "3008", "C3", "C4", "CACTUS", "AIRCROSS", "TCROSS", "KARDIAN",
+    "GRAND SIENA"
+
 ];
 
 // --- FUNÇÕES UTILITÁRIAS ---

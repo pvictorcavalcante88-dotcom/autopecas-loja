@@ -509,9 +509,17 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
 
     /* --- O PRODUTO E LUCRO --- */
     .cart-table td[data-label="Produto"] {
+        display: flex !important;
+        flex-direction: column !important; /* <--- ISSO RESOLVE A SOBREPOSIÇÃO */
+        justify-content: center !important;
+        align-items: center !important;
         text-align: center !important;
-        padding: 15px !important;
+        height: auto !important;
+        padding: 20px 15px !important;
+        gap: 15px; /* Espaço entre o nome e o input amarelo */
     }
+
+
     
     .cart-table td[data-label="Produto"] strong {
         display: block;
@@ -520,25 +528,28 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         margin-bottom: 10px;
     }
 
-    /* Estiliza a div do lucro que criamos no JS */
+    /* O Input de Lucro (Caixinha amarela) */
     .lucro-mobile-container {
+        width: 100%; /* Ocupa largura total disponível */
+        max-width: 200px; /* Mas não exagera */
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 10px;
-        background: #fff8e1; /* Amarelinho claro para destacar */
+        background: #fff3e0;
         padding: 8px;
-        border-radius: 6px;
-        border: 1px dashed #e67e22;
+        border-radius: 8px;
+        border: 1px solid #ffe0b2;
     }
     
+    /* Garante que o input não fique minúsculo */
     .input-lucro-afiliado {
         width: 60px !important;
-        padding: 5px;
+        height: 35px !important;
+        font-size: 16px !important;
         text-align: center;
         border: 1px solid #ccc;
-        border-radius: 4px;
-        font-weight: bold;
+        background: #fff;
     }
     .cart-table td[data-label="Produto"]::before { display: none; }
 

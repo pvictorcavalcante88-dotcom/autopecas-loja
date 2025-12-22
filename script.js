@@ -211,20 +211,29 @@ async function carregarPaginaCarrinho() {
             }
 
             // Desenha a linha (AGORA USANDO nomeExibir)
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td><img src="${p.image||p.imagem}" width="60" onerror="this.src='https://placehold.co/100'"></td>
-                <td><strong>${nomeExibir}</strong>${htmlMargem}</td> <td>${formatarMoeda(precoFinal)}</td>
-                <td>
-                    <div style="display: flex; align-items: center; gap: 10px; justify-content: center;">
-                        <button onclick="alterarQuantidade(${item.id}, -1)">-</button>
-                        <strong>${item.quantidade}</strong>
-                        <button onclick="alterarQuantidade(${item.id}, 1)">+</button>
-                    </div>
-                </td>
-                <td>${formatarMoeda(subtotalItem)}</td>
-                <td><button onclick="removerItem(${item.id})" style="color:red; border:none; cursor:pointer;">&times;</button></td>
-            `;
+           // ... dentro do loop for ...
+
+// Desenha a linha
+const row = document.createElement('tr');
+row.innerHTML = `
+    <td data-label="Imagem">
+        <img src="${p.image||p.imagem}" width="100" height="100" style="object-fit:contain;" onerror="this.src='https://placehold.co/100'">
+    </td>
+    
+    <td data-label="Produto">
+        <div class="produto-nome-mobile">${nomeExibir}</div> ${htmlMargem} </td> 
+
+    <td data-label="Preço">${formatarMoeda(precoFinal)}</td>
+    <td data-label="Qtd">
+        <div style="display: flex; align-items: center; gap: 10px; justify-content: flex-end;">
+            <button onclick="alterarQuantidade(${item.id}, -1)">-</button>
+            <strong>${item.quantidade}</strong>
+            <button onclick="alterarQuantidade(${item.id}, 1)">+</button>
+        </div>
+    </td>
+    <td data-label="Total">${formatarMoeda(subtotalItem)}</td>
+    <td data-label="Remover"><button onclick="removerItem(${item.id})" style="color:red; border:none; cursor:pointer;">&times;</button></td>
+`;
             cartItemsContainer.appendChild(row);
         } catch (e) {}
     }

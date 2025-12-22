@@ -408,153 +408,111 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
 .btn-banner:hover { transform: scale(1.05); }
 
 /* ========================================================================
-   📱 ESTILOS PARA CELULAR (CORREÇÃO FINAL V2)
+   📱 ESTILOS PARA CELULAR (CORREÇÃO FINAL V3 - ANTI-SOBREPOSIÇÃO)
    ======================================================================== */
 @media (max-width: 768px) {
 
-    /* --- 1. AJUSTES ESTRUTURAIS --- */
+    /* --- 1. ESTRUTURA GERAL --- */
     body {
-        /* Aumentei o padding porque a barra do parceiro + header ocupam muito espaço */
-        padding-top: 140px !important; 
-        padding-bottom: 200px !important;
+        padding-top: 140px !important;
+        padding-bottom: 220px !important; /* Mais espaço embaixo */
     }
 
     .container, .main-content {
-        padding: 0 15px !important;
         width: 100% !important;
+        padding: 0 10px !important;
         overflow-x: hidden;
     }
 
-    /* --- 2. BARRA DE PARCEIRO E HEADER --- */
+    /* --- 2. CABEÇALHO FIXO --- */
     #barra-parceiro {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        z-index: 2000;
-        height: auto !important;
-        padding: 8px 15px !important;
-        flex-direction: row !important; /* Mantém lado a lado se der */
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 10px;
+        position: fixed; top: 0; left: 0; width: 100%; z-index: 2000;
+        height: auto !important; padding: 10px !important;
+        flex-direction: row !important; flex-wrap: wrap; justify-content: center;
     }
 
     .main-header {
-        position: fixed;
-        top: 50px; /* Logo abaixo da barra do parceiro */
-        left: 0;
-        width: 100%;
-        z-index: 1900;
-        padding: 10px 15px;
-        box-shadow: 0 5px 10px rgba(0,0,0,0.05);
+        position: fixed; top: 50px; left: 0; width: 100%; z-index: 1900;
+        padding: 10px; box-shadow: 0 5px 10px rgba(0,0,0,0.05);
     }
-
-    .header-container {
-        flex-direction: column;
-        gap: 10px;
-    }
-
-    .search-container {
-        width: 100%;
-        order: 3;
-    }
-
-    .header-actions {
-        width: 100%;
-        justify-content: space-around;
-        order: 2;
-        margin-bottom: 5px;
-    }
-    
+    .header-container { flex-direction: column; gap: 5px; }
+    .search-container { width: 100%; order: 3; }
+    .header-actions { width: 100%; justify-content: space-around; order: 2; margin-bottom: 5px; }
     .logo { order: 1; margin-bottom: 5px; }
 
-
-    /* --- 3. CARRINHO: O GRANDE CONSERTO --- */
-
-    /* Força a tabela a não ser tabela */
+    /* --- 3. TABELA DO CARRINHO (CARTÕES) --- */
     .cart-table, .cart-table tbody, .cart-table tr, .cart-table td {
         display: block !important;
         width: 100% !important;
     }
-
     .cart-table thead { display: none !important; }
 
-    /* O Cartão do Produto */
     .cart-table tr {
         background: #fff;
-        margin-bottom: 20px;
-        border: 1px solid #e0e0e0;
+        margin-bottom: 25px; /* Mais espaço entre produtos */
+        border: 1px solid #ddd;
         border-radius: 12px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-        padding: 0 !important; /* Remove padding do TR para controlar nos TDs */
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        padding: 0 !important;
         overflow: hidden;
     }
 
-    /* --- A IMAGEM (Topo do Card) --- */
+    /* --- IMAGEM (Topo) --- */
     .cart-table td[data-label="Imagem"] {
         text-align: center;
-        background: #f9f9f9;
-        padding: 15px !important;
+        background: #fdfdfd;
+        padding: 20px !important;
         border-bottom: 1px solid #eee;
+        display: flex !important;
+        justify-content: center !important;
     }
     .cart-table td[data-label="Imagem"] img {
-        width: 120px !important;
-        height: 120px !important;
+        width: 140px !important; /* Imagem maior */
+        height: 140px !important;
         object-fit: contain;
-        margin: 0 auto;
     }
-    .cart-table td[data-label="Imagem"]::before { display: none; } /* Esconde o texto "Imagem" */
+    .cart-table td[data-label="Imagem"]::before { display: none; }
 
-
-    /* --- O PRODUTO E LUCRO --- */
+    /* --- NOME DO PRODUTO E LUCRO (A Correção Principal) --- */
     .cart-table td[data-label="Produto"] {
         display: flex !important;
-        flex-direction: column !important; /* <--- ISSO RESOLVE A SOBREPOSIÇÃO */
-        justify-content: center !important;
+        flex-direction: column !important; /* EMPILHAR VERTICALMENTE */
         align-items: center !important;
+        justify-content: center !important;
         text-align: center !important;
-        height: auto !important;
         padding: 20px 15px !important;
-        gap: 15px; /* Espaço entre o nome e o input amarelo */
+        height: auto !important; /* Altura automática para crescer */
     }
 
-
-    
-    .cart-table td[data-label="Produto"] strong {
-        display: block;
+    /* Nome do Produto */
+    .produto-nome-mobile {
         font-size: 1.1rem;
-        color: #333;
-        margin-bottom: 10px;
+        font-weight: bold;
+        color: #005fb9;
+        margin-bottom: 15px !important; /* Empurra o lucro para baixo */
+        line-height: 1.4;
+        display: block;
+        width: 100%;
     }
 
-    /* O Input de Lucro (Caixinha amarela) */
+    /* Caixa do Lucro */
     .lucro-mobile-container {
-        width: 100%; /* Ocupa largura total disponível */
-        max-width: 200px; /* Mas não exagera */
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 10px;
         background: #fff3e0;
-        padding: 8px;
+        padding: 10px 15px;
         border-radius: 8px;
-        border: 1px solid #ffe0b2;
+        border: 1px dashed #e67e22;
+        width: auto;
+        min-width: 180px;
+        margin-top: 5px;
     }
-    
-    /* Garante que o input não fique minúsculo */
-    .input-lucro-afiliado {
-        width: 60px !important;
-        height: 35px !important;
-        font-size: 16px !important;
-        text-align: center;
-        border: 1px solid #ccc;
-        background: #fff;
-    }
+
     .cart-table td[data-label="Produto"]::before { display: none; }
 
-
-    /* --- PREÇO, QTD, TOTAL (Linhas Padrão) --- */
+    /* --- OUTROS CAMPOS --- */
     .cart-table td {
         display: flex !important;
         justify-content: space-between;
@@ -564,68 +522,43 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         text-align: right;
     }
 
-    /* Texto do Label (Preço, Total, etc) */
     .cart-table td::before {
         content: attr(data-label);
         font-weight: 700;
-        color: #777;
+        color: #555;
         font-size: 0.9rem;
         text-transform: uppercase;
     }
 
-    /* --- AJUSTES ESPECÍFICOS --- */
     .cart-table td[data-label="Total"] {
-        background-color: #fbfbfb;
+        background-color: #f0fdf4;
         color: #27ae60;
         font-weight: 800;
-        font-size: 1.2rem;
+        font-size: 1.3rem;
     }
 
+    /* Botão Remover */
     .cart-table td[data-label="Remover"] {
         justify-content: center;
         padding: 0 !important;
     }
     .cart-table td[data-label="Remover"] button {
         width: 100%;
-        border-radius: 0; /* Botão quadrado no fundo do card */
         padding: 15px;
         background: #ffebee;
         color: #c62828;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 5px;
+        font-weight: bold;
+        display: flex; justify-content: center; align-items: center;
     }
-    /* Adiciona texto "Remover" ao lado do X */
-    .cart-table td[data-label="Remover"] button::after {
-        content: "Remover Item";
-    }
+    .cart-table td[data-label="Remover"] button::after { content: " Remover este item"; margin-left: 5px; }
     .cart-table td[data-label="Remover"]::before { display: none; }
 
-
-    /* --- 4. RESUMO FIXO --- */
+    /* --- RESUMO FIXO --- */
     .cart-total-box {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        background: #fff;
-        z-index: 2000;
-        padding: 15px;
+        position: fixed; bottom: 0; left: 0; width: 100%;
+        background: #fff; z-index: 2000; padding: 15px;
         box-shadow: 0 -5px 20px rgba(0,0,0,0.15);
         border-radius: 20px 20px 0 0;
     }
-    
-    .cart-total-box h3, .cart-total-box a { display: none; } /* Limpa visual */
-    
-    .summary-row {
-        margin-bottom: 5px;
-        font-size: 1rem;
-    }
-    
-    .btn-place-order {
-        margin-top: 10px;
-        padding: 15px;
-        font-size: 1.2rem;
-    }
+    .cart-total-box h3, .cart-total-box a { display: none; }
 }

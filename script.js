@@ -201,11 +201,11 @@ async function carregarPaginaCarrinho() {
             let htmlMargem = '';
             if(isAfiliado) {
                 htmlMargem = `
-                    <div style="display:flex; align-items:center; gap:5px; font-size:0.8rem; margin-top:5px;">
-                        <span style="color:#e67e22; font-weight:bold;">Lucro:</span>
+                    <div class="lucro-mobile-container"> <span style="color:#e67e22; font-weight:bold;">Lucro:</span>
                         <input type="number" value="${margemAplicada}" 
                             onchange="atualizarMargemCarrinho(${item.id}, this.value)"
-                            style="width:50px; padding:5px; border:1px solid #ccc; border-radius:4px; text-align:center;"> %
+                            class="input-lucro-afiliado" 
+                        > %
                     </div>
                 `;
             }

@@ -408,174 +408,213 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
 .btn-banner:hover { transform: scale(1.05); }
 
 /* ========================================================================
-   📱 ESTILOS PARA CELULAR (CORREÇÃO FINAL E UNIFICADA)
-   Este bloco substitui todos os outros códigos móveis.
+   📱 ESTILOS PARA CELULAR (CORREÇÃO FINAL V2)
    ======================================================================== */
 @media (max-width: 768px) {
 
-    /* --- 1. AJUSTES GERAIS DE ESTRUTURA --- */
+    /* --- 1. AJUSTES ESTRUTURAIS --- */
     body {
-        /* Espaço em cima para a barra do parceiro fixa */
-        padding-top: 90px !important; 
-        /* Espaço embaixo para o resumo do carrinho fixo */
-        padding-bottom: 180px; 
+        /* Aumentei o padding porque a barra do parceiro + header ocupam muito espaço */
+        padding-top: 140px !important; 
+        padding-bottom: 200px !important;
     }
 
     .container, .main-content {
-        width: 100% !important;
         padding: 0 15px !important;
+        width: 100% !important;
         overflow-x: hidden;
     }
 
-    /* --- 2. BARRA DE PARCEIRO (FIXA NO TOPO) --- */
+    /* --- 2. BARRA DE PARCEIRO E HEADER --- */
     #barra-parceiro {
-        height: auto !important;
-        min-height: 45px;
-        padding: 10px !important;
-        flex-direction: column; /* Empilha texto e botão */
-        gap: 8px;
         position: fixed;
         top: 0;
         left: 0;
         width: 100%;
-        z-index: 2000; /* Acima de tudo */
-        box-sizing: border-box;
+        z-index: 2000;
+        height: auto !important;
+        padding: 8px 15px !important;
+        flex-direction: row !important; /* Mantém lado a lado se der */
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
     }
 
-    /* --- 3. CABEÇALHO (LOGO E BUSCA) --- */
     .main-header {
-        margin-top: 0; /* A barra do parceiro já tem position fixed */
-        flex-direction: column;
-        height: auto;
-        padding: 15px;
+        position: fixed;
+        top: 50px; /* Logo abaixo da barra do parceiro */
+        left: 0;
+        width: 100%;
+        z-index: 1900;
+        padding: 10px 15px;
+        box-shadow: 0 5px 10px rgba(0,0,0,0.05);
     }
 
     .header-container {
         flex-direction: column;
-        gap: 15px;
+        gap: 10px;
     }
 
     .search-container {
         width: 100%;
-        max-width: 100%;
-        order: 3; /* Joga a busca para baixo do logo e ícones */
+        order: 3;
     }
-    
+
     .header-actions {
         width: 100%;
         justify-content: space-around;
         order: 2;
+        margin-bottom: 5px;
+    }
+    
+    .logo { order: 1; margin-bottom: 5px; }
+
+
+    /* --- 3. CARRINHO: O GRANDE CONSERTO --- */
+
+    /* Força a tabela a não ser tabela */
+    .cart-table, .cart-table tbody, .cart-table tr, .cart-table td {
+        display: block !important;
+        width: 100% !important;
+    }
+
+    .cart-table thead { display: none !important; }
+
+    /* O Cartão do Produto */
+    .cart-table tr {
+        background: #fff;
+        margin-bottom: 20px;
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        padding: 0 !important; /* Remove padding do TR para controlar nos TDs */
+        overflow: hidden;
+    }
+
+    /* --- A IMAGEM (Topo do Card) --- */
+    .cart-table td[data-label="Imagem"] {
+        text-align: center;
+        background: #f9f9f9;
+        padding: 15px !important;
+        border-bottom: 1px solid #eee;
+    }
+    .cart-table td[data-label="Imagem"] img {
+        width: 120px !important;
+        height: 120px !important;
+        object-fit: contain;
+        margin: 0 auto;
+    }
+    .cart-table td[data-label="Imagem"]::before { display: none; } /* Esconde o texto "Imagem" */
+
+
+    /* --- O PRODUTO E LUCRO --- */
+    .cart-table td[data-label="Produto"] {
+        text-align: center !important;
+        padding: 15px !important;
+    }
+    
+    .cart-table td[data-label="Produto"] strong {
+        display: block;
+        font-size: 1.1rem;
+        color: #333;
         margin-bottom: 10px;
     }
 
-    .logo {
-        order: 1;
-    }
-
-    /* --- 4. PÁGINA DE PRODUTO --- */
-    .product-detail-container {
-        grid-template-columns: 1fr; /* Coluna única */
-        padding: 15px;
-    }
-
-    .action-group {
-        flex-direction: column;
-        width: 100%;
-    }
-
-    .qty-selector {
-        width: 100%;
-        justify-content: space-between;
-        margin-bottom: 15px;
-        height: 50px;
-    }
-
-    .btn-buy-now, .btn-add-cart {
-        width: 100%;
-        padding: 15px;
-    }
-
-    /* --- 5. CARRINHO (TABELA VIRA CARTÕES) --- */
-    
-    .cart-page-container {
-        grid-template-columns: 1fr; /* Uma coluna só */
-        gap: 20px;
-    }
-
-    /* Esconde o cabeçalho da tabela */
-    .cart-table thead { display: none; }
-
-    /* Força tudo a ser bloco */
-    .cart-table, .cart-table tbody, .cart-table tr, .cart-table td {
-        display: block;
-        width: 100%;
-    }
-
-    /* Estilo do Cartão */
-    .cart-table tr {
-        background: #fff;
-        margin-bottom: 15px;
-        border-radius: 10px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        border: 1px solid #eee;
-        padding: 15px;
-    }
-
-    /* Linhas internas do cartão */
-    .cart-table td {
-        text-align: right;
-        padding: 10px 0;
-        border-bottom: 1px solid #f0f0f0;
+    /* Estiliza a div do lucro que criamos no JS */
+    .lucro-mobile-container {
         display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        background: #fff8e1; /* Amarelinho claro para destacar */
+        padding: 8px;
+        border-radius: 6px;
+        border: 1px dashed #e67e22;
+    }
+    
+    .input-lucro-afiliado {
+        width: 60px !important;
+        padding: 5px;
+        text-align: center;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-weight: bold;
+    }
+    .cart-table td[data-label="Produto"]::before { display: none; }
+
+
+    /* --- PREÇO, QTD, TOTAL (Linhas Padrão) --- */
+    .cart-table td {
+        display: flex !important;
         justify-content: space-between;
         align-items: center;
-        font-size: 14px;
+        padding: 12px 15px !important;
+        border-bottom: 1px solid #f0f0f0;
+        text-align: right;
     }
 
-    .cart-table td:last-child { border-bottom: none; }
-
-    /* Labels automáticos via data-label */
+    /* Texto do Label (Preço, Total, etc) */
     .cart-table td::before {
         content: attr(data-label);
-        font-weight: bold;
-        color: #555;
-        font-size: 12px;
+        font-weight: 700;
+        color: #777;
+        font-size: 0.9rem;
         text-transform: uppercase;
     }
 
-    /* Ajustes específicos de campos */
-    .cart-table td[data-label="Imagem"] { justify-content: center; border-bottom: none; }
-    .cart-table td[data-label="Imagem"]::before { display: none; }
-    .cart-table td[data-label="Imagem"] img { width: 100px; height: 100px; }
-
-    .cart-table td[data-label="Produto"] { display: block; text-align: center; font-size: 16px; font-weight: bold; color: #005fb9; }
-    .cart-table td[data-label="Produto"]::before { display: none; }
-
-    .cart-table td[data-label="Remover"] button {
-        width: 100%;
-        background: #fee;
-        color: red;
-        font-weight: bold;
-        padding: 10px;
-        border-radius: 5px;
+    /* --- AJUSTES ESPECÍFICOS --- */
+    .cart-table td[data-label="Total"] {
+        background-color: #fbfbfb;
+        color: #27ae60;
+        font-weight: 800;
+        font-size: 1.2rem;
     }
 
-    /* --- 6. RESUMO DO PEDIDO (FIXO NO RODAPÉ) --- */
+    .cart-table td[data-label="Remover"] {
+        justify-content: center;
+        padding: 0 !important;
+    }
+    .cart-table td[data-label="Remover"] button {
+        width: 100%;
+        border-radius: 0; /* Botão quadrado no fundo do card */
+        padding: 15px;
+        background: #ffebee;
+        color: #c62828;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
+    }
+    /* Adiciona texto "Remover" ao lado do X */
+    .cart-table td[data-label="Remover"] button::after {
+        content: "Remover Item";
+    }
+    .cart-table td[data-label="Remover"]::before { display: none; }
+
+
+    /* --- 4. RESUMO FIXO --- */
     .cart-total-box {
         position: fixed;
         bottom: 0;
         left: 0;
         width: 100%;
-        z-index: 1000;
-        background: white;
-        border-top: 2px solid #ccc;
-        box-shadow: 0 -5px 15px rgba(0,0,0,0.2);
+        background: #fff;
+        z-index: 2000;
         padding: 15px;
-        border-radius: 15px 15px 0 0;
-        max-height: 45vh;
-        overflow-y: auto;
+        box-shadow: 0 -5px 20px rgba(0,0,0,0.15);
+        border-radius: 20px 20px 0 0;
     }
     
-    /* Esconde título e link 'voltar' pra economizar espaço */
-    .cart-total-box h3, .cart-total-box a[href="index.html"] { display: none; }
+    .cart-total-box h3, .cart-total-box a { display: none; } /* Limpa visual */
+    
+    .summary-row {
+        margin-bottom: 5px;
+        font-size: 1rem;
+    }
+    
+    .btn-place-order {
+        margin-top: 10px;
+        padding: 15px;
+        font-size: 1.2rem;
+    }
 }

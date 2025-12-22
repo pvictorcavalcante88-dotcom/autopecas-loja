@@ -199,41 +199,46 @@ async function carregarPaginaCarrinho() {
 
             // Input de Margem (Só afiliado vê)
             let htmlMargem = '';
-            if(isAfiliado) {
-                htmlMargem = `
-                    <div class="lucro-mobile-container"> <span style="color:#e67e22; font-weight:bold;">Lucro:</span>
-                        <input type="number" value="${margemAplicada}" 
-                            onchange="atualizarMargemCarrinho(${item.id}, this.value)"
-                            class="input-lucro-afiliado" 
-                        > %
-                    </div>
-                `;
-            }
+            // Exemplo de como htmlMargem deve estar definido no seu script.js
+if(isAfiliado) {
+    htmlMargem = `
+        <div class="lucro-mobile-container">
+            <span style="color:#e67e22; font-weight:bold;">Lucro:</span>
+            <input type="number" value="${margemAplicada}" 
+                onchange="atualizarMargemCarrinho(${item.id}, this.value)"
+                class="input-lucro-afiliado" 
+            > %
+        </div>
+    `;
+}
 
             // Desenha a linha (AGORA USANDO nomeExibir)
            // ... dentro do loop for ...
 
 // Desenha a linha
-const row = document.createElement('tr');
-row.innerHTML = `
-    <td data-label="Imagem">
-        <img src="${p.image||p.imagem}" width="100" height="100" style="object-fit:contain;" onerror="this.src='https://placehold.co/100'">
-    </td>
-    
-    <td data-label="Produto">
-        <div class="produto-nome-mobile">${nomeExibir}</div> ${htmlMargem} </td> 
+// ... (dentro do loop for da função carregarPaginaCarrinho) ...
 
-    <td data-label="Preço">${formatarMoeda(precoFinal)}</td>
-    <td data-label="Qtd">
-        <div style="display: flex; align-items: center; gap: 10px; justify-content: flex-end;">
-            <button onclick="alterarQuantidade(${item.id}, -1)">-</button>
-            <strong>${item.quantidade}</strong>
-            <button onclick="alterarQuantidade(${item.id}, 1)">+</button>
-        </div>
-    </td>
-    <td data-label="Total">${formatarMoeda(subtotalItem)}</td>
-    <td data-label="Remover"><button onclick="removerItem(${item.id})" style="color:red; border:none; cursor:pointer;">&times;</button></td>
-`;
+            // Desenha a linha
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td data-label="Imagem">
+                    <img src="${p.image||p.imagem}" width="100" height="100" style="object-fit:contain;" onerror="this.src='https://placehold.co/100'">
+                </td>
+                
+                <td data-label="Produto">
+                    <div class="produto-nome-mobile">${nomeExibir}</div> ${htmlMargem} </td> 
+
+                <td data-label="Preço">${formatarMoeda(precoFinal)}</td>
+                <td data-label="Qtd">
+                    <div style="display: flex; align-items: center; gap: 10px; justify-content: flex-end;">
+                        <button onclick="alterarQuantidade(${item.id}, -1)">-</button>
+                        <strong>${item.quantidade}</strong>
+                        <button onclick="alterarQuantidade(${item.id}, 1)">+</button>
+                    </div>
+                </td>
+                <td data-label="Total">${formatarMoeda(subtotalItem)}</td>
+                <td data-label="Remover"><button onclick="removerItem(${item.id})" style="color:red; border:none; cursor:pointer;">&times;</button></td>
+            `;
             cartItemsContainer.appendChild(row);
         } catch (e) {}
     }

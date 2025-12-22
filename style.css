@@ -415,7 +415,7 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
     /* --- 1. ESTRUTURA GERAL --- */
     body {
         padding-top: 140px !important;
-        padding-bottom: 220px !important; /* Mais espaço embaixo */
+        padding-bottom: 220px !important; /* Mais espaço embaixo para o resumo */
     }
 
     .container, .main-content {
@@ -508,6 +508,15 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         width: auto;
         min-width: 180px;
         margin-top: 5px;
+    }
+    /* Estilo do input específico */
+    .input-lucro-afiliado {
+        width: 60px !important;
+        text-align: center;
+        padding: 5px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 1rem;
     }
 
     .cart-table td[data-label="Produto"]::before { display: none; }

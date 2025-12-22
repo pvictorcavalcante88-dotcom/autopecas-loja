@@ -476,47 +476,53 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
     /* --- NOME DO PRODUTO E LUCRO (A Correção Principal) --- */
     .cart-table td[data-label="Produto"] {
         display: flex !important;
-        flex-direction: column !important; /* EMPILHAR VERTICALMENTE */
+        flex-direction: column !important; /* ISSO É O QUE MANDA UM FICAR EMBAIXO DO OUTRO */
         align-items: center !important;
         justify-content: center !important;
+        padding: 20px 10px !important;
+        height: auto !important;
         text-align: center !important;
-        padding: 20px 15px !important;
-        height: auto !important; /* Altura automática para crescer */
     }
 
     /* Nome do Produto */
     .produto-nome-mobile {
-        font-size: 1.1rem;
-        font-weight: bold;
-        color: #005fb9;
-        margin-bottom: 15px !important; /* Empurra o lucro para baixo */
-        line-height: 1.4;
-        display: block;
         width: 100%;
+        display: block;
+        margin-bottom: 15px !important; /* Espaço obrigatório embaixo */
+        color: #005fb9;
+        font-weight: bold;
+        line-height: 1.4;
     }
 
     /* Caixa do Lucro */
     .lucro-mobile-container {
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        display: flex !important; /* Garante que apareça */
+        flex-direction: row !important; /* O texto e o input ficam lado a lado */
+        align-items: center !important;
+        justify-content: center !important;
         gap: 10px;
-        background: #fff3e0;
-        padding: 10px 15px;
-        border-radius: 8px;
-        border: 1px dashed #e67e22;
-        width: auto;
-        min-width: 180px;
-        margin-top: 5px;
+        background: #fff8e1;
+        padding: 8px 15px;
+        border-radius: 20px;
+        border: 1px solid #ffe0b2;
+        width: fit-content; /* Ocupa só o espaço necessário */
+        margin: 0 auto; /* Centraliza */
     }
+
+    .lucro-mobile-container span {
+        color: #e67e22;
+        font-weight: bold;
+        font-size: 0.9rem;
+    }
+
     /* Estilo do input específico */
     .input-lucro-afiliado {
         width: 60px !important;
-        text-align: center;
         padding: 5px;
-        border: 1px solid #ccc;
+        border: 1px solid #ddd;
         border-radius: 4px;
-        font-size: 1rem;
+        text-align: center;
+        background: #fff;
     }
 
     .cart-table td[data-label="Produto"]::before { display: none; }

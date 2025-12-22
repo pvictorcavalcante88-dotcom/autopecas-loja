@@ -133,12 +133,10 @@ document.addEventListener("DOMContentLoaded", async function() {
 
 
 // ==============================================================
-// 🛒 CARRINHO COMPLETO (Lucro + Esvaziar + Subtotal)
-// ==============================================================
-// ==============================================================
-// 🛒 CARRINHO COMPLETO (ATUALIZADO COM NOME DINÂMICO)
+// 🛒 CARRINHO COMPLETO (CORRIGIDO E LIMPO)
 // ==============================================================
 async function carregarPaginaCarrinho() {
+    // 1. Verificações Iniciais
     if (!localStorage.getItem('afiliadoLogado')) {
         alert("Você precisa fazer login para acessar o carrinho.");
         window.location.href = "login.html";
@@ -162,7 +160,7 @@ async function carregarPaginaCarrinho() {
     
     const isAfiliado = !!localStorage.getItem('afiliadoLogado');
 
-    // 1. Carrinho Vazio
+    // 2. Carrinho Vazio
     if (cart.length === 0) {
         cartItemsContainer.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;">Carrinho vazio.</td></tr>';
         if (cartTotalElement) cartTotalElement.innerText = 'R$ 0,00';
@@ -174,16 +172,15 @@ async function carregarPaginaCarrinho() {
         return;
     }
 
-    // 2. Loop dos Itens
+    // 3. Loop dos Itens
     for (const item of cart) {
         try {
             const response = await fetch(`${API_URL}/products/${item.id}`);
             if (!response.ok) continue;
             const p = await response.json();
 
-            // --- NOVIDADE AQUI: MONTAGEM DO NOME PERSONALIZADO ---
+            // --- NOME PERSONALIZADO ---
             const nomeExibir = montarNomeCompleto(item, p);
-            // -----------------------------------------------------
 
             // Preços
             const precoBase = parseFloat(p.price || p.preco_novo);
@@ -197,28 +194,21 @@ async function carregarPaginaCarrinho() {
             totalVenda += subtotalItem;
             totalLucro += lucroItem;
 
-            // Input de Margem (Só afiliado vê)
+            // --- INPUT DE LUCRO (A Correção do Mobile) ---
             let htmlMargem = '';
-            // Exemplo de como htmlMargem deve estar definido no seu script.js
-if(isAfiliado) {
-    htmlMargem = `
-        <div class="lucro-mobile-container">
-            <span style="color:#e67e22; font-weight:bold;">Lucro:</span>
-            <input type="number" value="${margemAplicada}" 
-                onchange="atualizarMargemCarrinho(${item.id}, this.value)"
-                class="input-lucro-afiliado" 
-            > %
-        </div>
-    `;
-}
+            if(isAfiliado) {
+                htmlMargem = `
+                    <div class="lucro-mobile-container">
+                        <span>Lucro:</span>
+                        <input type="number" value="${margemAplicada}" 
+                            onchange="atualizarMargemCarrinho(${item.id}, this.value)"
+                            class="input-lucro-afiliado" 
+                        > %
+                    </div>
+                `;
+            }
 
-            // Desenha a linha (AGORA USANDO nomeExibir)
-           // ... dentro do loop for ...
-
-// Desenha a linha
-// ... (dentro do loop for da função carregarPaginaCarrinho) ...
-
-            // Desenha a linha
+            // --- DESENHA A LINHA ---
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td data-label="Imagem">
@@ -226,7 +216,9 @@ if(isAfiliado) {
                 </td>
                 
                 <td data-label="Produto">
-                    <div class="produto-nome-mobile">${nomeExibir}</div> ${htmlMargem} </td> 
+                    <div class="produto-nome-mobile">${nomeExibir}</div>
+                    ${htmlMargem} 
+                </td> 
 
                 <td data-label="Preço">${formatarMoeda(precoFinal)}</td>
                 <td data-label="Qtd">
@@ -243,7 +235,7 @@ if(isAfiliado) {
         } catch (e) {}
     }
     
-    // 3. Botão Esvaziar Carrinho
+    // 4. Botão Esvaziar Carrinho
     const rowLimpar = document.createElement('tr');
     rowLimpar.innerHTML = `
         <td colspan="6" style="text-align: right; padding-top: 15px;">
@@ -253,11 +245,11 @@ if(isAfiliado) {
         </td>`;
     cartItemsContainer.appendChild(rowLimpar);
 
-    // 4. Atualiza Totais
+    // 5. Atualiza Totais
     if (cartTotalElement) cartTotalElement.innerText = formatarMoeda(totalVenda);
     if (cartSubtotalElement) cartSubtotalElement.innerText = formatarMoeda(totalVenda);
 
-    // 5. Exibe o Lucro (Se for afiliado)
+    // 6. Exibe o Lucro (Se for afiliado)
     if (isAfiliado && rowLucro && valorLucro) {
         rowLucro.style.display = 'flex'; 
         valorLucro.innerText = formatarMoeda(totalLucro);
@@ -267,6 +259,7 @@ if(isAfiliado) {
 
     if(isAfiliado) renderizarBotoesAfiliadoCarrinho();
 }
+
 // --- FUNÇÃO NOVA: LIMPAR TUDO ---
 function limparCarrinho() {
     if(confirm("Tem certeza que deseja esvaziar todo o carrinho?")) {

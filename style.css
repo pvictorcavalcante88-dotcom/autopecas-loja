@@ -704,3 +704,51 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         padding: 5px !important;
     }
 }
+
+/* ========================================================================
+   CORREÇÃO FINAL: BARRA DO AFILIADO + CABEÇALHO
+   ======================================================================== */
+
+@media (max-width: 768px) {
+
+    /* 1. ARRUMA A BARRA PRETA (PARCEIRO) */
+    #barra-parceiro {
+        height: auto !important;       /* Deixa a altura crescer conforme precisa */
+        min-height: 80px !important;   /* Garante tamanho para 2 linhas */
+        flex-wrap: wrap !important;    /* Permite quebrar linha */
+        justify-content: center !important;
+        padding: 10px 5px !important;
+        gap: 8px !important;
+        align-content: center !important;
+    }
+
+    /* Ajuste fino dos itens dentro da barra preta */
+    #barra-parceiro > div {
+        width: 100%;                  /* Força o Nome+Status a ocupar a linha de cima */
+        justify-content: center;      /* Centraliza */
+        margin-bottom: 5px;
+    }
+
+    #barra-parceiro > a {
+        width: 90%;                   /* Botão "Acessar Painel" quase largura total */
+        justify-content: center;      /* Centraliza texto do botão */
+    }
+
+    /* 2. EMPURRA O CABEÇALHO BRANCO PRA BAIXO */
+    /* Como a barra preta ficou maior (aprox 80px), o cabeçalho branco tem que descer */
+    .main-header {
+        top: 85px !important;         /* Desce para não ficar embaixo da barra preta */
+    }
+
+    /* 3. EMPURRA O CORPO DO SITE PRA BAIXO */
+    /* Soma: 85px (barra preta) + 140px (cabeçalho branco) = ~225px */
+    body {
+        padding-top: 230px !important; 
+    }
+
+    /* 4. AJUSTE FINO NO CARRINHO (CART) */
+    /* Dá um espaço extra no final do card para o botão não ficar colado */
+    .mobile-cart-card {
+        padding-bottom: 20px;
+    }
+}

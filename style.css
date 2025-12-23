@@ -408,153 +408,161 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
 .btn-banner:hover { transform: scale(1.05); }
 
 /* ========================================================================
-   📱 MOBILE FINAL (CORREÇÃO TOTAL DO CABEÇALHO E LAYOUT)
+   📱 MOBILE FINAL (CARDS + HEADER + BOTÃO FIXED)
    ======================================================================== */
 
-.mobile-only { display: none !important; } /* Esconde coisas de mobile no PC */
+.mobile-only { display: none !important; } /* Esconde mobile no PC */
 
 @media (max-width: 768px) {
 
-    /* --- 1. AJUSTES GERAIS --- */
+    /* --- 1. CONSERTO DO CABEÇALHO (FIXO E ORGANIZADO) --- */
+    
+    /* Espaço para o cabeçalho duplo não cobrir o conteúdo */
     body {
-        /* Aumentei o padding porque o cabeçalho vai ficar maior (3 linhas) */
-        padding-top: 200px !important; 
-        padding-bottom: 80px !important;
+        padding-top: 170px !important; 
+        padding-bottom: 50px !important;
     }
 
-    .desktop-only { display: none !important; }
-    .mobile-only { display: block !important; width: 100% !important; }
-
-    /* --- 2. CABEÇALHO FIXO E ORGANIZADO (COLUNA) --- */
-    
-    /* Barra do Parceiro (Topo absoluto) */
+    /* Barra Verde/Escura do Parceiro (Fica no topo absoluto) */
     #barra-parceiro {
         position: fixed;
         top: 0;
         left: 0;
         width: 100%;
-        z-index: 2000;
+        height: auto;
+        min-height: 40px;
+        z-index: 2000; /* Fica acima de tudo */
         padding: 5px 10px !important;
         display: flex;
+        flex-wrap: wrap;
         justify-content: center;
-        background: #f8f9fa; /* Garante fundo caso não tenha */
+        gap: 10px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
 
-    /* O Cabeçalho Principal */
+    /* Cabeçalho Branco (Logo e Busca) - Fica logo abaixo da barra parceiro */
     .main-header {
         position: fixed;
-        top: 40px; /* Fica logo abaixo da barra parceiro */
+        top: 50px; /* Altura estimada da barra do parceiro */
         left: 0;
         width: 100%;
         z-index: 1900;
         background: white;
         padding: 10px 15px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-        height: auto !important; /* Permite crescer */
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
     }
 
-    /* O Container vira uma Coluna Vertical */
-    .header-container {
-        display: flex !important;
-        flex-direction: column !important;
-        align-items: center !important;
-        justify-content: flex-start !important;
-        gap: 12px !important; /* Espaço entre as linhas */
-        padding: 5px 0 !important;
-        width: 100% !important;
-    }
-
-    /* LINHA 1: Logo */
-    .logo {
-        width: 100%;
-        justify-content: center;
-        font-size: 1.4rem;
-        margin: 0 !important;
-        order: 1;
-    }
-
-    /* LINHA 2: Busca */
-    .search-container {
-        width: 100% !important;
-        max-width: 100% !important;
-        margin: 0 !important;
-        order: 2;
-        height: 40px; /* Altura fixa para ficar bonito */
-    }
+    /* Organiza os itens do cabeçalho */
+    .header-container { flex-direction: column; gap: 5px; width: 100%; padding: 0; }
+    .logo { justify-content: center; margin-bottom: 5px; }
+    .search-container { width: 100%; max-width: 100%; order: 3; }
     
-    .search-container input {
-        width: 100%;
-    }
 
-    /* LINHA 3: Botões (Sino, Login, Carrinho) */
-    .header-actions {
-        width: 100% !important;
-        display: flex !important;
-        justify-content: center !important; /* Centraliza os ícones */
-        gap: 30px !important; /* Espaço bom entre os ícones */
-        margin: 0 !important; /* Removemos aquele -40px que dava erro */
-        padding: 0 !important;
-        order: 3;
-        opacity: 1 !important;
-        visibility: visible !important;
-    }
 
-    /* Estilo dos ícones no mobile */
-    .action-button {
-        flex-direction: row; /* Ícone ao lado do texto (se houver) */
-        color: #333;
-    }
-
-    .action-button i {
-        font-size: 1.6rem; /* Ícones grandes para o dedo */
-        color: var(--primary-color);
-    }
-
-    /* Esconde o texto "Entrar" e "Carrinho" para limpar o visual */
-    .action-button span:not(.badge) {
-        display: none !important;
-    }
-
-    /* --- 3. LAYOUT DA PÁGINA DE CARRINHO (MOBILE) --- */
+    /* --- 2. LAYOUT DA PÁGINA --- */
     .cart-page-container {
         display: flex !important;
         flex-direction: column !important;
         width: 100% !important;
         padding: 10px !important;
         gap: 20px !important;
-        margin-top: 0 !important;
     }
 
-    /* Cards do carrinho */
+    /* Esconde tabela PC / Mostra Cards Mobile */
+    .desktop-only { display: none !important; }
+    .mobile-only { display: block !important; width: 100% !important; }
+
+
+    /* --- 3. ESTILO DOS CARDS (JÁ ESTAVA BOM, MANTIVE) --- */
     .mobile-cart-card {
         background: white;
         border: 1px solid #eee;
         border-radius: 12px;
         padding: 15px;
         margin-bottom: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.03);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         display: flex;
         flex-direction: column;
         align-items: center;
         text-align: center;
     }
-    
-    .mobile-cart-img { width: 100px; height: 100px; object-fit: contain; margin-bottom: 10px; }
-    
-    .mobile-cart-title { font-size: 1rem; font-weight: bold; color: var(--primary-color); margin-bottom: 5px; }
 
-    /* Botão Finalizar Compra no Mobile */
+    .mobile-cart-img { width: 120px; height: 120px; object-fit: contain; margin-bottom: 10px; }
+    
+    .mobile-cart-title { 
+        font-size: 1rem; font-weight: bold; color: #005fb9; margin-bottom: 8px; line-height: 1.4;
+    }
+
+    .mobile-lucro-box {
+        background: #fff8e1; border: 1px dashed #e67e22; padding: 5px 15px;
+        border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px;
+    }
+    .mobile-lucro-box input {
+        width: 50px; padding: 5px; text-align: center; border: 1px solid #ccc; border-radius: 4px;
+    }
+
+    .mobile-cart-details {
+        width: 100%; display: flex; justify-content: space-between; align-items: center;
+        border-top: 1px solid #f0f0f0; padding-top: 10px; margin-top: 5px;
+    }
+    
+    .mobile-qty-box {
+        display: flex; align-items: center; gap: 10px; background: #f5f5f5;
+        padding: 5px 10px; border-radius: 6px;
+    }
+
+    .mobile-remove-btn {
+        width: 100%; margin-top: 15px; background: #ffebee; color: #c0392b;
+        border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer;
+    }
+
+
+    /* --- 4. CONSERTO DO BOTÃO FINALIZAR (O Resgate!) --- */
+    
+    .cart-total-box {
+        width: 100% !important;
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+        margin-top: 10px;
+    }
+
+    /* Container onde o JS coloca o botão */
+    #afiliado-cart-actions {
+        display: block !important;
+        width: 100% !important;
+        margin-top: 20px;
+    }
+
+    /* Estilo forçado para o botão (caso esteja invisível) */
     #afiliado-cart-actions button, .btn-place-order {
         display: block !important;
         width: 100% !important;
-        background-color: var(--accent-color) !important; /* Laranja */
+        background-color: #2c3e50 !important; /* Azul Escuro */
         color: white !important;
         padding: 15px !important;
         font-size: 1.1rem !important;
         font-weight: bold !important;
+        border: none !important;
         border-radius: 8px !important;
-        margin-top: 10px;
+        cursor: pointer !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        text-align: center;
     }
+    
+    /* Hover do botão */
+    #afiliado-cart-actions button:active {
+        background-color: #1a252f !important;
+        transform: scale(0.98);
+    }
+
+    
+
 }
 
 /* FORÇA O BOTÃO DO CARRINHO A APARECER SEMPRE */

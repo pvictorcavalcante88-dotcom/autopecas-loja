@@ -459,7 +459,7 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
     .header-container { flex-direction: column; gap: 5px; width: 100%; padding: 0; }
     .logo { justify-content: center; margin-bottom: 5px; }
     .search-container { width: 100%; max-width: 100%; order: 3; }
-    .header-actions { display: none; } /* Opcional: Esconde ícones de topo no mobile para limpar */
+    
 
 
     /* --- 2. LAYOUT DA PÁGINA --- */
@@ -559,5 +559,33 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
     #afiliado-cart-actions button:active {
         background-color: #1a252f !important;
         transform: scale(0.98);
+    }
+}
+
+/* FORÇA O BOTÃO DO CARRINHO A APARECER SEMPRE */
+.header-actions {
+    display: flex !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* NO MOBILE, AJUSTA PARA NÃO FICAR TORTO */
+@media (max-width: 768px) {
+    .header-actions {
+        display: flex !important;
+        width: 100%;
+        justify-content: flex-end; /* Joga pra direita */
+        padding-right: 15px;
+        margin-top: -40px; /* Puxa pra cima pra ficar do lado da logo se precisar */
+        position: relative;
+        z-index: 2001;
+    }
+    
+    /* Ajusta tamanho dos ícones no celular */
+    .action-button i {
+        font-size: 1.4rem;
+    }
+    .action-button span {
+        display: none; /* Esconde o texto "Carrinho", deixa só o ícone */
     }
 }

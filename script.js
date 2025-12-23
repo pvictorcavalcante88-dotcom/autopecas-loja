@@ -143,7 +143,7 @@ async function carregarPaginaCarrinho() {
     }
 
     // --- PEGA OS ELEMENTOS ---
-    const cartItemsContainer = document.getElementById('cart-items'); // Tabela PC
+    const cartItemsContainer = document.getElementById('cart-items-desktop'); // Tabela PC
     const cartMobileContainer = document.getElementById('cart-items-mobile'); // Div Mobile
     
     const cartTotalElement = document.getElementById('cart-total');

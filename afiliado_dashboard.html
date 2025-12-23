@@ -18,25 +18,24 @@
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; display: flex; }
         
         /* MENU LATERAL */
-        aside { width: 250px; background: var(--primary); color: white; min-height: 100vh; position: fixed; }
+        aside { width: 250px; background: var(--primary); color: white; min-height: 100vh; position: fixed; z-index: 100; }
         aside h2 { text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(255,255,255,0.1); margin: 0; }
         aside nav a { display: flex; align-items: center; gap: 10px; padding: 15px 20px; color: #bdc3c7; text-decoration: none; transition: 0.3s; cursor: pointer; }
         aside nav a:hover, aside nav a.active { background: rgba(255,255,255,0.1); color: var(--accent); border-left: 4px solid var(--accent); }
 
         /* CONTEÚDO PRINCIPAL */
-        main { margin-left: 250px; padding: 30px; width: 100%; }
+        main { margin-left: 250px; padding: 30px; width: 100%; transition: margin 0.3s; }
 
         /* HEADER */
-        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px; }
         .welcome h1 { margin: 0; font-size: 1.5rem; color: var(--primary); }
         .header-actions { display: flex; align-items: center; gap: 20px; }
         
         /* SINO DE NOTIFICAÇÃO */
         .notification-btn { position: relative; background: white; border: none; padding: 10px; border-radius: 50%; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .notification-btn i { font-size: 1.2rem; color: #555; }
-        .badge-dot { position: absolute; top: 5px; right: 5px; width: 10px; height: 10px; background: var(--danger); border-radius: 50%; border: 2px solid white; display: none; } 
         
-        .btn-loja { background: var(--accent); color: white; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; }
+        .btn-loja { background: var(--accent); color: white; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; font-size: 0.9rem; }
         .btn-sair { background: var(--danger); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-left: 10px; }
 
         /* CARDS */
@@ -48,9 +47,20 @@
 
         /* TABELAS E LISTAS */
         .section-title { font-size: 1.1rem; color: var(--primary); margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
-        .data-table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        
+        /* --- CORREÇÃO DA TABELA PARA CELULAR --- */
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto; /* Permite rolar para o lado */
+            -webkit-overflow-scrolling: touch;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            background: white;
+        }
+
+        .data-table { width: 100%; border-collapse: collapse; min-width: 600px; /* Força largura mínima pra não esmagar */ }
         .data-table th, .data-table td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
-        .data-table th { background: #f8f9fa; color: #555; font-weight: 600; }
+        .data-table th { background: #f8f9fa; color: #555; font-weight: 600; white-space: nowrap; }
 
         /* STATUS BADGES */
         .status { padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; }
@@ -58,65 +68,55 @@
         .status.pendente { background: #fff3cd; color: #856404; }
         .status.cancelado { background: #f8d7da; color: #721c24; }
 
-        /* ABAS (Conteúdo dinâmico) */
+        /* ABAS */
         .tab-content { display: none; }
         .tab-content.active { display: block; animation: fadeIn 0.3s; }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-/* Adicione isso dentro da tag <style> */
+        /* DROPDOWN NOTIFICAÇÃO */
+        .notification-container { position: relative; display: inline-block; }
+        .badge-dot { position: absolute; top: -5px; right: -5px; background: #e74c3c; color: white; border-radius: 50%; padding: 2px 5px; font-size: 0.7rem; font-weight: bold; border: 2px solid white; }
+        
+        .dropdown-content { display: none; position: absolute; right: 0; top: 50px; background-color: #fff; min-width: 300px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); border-radius: 8px; z-index: 1000; border: 1px solid #eee; }
+        .dropdown-header { padding: 10px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50; background: #f8f9fa; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; }
+        .notif-item { padding: 10px; border-bottom: 1px solid #eee; font-size: 0.9rem; display: flex; align-items: start; gap: 10px; }
+        .notif-item:last-child { border-bottom: none; }
+        .notif-item:hover { background-color: #f1f1f1; }
 
-/* Container do Sino */
-.notification-container { position: relative; display: inline-block; }
+        /* =========================================
+           📱 AJUSTES PARA MOBILE (Responsividade)
+           ========================================= */
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            
+            /* Menu Lateral vira um topo simples ou fica escondido */
+            aside { 
+                width: 100%; 
+                height: auto; 
+                min-height: auto; 
+                position: relative; 
+                display: flex; 
+                flex-direction: column;
+            }
+            
+            /* Ajuste dos links do menu para caberem lado a lado ou em grade se quiser, 
+               mas em coluna no topo funciona bem */
+            aside nav { display: flex; overflow-x: auto; padding-bottom: 5px; }
+            aside nav a { white-space: nowrap; padding: 10px 15px; font-size: 0.9rem; flex: 1; justify-content: center; }
+            
+            /* Tira a margem do conteúdo principal */
+            main { margin-left: 0; padding: 15px; width: 100%; }
 
-/* Bolinha Vermelha */
-.badge-dot {
-    position: absolute;
-    top: -5px;
-    right: -5px;
-    background: #e74c3c;
-    color: white;
-    border-radius: 50%;
-    padding: 2px 5px;
-    font-size: 0.7rem;
-    font-weight: bold;
-    border: 2px solid white;
-}
-
-/* O Menu Dropdown (Escondido por padrão) */
-.dropdown-content {
-    display: none; /* Escondido */
-    position: absolute;
-    right: 0;
-    top: 40px;
-    background-color: #fff;
-    min-width: 300px;
-    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-    border-radius: 8px;
-    z-index: 1000;
-    border: 1px solid #eee;
-}
-
-.dropdown-header {
-    padding: 10px;
-    border-bottom: 1px solid #eee;
-    font-weight: bold;
-    color: #2c3e50;
-    background: #f8f9fa;
-    border-radius: 8px 8px 0 0;
-}
-
-/* Itens da lista */
-.notif-item {
-    padding: 10px;
-    border-bottom: 1px solid #eee;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: start;
-    gap: 10px;
-}
-.notif-item:last-child { border-bottom: none; }
-.notif-item:hover { background-color: #f1f1f1; }
+            /* Ajuste do Header */
+            header { flex-direction: column; align-items: flex-start; gap: 15px; }
+            .header-actions { width: 100%; justify-content: space-between; }
+            
+            /* Ajuste dos Cards de dados bancários */
+            .card > div[style*="grid"] {
+                grid-template-columns: 1fr !important; /* Um campo embaixo do outro */
+            }
+        }
 
     </style>
 </head>
@@ -125,47 +125,49 @@
     <aside>
         <h2>🦊 Parceiro</h2>
         <nav>
-            <a onclick="mudarAba('dashboard')" class="active" id="nav-dashboard"><i class="ph ph-squares-four"></i> Visão Geral</a>
+            <a onclick="mudarAba('dashboard')" class="active" id="nav-dashboard"><i class="ph ph-squares-four"></i> Painel</a>
             <a onclick="mudarAba('vendas')" id="nav-vendas"><i class="ph ph-shopping-cart"></i> Vendas</a>
-            <a onclick="mudarAba('orcamentos')" id="nav-orcamentos"><i class="ph ph-file-text"></i> Meus Orçamentos</a>
-            <a onclick="mudarAba('clientes')" id="nav-clientes"><i class="ph ph-users"></i> Carteira de Clientes</a>
+            <a onclick="mudarAba('orcamentos')" id="nav-orcamentos"><i class="ph ph-file-text"></i> Orçamentos</a>
+            <a onclick="mudarAba('clientes')" id="nav-clientes"><i class="ph ph-users"></i> Clientes</a>
         </nav>
     </aside>
 
     <main>
         <header>
-    <div class="welcome">
-        <h1 id="nome-afiliado">Olá, Parceiro!</h1>
-        <small>Gerencie seus ganhos e orçamentos.</small>
-    </div>
-    <div class="header-actions">
-        <a href="index.html" class="btn-loja"><i class="ph ph-storefront"></i> Voltar para Loja</a>
-        
-        <div class="notification-container" id="box-sino" style="position: relative;">
-        <button class="notification-btn" onclick="abrirNotificacoes()">
-            <i class="ph ph-bell"></i>
-            <span class="badge-dot" id="notif-badge" style="display:none">0</span>
-        </button>
-        
-        <div id="notif-dropdown" class="dropdown-content">
-            <div class="dropdown-header">Notificações</div>
-            <div id="notif-list">
+            <div class="welcome">
+                <h1 id="nome-afiliado">Olá, Parceiro!</h1>
+                <small>Gerencie seus ganhos e orçamentos.</small>
+            </div>
+            <div class="header-actions">
+                <a href="index.html" class="btn-loja"><i class="ph ph-storefront"></i> Ir para Loja</a>
+                
+                <div class="notification-container" id="box-sino">
+                    <button class="notification-btn" onclick="abrirNotificacoes()">
+                        <i class="ph ph-bell"></i>
+                        <span class="badge-dot" id="notif-badge" style="display:none">0</span>
+                    </button>
+                    
+                    <div id="notif-dropdown" class="dropdown-content">
+                        <div class="dropdown-header">
+                            Atualizações
+                            <small style="cursor:pointer; color:#3498db;" onclick="marcarLidas()">Limpar</small>
+                        </div>
+                        <div id="notif-list"></div>
+                    </div>
                 </div>
-        </div>
-    </div>
 
-    <button id="logout-btn" class="btn-sair"><i class="ph ph-sign-out"></i> Sair</button>
-    </div>
-</header>
+                <button id="logout-btn" class="btn-sair"><i class="ph ph-sign-out"></i></button>
+            </div>
+        </header>
 
         <div id="dashboard" class="tab-content active">
             <div class="stats-grid">
                 <div class="card money">
                     <h3>Saldo Disponível</h3>
                     <div class="value" id="saldo-total">R$ 0,00</div>
-                    <button id="btn-saque" onclick="solicitarSaque()" style="margin-top:10px; background:var(--success); color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer;">
-    Solicitar Saque
-</button>
+                    <button id="btn-saque" onclick="solicitarSaque()" style="margin-top:10px; background:var(--success); color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer; width:100%;">
+                        Solicitar Saque
+                    </button>
                 </div>
                 <div class="card">
                     <h3>Vendas Aprovadas</h3>
@@ -173,7 +175,7 @@
                 </div>
                 <div class="card">
                     <h3>Seu Código</h3>
-                    <input type="text" id="link-afiliado" readonly style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; color:#555;" value="...">
+                    <input type="text" id="link-afiliado" readonly style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; color:#555; text-align:center; font-weight:bold;" value="...">
                 </div>
             </div>
 
@@ -182,23 +184,21 @@
                 <a onclick="mudarAba('vendas')" style="font-size:0.9rem; color:var(--accent); cursor:pointer;">Ver todas</a>
             </div>
 
-            <div class="table-responsive"></div>
-
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Data</th>
-                        <th>Cliente</th>
-                        <th>Valor Venda</th>
-                        <th>Comissão</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody id="lista-ultimas-vendas">
-                    <tr><td colspan="5" align="center">Carregando...</td></tr>
-                </tbody>
-            </table>
-
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Cliente</th>
+                            <th>Valor Venda</th>
+                            <th>Comissão</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lista-ultimas-vendas">
+                        <tr><td colspan="5" align="center">Carregando...</td></tr>
+                    </tbody>
+                </table>
             </div>
             
             <br>
@@ -206,99 +206,95 @@
             <div class="card" style="margin-top:20px;">
                 <h3><i class="ph ph-bank"></i> Meus Dados de Recebimento</h3>
                 <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap:10px; align-items:end;">
-                    <div><small>Chave Pix</small><input type="text" id="input-pix" style="width:100%; padding:8px;"></div>
-                    <div><small>Banco</small><input type="text" id="input-banco" style="width:100%; padding:8px;"></div>
-                    <div><small>Agência</small><input type="text" id="input-agencia" style="width:100%; padding:8px;"></div>
-                    <div><small>Conta</small><input type="text" id="input-conta" style="width:100%; padding:8px;"></div>
+                    <div><small>Chave Pix</small><input type="text" id="input-pix" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;"></div>
+                    <div><small>Banco</small><input type="text" id="input-banco" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;"></div>
+                    <div><small>Agência</small><input type="text" id="input-agencia" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;"></div>
+                    <div><small>Conta</small><input type="text" id="input-conta" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;"></div>
                     <button onclick="salvarDadosBancarios()" style="padding:10px; background:var(--primary); color:white; border:none; border-radius:4px; cursor:pointer;">Salvar</button>
                 </div>
             </div>
+
             <div class="card" style="margin-top:20px;">
                 <h3><i class="ph ph-clock-counter-clockwise"></i> Histórico de Saques</h3>
-
                 <div class="table-responsive">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Data Solicitação</th>
-                            <th>Valor</th>
-                            <th>Data Pagamento</th>
-                            <th>Status</th>
-                            <th>Comprovante</th>
-                        </tr>
-                    </thead>
-                    <tbody id="lista-saques">
-                        <tr><td colspan="4" align="center">Carregando...</td></tr>
-                    </tbody>
-                </table>
-
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Data Solicitação</th>
+                                <th>Valor</th>
+                                <th>Data Pagamento</th>
+                                <th>Status</th>
+                                <th>Comprovante</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lista-saques">
+                            <tr><td colspan="5" align="center">Carregando...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
-
         </div>
 
         <div id="vendas" class="tab-content">
             <h2 class="section-title">Histórico Completo de Vendas</h2>
             <div class="table-responsive">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Data</th>
-                        <th>Cliente</th>
-                        <th>Valor</th>
-                        <th>Sua Comissão</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody id="lista-todas-vendas">
-                    <tr><td colspan="5" align="center">Carregando...</td></tr>
-                </tbody>
-            </table>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Cliente</th>
+                            <th>Valor</th>
+                            <th>Sua Comissão</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lista-todas-vendas">
+                        <tr><td colspan="5" align="center">Carregando...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 
         <div id="orcamentos" class="tab-content">
             <h2 class="section-title">
                 Meus Orçamentos Salvos
-                <small style="font-weight:normal; font-size:0.9rem; margin-left:10px; color:#666;">(Salvos quando você cria um carrinho na loja)</small>
+                <small style="font-weight:normal; font-size:0.9rem; margin-left:10px; color:#666;">(Salvos ao criar carrinho)</small>
             </h2>
             <div class="table-responsive">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Nome do Orçamento</th>
-                        <th>Data Criação</th>
-                        <th>Total Estimado</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody id="lista-orcamentos-salvos">
-                    <tr><td colspan="4" align="center">Carregando orçamentos...</td></tr>
-                </tbody>
-            </table>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Nome do Orçamento</th>
+                            <th>Data Criação</th>
+                            <th>Total Estimado</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lista-orcamentos-salvos">
+                        <tr><td colspan="4" align="center">Carregando orçamentos...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 
         <div id="clientes" class="tab-content">
             <h2 class="section-title">Carteira de Clientes</h2>
-            <p style="color:#666; font-size:0.9rem;">Lista automática baseada nas vendas confirmadas.</p>
+            <p style="color:#666; font-size:0.9rem; margin-bottom:15px;">Lista automática baseada nas vendas confirmadas.</p>
             
             <div class="table-responsive">
-
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Nome</th>
-                        <th>Email / Contato</th>
-                        <th>Total Gasto</th>
-                        <th>Última Compra</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody id="lista-clientes">
-                    <tr><td colspan="5" align="center">Buscando clientes...</td></tr>
-                </tbody>
-            </table>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Email / Contato</th>
+                            <th>Total Gasto</th>
+                            <th>Última Compra</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lista-clientes">
+                        <tr><td colspan="4" align="center">Buscando clientes...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 

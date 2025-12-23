@@ -408,172 +408,105 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
 .btn-banner:hover { transform: scale(1.05); }
 
 /* ========================================================================
-   📱 ESTILOS PARA CELULAR (CORREÇÃO FINAL V3 - ANTI-SOBREPOSIÇÃO)
+   📱 CSS HÍBRIDO (SIMPLES E INFALÍVEL)
    ======================================================================== */
+
+/* Por padrão (PC), esconde a versão mobile */
+.mobile-only {
+    display: none !important;
+}
+
+/* No Celular (até 768px) */
 @media (max-width: 768px) {
-
-    /* --- 1. ESTRUTURA GERAL --- */
-    body {
-        padding-top: 140px !important;
-        padding-bottom: 220px !important; /* Mais espaço embaixo para o resumo */
+    
+    /* Esconde a Tabela inteira (Tchau problemas!) */
+    .desktop-only {
+        display: none !important;
     }
 
-    .container, .main-content {
-        width: 100% !important;
-        padding: 0 10px !important;
-        overflow-x: hidden;
-    }
-
-    /* --- 2. CABEÇALHO FIXO --- */
-    #barra-parceiro {
-        position: fixed; top: 0; left: 0; width: 100%; z-index: 2000;
-        height: auto !important; padding: 10px !important;
-        flex-direction: row !important; flex-wrap: wrap; justify-content: center;
-    }
-
-    .main-header {
-        position: fixed; top: 50px; left: 0; width: 100%; z-index: 1900;
-        padding: 10px; box-shadow: 0 5px 10px rgba(0,0,0,0.05);
-    }
-    .header-container { flex-direction: column; gap: 5px; }
-    .search-container { width: 100%; order: 3; }
-    .header-actions { width: 100%; justify-content: space-around; order: 2; margin-bottom: 5px; }
-    .logo { order: 1; margin-bottom: 5px; }
-
-    /* --- 3. TABELA DO CARRINHO (CARTÕES) --- */
-    .cart-table, .cart-table tbody, .cart-table tr, .cart-table td {
+    /* Mostra a versão de Cards */
+    .mobile-only {
         display: block !important;
-        width: 100% !important;
     }
-    .cart-table thead { display: none !important; }
 
-    .cart-table tr {
-        background: #fff;
-        margin-bottom: 25px; /* Mais espaço entre produtos */
+    /* Estilo do Card Mobile (Livre de tabelas!) */
+    .mobile-cart-card {
+        background: white;
         border: 1px solid #ddd;
         border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        padding: 0 !important;
-        overflow: hidden;
+        padding: 15px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        position: relative;
     }
 
-    /* --- IMAGEM (Topo) --- */
-    .cart-table td[data-label="Imagem"] {
-        text-align: center;
-        background: #fdfdfd;
-        padding: 20px !important;
-        border-bottom: 1px solid #eee;
-        display: flex !important;
-        justify-content: center !important;
-    }
-    .cart-table td[data-label="Imagem"] img {
-        width: 140px !important; /* Imagem maior */
-        height: 140px !important;
+    .mobile-cart-img {
+        width: 120px;
+        height: 120px;
         object-fit: contain;
-    }
-    .cart-table td[data-label="Imagem"]::before { display: none; }
-
-    /* --- NOME DO PRODUTO E LUCRO (A Correção Principal) --- */
-    .cart-table td[data-label="Produto"] {
-        display: flex !important;
-        flex-direction: column !important; /* ISSO É O QUE MANDA UM FICAR EMBAIXO DO OUTRO */
-        align-items: center !important;
-        justify-content: center !important;
-        padding: 20px 10px !important;
-        height: auto !important;
-        text-align: center !important;
+        margin-bottom: 15px;
     }
 
-    /* Nome do Produto */
-    .produto-nome-mobile {
-        width: 100%;
-        display: block;
-        margin-bottom: 15px !important; /* Espaço obrigatório embaixo */
+    .mobile-cart-title {
+        font-size: 1.1rem;
+        font-weight: bold;
         color: #005fb9;
-        font-weight: bold;
-        line-height: 1.4;
+        margin-bottom: 10px;
     }
 
-    /* Caixa do Lucro */
-    .lucro-mobile-container {
-        display: flex !important; /* Garante que apareça */
-        flex-direction: row !important; /* O texto e o input ficam lado a lado */
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 10px;
+    /* Box do Lucro Mobile */
+    .mobile-lucro-box {
         background: #fff8e1;
+        border: 1px dashed #e67e22;
         padding: 8px 15px;
-        border-radius: 20px;
-        border: 1px solid #ffe0b2;
-        width: fit-content; /* Ocupa só o espaço necessário */
-        margin: 0 auto; /* Centraliza */
+        border-radius: 8px;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
     }
-
-    .lucro-mobile-container span {
-        color: #e67e22;
-        font-weight: bold;
-        font-size: 0.9rem;
-    }
-
-    /* Estilo do input específico */
-    .input-lucro-afiliado {
-        width: 60px !important;
+    .mobile-lucro-box input {
+        width: 60px;
         padding: 5px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
         text-align: center;
-        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 4px;
     }
 
-    .cart-table td[data-label="Produto"]::before { display: none; }
-
-    /* --- OUTROS CAMPOS --- */
-    .cart-table td {
-        display: flex !important;
+    /* Linha de Preços e Qtd */
+    .mobile-cart-details {
+        width: 100%;
+        display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 12px 15px !important;
-        border-bottom: 1px solid #f0f0f0;
-        text-align: right;
+        border-top: 1px solid #eee;
+        padding-top: 15px;
+        margin-top: 10px;
     }
 
-    .cart-table td::before {
-        content: attr(data-label);
-        font-weight: 700;
-        color: #555;
-        font-size: 0.9rem;
-        text-transform: uppercase;
+    .mobile-qty-box {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #f5f5f5;
+        padding: 5px 10px;
+        border-radius: 6px;
     }
 
-    .cart-table td[data-label="Total"] {
-        background-color: #f0fdf4;
-        color: #27ae60;
-        font-weight: 800;
-        font-size: 1.3rem;
-    }
-
-    /* Botão Remover */
-    .cart-table td[data-label="Remover"] {
-        justify-content: center;
-        padding: 0 !important;
-    }
-    .cart-table td[data-label="Remover"] button {
+    /* Botão Remover Grande */
+    .mobile-remove-btn {
         width: 100%;
-        padding: 15px;
+        margin-top: 15px;
         background: #ffebee;
-        color: #c62828;
+        color: #c0392b;
+        border: none;
+        padding: 12px;
+        border-radius: 6px;
         font-weight: bold;
-        display: flex; justify-content: center; align-items: center;
+        cursor: pointer;
     }
-    .cart-table td[data-label="Remover"] button::after { content: " Remover este item"; margin-left: 5px; }
-    .cart-table td[data-label="Remover"]::before { display: none; }
-
-    /* --- RESUMO FIXO --- */
-    .cart-total-box {
-        position: fixed; bottom: 0; left: 0; width: 100%;
-        background: #fff; z-index: 2000; padding: 15px;
-        box-shadow: 0 -5px 20px rgba(0,0,0,0.15);
-        border-radius: 20px 20px 0 0;
-    }
-    .cart-total-box h3, .cart-total-box a { display: none; }
 }

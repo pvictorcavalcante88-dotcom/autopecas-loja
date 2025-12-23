@@ -44,25 +44,25 @@
 
 <main class="cart-page-container">
         
-        <div class="cart-items-list">
-            <div class="table-responsive">
-                <table class="cart-table" width="100%">
-                    <thead>
-                        <tr>
-                            <th>Imagem</th>
-                            <th>Produto</th>
-                            <th>Preço</th>
-                            <th>Qtd</th>
-                            <th>Total</th>
-                            <th>Remover</th>
-                        </tr>
-                    </thead>
-                    
-                    <tbody id="cart-items">
-                        </tbody>
-                </table>
-            </div>
-        </div>
+        <div class="desktop-only">
+    <table class="cart-table" width="100%">
+        <thead>
+            <tr>
+                <th>Imagem</th>
+                <th>Produto</th>
+                <th>Preço</th>
+                <th>Qtd</th>
+                <th>Total</th>
+                <th>Remover</th>
+            </tr>
+        </thead>
+        <tbody id="cart-items-desktop">
+            </tbody>
+    </table>
+</div>
+
+<div id="cart-items-mobile" class="mobile-only">
+    </div>
 
         <div class="order-summary-box cart-total-box"> 
             <h3>Resumo do Pedido</h3>

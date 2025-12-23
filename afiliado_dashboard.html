@@ -6,119 +6,152 @@
     <title>Painel do Parceiro | AutoPeças</title>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
-        :root {
-            --primary: #2c3e50;
-            --accent: #e67e22;
-            --bg: #f4f6f8;
-            --white: #ffffff;
-            --success: #27ae60;
-            --warning: #f1c40f;
-            --danger: #c0392b;
+    /* =========================================
+       RESET OBRIGATÓRIO (TRAVA A LARGURA)
+       ========================================= */
+    * {
+        box-sizing: border-box; /* O SEGREDO: Faz o padding não aumentar a largura */
+        outline: none;
+    }
+
+    :root {
+        --primary: #2c3e50;
+        --accent: #e67e22;
+        --bg: #f4f6f8;
+        --white: #ffffff;
+        --success: #27ae60;
+        --warning: #f1c40f;
+        --danger: #c0392b;
+    }
+
+    body { 
+        font-family: 'Segoe UI', sans-serif; 
+        background: var(--bg); 
+        margin: 0; 
+        padding: 0;
+        display: flex; 
+        width: 100%;
+        overflow-x: hidden; /* Evita rolagem lateral no corpo */
+    }
+    
+    /* MENU LATERAL (PC) */
+    aside { width: 250px; background: var(--primary); color: white; min-height: 100vh; position: fixed; z-index: 100; }
+    aside h2 { text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(255,255,255,0.1); margin: 0; font-size: 1.4rem; }
+    aside nav a { display: flex; align-items: center; gap: 10px; padding: 15px 20px; color: #bdc3c7; text-decoration: none; transition: 0.3s; cursor: pointer; }
+    aside nav a:hover, aside nav a.active { background: rgba(255,255,255,0.1); color: var(--accent); border-left: 4px solid var(--accent); }
+
+    /* CONTEÚDO PRINCIPAL (PC) */
+    main { margin-left: 250px; padding: 30px; width: calc(100% - 250px); }
+
+    /* HEADER */
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px; }
+    .welcome h1 { margin: 0; font-size: 1.5rem; color: var(--primary); }
+    .header-actions { display: flex; align-items: center; gap: 15px; }
+    
+    /* BOTÕES DO TOPO */
+    .btn-loja { background: var(--accent); color: white; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; font-size: 0.9rem; white-space: nowrap; }
+    .notification-btn { position: relative; background: white; border: none; padding: 10px; border-radius: 50%; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; }
+    .notification-btn i { font-size: 1.2rem; color: #555; }
+    .btn-sair { background: var(--danger); color: white; border: none; padding: 0; border-radius: 6px; font-weight: bold; cursor: pointer; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
+    .btn-sair i { font-size: 1.2rem; }
+
+    /* CARDS */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .card { background: var(--white); padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+    .card h3 { margin: 0 0 10px 0; font-size: 0.9rem; color: #7f8c8d; }
+    .card .value { font-size: 1.8rem; font-weight: bold; color: var(--primary); }
+    .card.money .value { color: var(--success); }
+
+    /* TABELAS */
+    .section-title { font-size: 1.1rem; color: var(--primary); margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+    .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); background: white; border: 1px solid #eee; }
+    .data-table { width: 100%; border-collapse: collapse; min-width: 600px; }
+    .data-table th, .data-table td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
+    .data-table th { background: #f8f9fa; color: #555; font-weight: 600; white-space: nowrap; }
+
+    /* STATUS BADGES */
+    .status { padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; }
+    .status.aprovado { background: #d4edda; color: #155724; }
+    .status.pendente { background: #fff3cd; color: #856404; }
+    .status.cancelado { background: #f8d7da; color: #721c24; }
+
+    /* ABAS */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; animation: fadeIn 0.3s; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* DROPDOWN NOTIFICAÇÃO */
+    .notification-container { position: relative; display: inline-block; }
+    .badge-dot { position: absolute; top: -5px; right: -5px; background: #e74c3c; color: white; border-radius: 50%; padding: 2px 5px; font-size: 0.7rem; font-weight: bold; border: 2px solid white; }
+    .dropdown-content { display: none; position: absolute; right: 0; top: 50px; background-color: #fff; min-width: 280px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); border-radius: 8px; z-index: 1000; border: 1px solid #eee; }
+    .dropdown-header { padding: 10px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50; background: #f8f9fa; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; }
+    .notif-item { padding: 10px; border-bottom: 1px solid #eee; font-size: 0.9rem; display: flex; align-items: start; gap: 10px; }
+
+    /* =========================================
+       📱 AJUSTES MOBILE (FINAL)
+       ========================================= */
+    @media (max-width: 768px) {
+        body { flex-direction: column; width: 100%; overflow-x: hidden; }
+        
+        /* O Menu azul do topo */
+        aside { 
+            width: 100%; 
+            position: relative; 
+            min-height: auto; 
+            height: auto;
+            display: flex; 
+            flex-direction: column;
+            padding-bottom: 5px;
         }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; display: flex; }
+        aside h2 { padding: 15px 0; font-size: 1.2rem; }
         
-        /* MENU LATERAL */
-        aside { width: 250px; background: var(--primary); color: white; min-height: 100vh; position: fixed; z-index: 100; }
-        aside h2 { text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(255,255,255,0.1); margin: 0; }
-        aside nav a { display: flex; align-items: center; gap: 10px; padding: 15px 20px; color: #bdc3c7; text-decoration: none; transition: 0.3s; cursor: pointer; }
-        aside nav a:hover, aside nav a.active { background: rgba(255,255,255,0.1); color: var(--accent); border-left: 4px solid var(--accent); }
-
-        /* CONTEÚDO PRINCIPAL */
-        main { margin-left: 250px; padding: 30px; width: 100%; transition: margin 0.3s; }
-
-        /* HEADER */
-        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px; }
-        .welcome h1 { margin: 0; font-size: 1.5rem; color: var(--primary); }
-        .header-actions { display: flex; align-items: center; gap: 20px; }
+        /* Links com rolagem horizontal suave */
+        aside nav { 
+            display: flex; 
+            overflow-x: auto; 
+            padding: 0 10px 10px 10px; 
+            gap: 10px;
+            -webkit-overflow-scrolling: touch; /* Rolagem macia no iPhone */
+        }
+        /* Esconde a barra de rolagem feia */
+        aside nav::-webkit-scrollbar { display: none; }
         
-        /* SINO DE NOTIFICAÇÃO */
-        .notification-btn { position: relative; background: white; border: none; padding: 10px; border-radius: 50%; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .notification-btn i { font-size: 1.2rem; color: #555; }
-        
-        .btn-loja { background: var(--accent); color: white; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; font-size: 0.9rem; }
-        .btn-sair { background: var(--danger); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-left: 10px; }
+        aside nav a { 
+            flex: 0 0 auto; /* Não deixa encolher */
+            background: rgba(255,255,255,0.1); 
+            border-radius: 50px; 
+            padding: 8px 15px; 
+            font-size: 0.85rem; 
+            border-left: none !important; /* Remove a borda lateral do PC */
+        }
+        aside nav a.active { 
+            background: var(--accent); 
+            color: white; 
+        }
 
-        /* CARDS */
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .card { background: var(--white); padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        .card h3 { margin: 0 0 10px 0; font-size: 0.9rem; color: #7f8c8d; }
-        .card .value { font-size: 1.8rem; font-weight: bold; color: var(--primary); }
-        .card.money .value { color: var(--success); }
+        /* Conteúdo Principal */
+        main { 
+            margin-left: 0; 
+            width: 100%; 
+            padding: 15px; 
+        }
 
-        /* TABELAS E LISTAS */
-        .section-title { font-size: 1.1rem; color: var(--primary); margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        /* Header (Olá Parceiro + Botões) */
+        header { flex-direction: column; align-items: flex-start; gap: 15px; }
+        .welcome { width: 100%; }
         
-        /* --- CORREÇÃO DA TABELA PARA CELULAR --- */
-        .table-responsive {
-            width: 100%;
-            overflow-x: auto; /* Permite rolar para o lado */
-            -webkit-overflow-scrolling: touch;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        .header-actions { 
+            width: 100%; 
+            justify-content: space-between; 
             background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
 
-        .data-table { width: 100%; border-collapse: collapse; min-width: 600px; /* Força largura mínima pra não esmagar */ }
-        .data-table th, .data-table td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
-        .data-table th { background: #f8f9fa; color: #555; font-weight: 600; white-space: nowrap; }
-
-        /* STATUS BADGES */
-        .status { padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; }
-        .status.aprovado { background: #d4edda; color: #155724; }
-        .status.pendente { background: #fff3cd; color: #856404; }
-        .status.cancelado { background: #f8d7da; color: #721c24; }
-
-        /* ABAS */
-        .tab-content { display: none; }
-        .tab-content.active { display: block; animation: fadeIn 0.3s; }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* DROPDOWN NOTIFICAÇÃO */
-        .notification-container { position: relative; display: inline-block; }
-        .badge-dot { position: absolute; top: -5px; right: -5px; background: #e74c3c; color: white; border-radius: 50%; padding: 2px 5px; font-size: 0.7rem; font-weight: bold; border: 2px solid white; }
-        
-        .dropdown-content { display: none; position: absolute; right: 0; top: 50px; background-color: #fff; min-width: 300px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); border-radius: 8px; z-index: 1000; border: 1px solid #eee; }
-        .dropdown-header { padding: 10px; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50; background: #f8f9fa; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; }
-        .notif-item { padding: 10px; border-bottom: 1px solid #eee; font-size: 0.9rem; display: flex; align-items: start; gap: 10px; }
-        .notif-item:last-child { border-bottom: none; }
-        .notif-item:hover { background-color: #f1f1f1; }
-
-        /* =========================================
-           📱 AJUSTES PARA MOBILE (Responsividade)
-           ========================================= */
-        @media (max-width: 768px) {
-            body { flex-direction: column; }
-            
-            /* Menu Lateral vira um topo simples ou fica escondido */
-            aside { 
-                width: 100%; 
-                height: auto; 
-                min-height: auto; 
-                position: relative; 
-                display: flex; 
-                flex-direction: column;
-            }
-            
-            /* Ajuste dos links do menu para caberem lado a lado ou em grade se quiser, 
-               mas em coluna no topo funciona bem */
-            aside nav { display: flex; overflow-x: auto; padding-bottom: 5px; }
-            aside nav a { white-space: nowrap; padding: 10px 15px; font-size: 0.9rem; flex: 1; justify-content: center; }
-            
-            /* Tira a margem do conteúdo principal */
-            main { margin-left: 0; padding: 15px; width: 100%; }
-
-            /* Ajuste do Header */
-            header { flex-direction: column; align-items: flex-start; gap: 15px; }
-            .header-actions { width: 100%; justify-content: space-between; }
-            
-            /* Ajuste dos Cards de dados bancários */
-            .card > div[style*="grid"] {
-                grid-template-columns: 1fr !important; /* Um campo embaixo do outro */
-            }
-        }
-
-    </style>
+        .btn-loja { flex: 1; text-align: center; font-size: 0.85rem; padding: 10px; }
+    }
+</style>
 </head>
 <body>
 

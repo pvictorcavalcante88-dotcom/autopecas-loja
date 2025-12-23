@@ -561,57 +561,7 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         transform: scale(0.98);
     }
 
-    /* 1. Transforma o cabeçalho em uma coluna vertical */
-    .header-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 15px 10px;
-        gap: 15px; /* Espaço entre Logo, Busca e Botões */
-        height: auto !important; /* Remove altura fixa se houver */
-    }
-
-    /* 2. Centraliza a Logo */
-    .logo {
-        width: 100%;
-        display: flex;
-        justify-content: center;
-        margin-right: 0; /* Remove margem lateral se houver */
-    }
-
-    /* 3. Ajusta a Barra de Busca para ocupar a largura total */
-    .search-container {
-        width: 100%;
-        max-width: 100%; /* Garante que não estoure a tela */
-        margin: 0;
-        order: 2; /* Mantém a busca no meio */
-    }
-
-    .search-container input {
-        width: 100%; /* Input ocupa todo o espaço */
-    }
-
-    /* 4. Arruma os botões (Sino, Entrar, Carrinho) */
-    .header-actions {
-        width: 100%;
-        display: flex;
-        justify-content: center; /* Centraliza os ícones na tela */
-        align-items: center;
-        gap: 25px; /* Espaço generoso entre os ícones */
-        margin-left: 0; /* Remove margens antigas */
-        order: 3; /* Fica por último */
-    }
-
-    /* DICA DE OURO: Esconde o texto "Entrar" e "Carrinho" no celular */
-    /* Deixa apenas os ícones para ficar mais limpo. Se quiser o texto, apague essa parte abaixo */
-    .header-actions .action-button span:not(.badge) {
-        display: none;
-    }
     
-    /* Aumenta um pouco os ícones para facilitar o toque */
-    .header-actions i {
-        font-size: 24px;
-    }
 
 }
 
@@ -622,23 +572,66 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
     visibility: visible !important;
 }
 
-/* NO MOBILE, AJUSTA PARA NÃO FICAR TORTO */
+/* ========================================================================
+   CORREÇÃO CIRÚRGICA DO MOBILE (Mantendo seu Design)
+   ======================================================================== */
+
 @media (max-width: 768px) {
-    .header-actions {
-        display: flex !important;
+
+    /* 1. Ajusta o corpo para o cabeçalho não cobrir o conteúdo */
+    body {
+        padding-top: 180px !important; /* Espaço para as 3 linhas do cabeçalho */
+    }
+
+    /* 2. Solta o Header para ele crescer conforme necessário */
+    .main-header {
+        height: auto !important;
+        padding-bottom: 10px;
+    }
+
+    /* 3. Organiza os itens em COLUNA (Um embaixo do outro) */
+    .header-container {
+        display: flex;
+        flex-direction: column; /* O SEGREDO: Coluna vertical */
+        align-items: center;
+        gap: 15px; /* Espaço entre Logo, Busca e Botões */
+    }
+
+    /* 4. Centraliza a Logo */
+    .logo {
         width: 100%;
-        justify-content: flex-end; /* Joga pra direita */
-        padding-right: 15px;
-        margin-top: -40px; /* Puxa pra cima pra ficar do lado da logo se precisar */
-        position: relative;
-        z-index: 2001;
+        justify-content: center;
+        margin: 0;
+    }
+
+    /* 5. A Busca ocupa a largura toda */
+    .search-container {
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        order: 2; /* Garante que fique no meio */
+    }
+
+    /* 6. Arruma os botões (Sino, Entrar, Carrinho) */
+    .header-actions {
+        width: 100%;
+        display: flex;
+        justify-content: center; /* Centraliza na tela */
+        gap: 25px; /* Afasta um ícone do outro */
+        margin: 0 !important; /* Remove margens negativas antigas */
+        padding: 0;
+        order: 3; /* Garante que fique por último */
+        position: static; /* Remove posições absolutas que causam sobreposição */
+    }
+
+    /* 7. Limpeza visual: Esconde o texto "Carrinho/Entrar" no mobile, mantém só ícone */
+    /* Se você quiser que o texto apareça, apague as 3 linhas abaixo */
+    .header-actions .action-button span:not(.badge) {
+        display: none;
     }
     
-    /* Ajusta tamanho dos ícones no celular */
-    .action-button i {
-        font-size: 1.4rem;
-    }
-    .action-button span {
-        display: none; /* Esconde o texto "Carrinho", deixa só o ícone */
+    /* Aumenta um pouco os ícones para facilitar o toque */
+    .header-actions i {
+        font-size: 1.5rem;
     }
 }

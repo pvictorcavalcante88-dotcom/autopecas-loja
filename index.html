@@ -6,7 +6,7 @@
     <title>AutoPeças Veloz - Sua Loja de Peças</title>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=2.1">
 </head>
 <body>
 
@@ -216,15 +216,40 @@
             } catch(e) { console.error("Erro no sino:", e); }
         }
 
-        function abrirNotificacoes() {
-            const dropdown = document.getElementById('notif-dropdown');
-            if(dropdown.style.display === 'block') {
-                dropdown.style.display = 'none';
-            } else {
-                dropdown.style.display = 'block';
-                marcarLidas(); // Opcional: marca como lido ao abrir
+        /* ============================================================
+       SCRIPT PARA CONTROLAR O MENU DE NOTIFICAÇÕES (SINO)
+       ============================================================ */
+    
+    // 1. Função que abre/fecha o menu quando clica no sino
+    function abrirNotificacoes() {
+        var dropdown = document.getElementById("notif-dropdown");
+        
+        // Se já tiver a classe 'show', tira. Se não tiver, coloca.
+        if (dropdown.classList.contains("show")) {
+            dropdown.classList.remove("show");
+            dropdown.style.display = "none"; // Garante que suma
+        } else {
+            dropdown.classList.add("show");
+            dropdown.style.display = "block"; // Garante que apareça
+        }
+    }
+
+    // 2. Função para fechar o menu se clicar em qualquer lugar fora dele
+    window.onclick = function(event) {
+        // Se o clique NÃO foi no sino E NÃO foi dentro do menu...
+        if (!event.target.matches('.bell-icon') && !event.target.closest('.notification-container')) {
+            
+            var dropdowns = document.getElementsByClassName("notif-dropdown");
+            for (var i = 0; i < dropdowns.length; i++) {
+                var openDropdown = dropdowns[i];
+                // Fecha o menu
+                if (openDropdown.classList.contains('show') || openDropdown.style.display === "block") {
+                    openDropdown.classList.remove('show');
+                    openDropdown.style.display = "none";
+                }
             }
         }
+    }
 
         async function marcarLidas() {
             const afData = localStorage.getItem('afiliadoLogado');

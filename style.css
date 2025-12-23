@@ -635,3 +635,72 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         font-size: 1.5rem;
     }
 }
+
+/* } <--- ESSA CHAVE É UMA SEGURANÇA CASO TENHA FICADO ALGUMA ABERTA ANTES */
+
+/* ========================================================================
+   CORREÇÃO DE EMERGÊNCIA (FORCE MOBILE)
+   ======================================================================== */
+
+/* 1. Esconde o menu de notificações que está vazando na tela */
+.notif-dropdown {
+    display: none !important; /* Só deve aparecer quando clicar */
+}
+
+/* Quando clicar (via JS), ele deve flutuar e não empurrar nada */
+.notif-dropdown.show, .notif-dropdown.active {
+    display: block !important;
+    position: absolute !important;
+    top: 40px !important;
+    right: 0 !important;
+    z-index: 9999 !important;
+    background: white !important;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2) !important;
+    width: 250px !important;
+}
+
+/* 2. Força BRUTAL do layout em Coluna no Mobile */
+@media screen and (max-width: 900px) { /* Aumentei para 900px para pegar celulares grandes */
+    
+    .header-container {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        height: auto !important;
+        padding-bottom: 15px !important;
+    }
+
+    /* Linha 1: Logo */
+    .logo {
+        width: 100% !important;
+        justify-content: center !important;
+        margin-bottom: 10px !important;
+        display: flex !important;
+    }
+
+    /* Linha 2: Busca */
+    .search-container {
+        width: 100% !important;
+        max-width: 95% !important; /* Um pouco menos que 100% pra não colar na borda */
+        margin: 0 auto 15px auto !important;
+        order: 2 !important;
+    }
+
+    /* Linha 3: Ícones */
+    .header-actions {
+        width: 100% !important;
+        justify-content: center !important;
+        margin: 0 !important;
+        order: 3 !important;
+        display: flex !important;
+        gap: 20px !important;
+        position: static !important; /* Remove qualquer posição fixa que esteja atrapalhando */
+    }
+
+    /* Ajuste para o botão "Acessar Meu Painel" não quebrar o topo */
+    #barra-parceiro {
+        flex-wrap: wrap !important;
+        height: auto !important;
+        padding: 5px !important;
+    }
+}

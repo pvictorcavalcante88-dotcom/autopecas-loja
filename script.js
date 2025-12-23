@@ -133,97 +133,113 @@ document.addEventListener("DOMContentLoaded", async function() {
 
 
 // ==============================================================
-// 🛒 CARRINHO HÍBRIDO (TABELA PC + CARDS MOBILE)
+// 🛒 CARRINHO HÍBRIDO V3 (COM BOTÃO E IMAGENS CORRIGIDOS)
 // ==============================================================
 async function carregarPaginaCarrinho() {
     if (!localStorage.getItem('afiliadoLogado')) {
-        alert("Faça login."); window.location.href = "login.html"; return;
+        alert("Você precisa fazer login para acessar o carrinho.");
+        window.location.href = "login.html";
+        return;
     }
 
-    // Pega os DOIS containers
-    const containerDesktop = document.getElementById('cart-items-desktop');
-    const containerMobile  = document.getElementById('cart-items-mobile'); // Novo container
+    // --- PEGA OS ELEMENTOS ---
+    const cartItemsContainer = document.getElementById('cart-items'); // Tabela PC
+    const cartMobileContainer = document.getElementById('cart-items-mobile'); // Div Mobile
     
-    // Elementos de totais
     const cartTotalElement = document.getElementById('cart-total');
     const cartSubtotalElement = document.getElementById('cart-subtotal');
     const rowLucro = document.getElementById('row-afiliado-lucro');
     const valorLucro = document.getElementById('afiliado-lucro-valor');
-
-    if (!containerDesktop) return;
+    const divAcoes = document.getElementById('afiliado-cart-actions'); // Container do botão
 
     let cart = getCarrinho();
     
-    // Limpa ambos
-    containerDesktop.innerHTML = ''; 
-    if(containerMobile) containerMobile.innerHTML = '';
+    // Limpa tudo antes de começar
+    if (cartItemsContainer) cartItemsContainer.innerHTML = ''; 
+    if (cartMobileContainer) cartMobileContainer.innerHTML = '';
+    if (divAcoes) divAcoes.innerHTML = ''; // Limpa o botão antigo
     
     let totalVenda = 0;
     let totalLucro = 0; 
     const isAfiliado = !!localStorage.getItem('afiliadoLogado');
 
-    // Carrinho Vazio
+    // 1. Carrinho Vazio
     if (cart.length === 0) {
-        containerDesktop.innerHTML = '<tr><td colspan="6" align="center">Vazio</td></tr>';
-        if(containerMobile) containerMobile.innerHTML = '<div style="text-align:center; padding:20px;">Seu carrinho está vazio.</div>';
+        if(cartItemsContainer) cartItemsContainer.innerHTML = '<tr><td colspan="6" align="center">Carrinho vazio.</td></tr>';
+        if(cartMobileContainer) cartMobileContainer.innerHTML = '<div style="text-align:center; padding:20px;">Carrinho vazio.</div>';
+        
+        if (cartTotalElement) cartTotalElement.innerText = 'R$ 0,00';
+        if (cartSubtotalElement) cartSubtotalElement.innerText = 'R$ 0,00';
+        if (rowLucro) rowLucro.style.display = 'none';
         return;
     }
 
-    // LOOP GERA O HTML DUPLO
+    // 2. Loop dos Itens
     for (const item of cart) {
         try {
             const response = await fetch(`${API_URL}/products/${item.id}`);
             if (!response.ok) continue;
             const p = await response.json();
+
             const nomeExibir = montarNomeCompleto(item, p);
 
-            // Cálculos
+            // Preços e Margem
             const precoBase = parseFloat(p.price || p.preco_novo);
-            let margem = (item.customMargin !== undefined) ? item.customMargin : ((FATOR_GLOBAL - 1) * 100);
-            const precoFinal = precoBase * (1 + (margem / 100));
-            const subtotal = precoFinal * item.quantidade;
-            const lucroItem = (precoFinal - precoBase) * item.quantidade;
+            let margemAplicada = (item.customMargin !== undefined) ? item.customMargin : ((FATOR_GLOBAL - 1) * 100);
+            const precoFinal = precoBase * (1 + (margemAplicada / 100));
+            
+            const subtotalItem = precoFinal * item.quantidade;
+            const lucroItem = (precoFinal - precoBase) * item.quantidade; 
 
-            totalVenda += subtotal;
+            totalVenda += subtotalItem;
             totalLucro += lucroItem;
 
-            // --- 1. GERA LINHA DA TABELA (DESKTOP) ---
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><img src="${p.image||p.imagem}" width="60"></td>
-                <td>
-                    ${nomeExibir} <br>
-                    ${isAfiliado ? `<small style="color:#e67e22">Lucro: <input type="number" value="${margem}" style="width:50px" onchange="atualizarMargemCarrinho(${item.id}, this.value)">%</small>` : ''}
-                </td>
-                <td>${formatarMoeda(precoFinal)}</td>
-                <td>
-                    <button onclick="alterarQuantidade(${item.id}, -1)">-</button>
-                    ${item.quantidade}
-                    <button onclick="alterarQuantidade(${item.id}, 1)">+</button>
-                </td>
-                <td>${formatarMoeda(subtotal)}</td>
-                <td><button onclick="removerItem(${item.id})" style="color:red">X</button></td>
-            `;
-            containerDesktop.appendChild(tr);
+            // --- VERSÃO DESKTOP (TABELA) ---
+            if (cartItemsContainer) {
+                const htmlMargemPC = isAfiliado ? `
+                    <div style="margin-top:5px; font-size:0.85rem; color:#e67e22;">
+                        Lucro: <input type="number" value="${margemAplicada}" 
+                        style="width:50px; text-align:center; border:1px solid #ddd;" 
+                        onchange="atualizarMargemCarrinho(${item.id}, this.value)"> %
+                    </div>` : '';
 
-            // --- 2. GERA CARD (MOBILE) - SEM TABELAS! ---
-            if(containerMobile) {
-                const card = document.createElement('div');
-                card.className = 'mobile-cart-card';
-                card.innerHTML = `
-                    <img src="${p.image||p.imagem}" class="mobile-cart-img">
-                    <div class="mobile-cart-title">${nomeExibir}</div>
-                    
-                    ${isAfiliado ? `
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><img src="${p.image||p.imagem}" width="60" style="vertical-align:middle" onerror="this.src='https://placehold.co/100'"></td>
+                    <td><strong>${nomeExibir}</strong> ${htmlMargemPC}</td>
+                    <td>${formatarMoeda(precoFinal)}</td>
+                    <td>
+                        <button onclick="alterarQuantidade(${item.id}, -1)">-</button> 
+                        ${item.quantidade} 
+                        <button onclick="alterarQuantidade(${item.id}, 1)">+</button>
+                    </td>
+                    <td>${formatarMoeda(subtotalItem)}</td>
+                    <td><button onclick="removerItem(${item.id})" style="color:red;border:none;background:none;cursor:pointer;">X</button></td>
+                `;
+                cartItemsContainer.appendChild(row);
+            }
+
+            // --- VERSÃO MOBILE (CARDS) ---
+            if (cartMobileContainer) {
+                const htmlMargemMobile = isAfiliado ? `
                     <div class="mobile-lucro-box">
                         <strong>Lucro:</strong>
-                        <input type="number" value="${margem}" onchange="atualizarMargemCarrinho(${item.id}, this.value)"> %
-                    </div>` : ''}
+                        <input type="number" value="${margemAplicada}" 
+                            onchange="atualizarMargemCarrinho(${item.id}, this.value)"> %
+                    </div>` : '';
 
+                const card = document.createElement('div');
+                card.className = 'mobile-cart-card';
+                // ADICIONEI O ONERROR AQUI EMBAIXO 👇
+                card.innerHTML = `
+                    <img src="${p.image||p.imagem}" class="mobile-cart-img" onerror="this.src='https://placehold.co/100?text=Sem+Imagem'">
+                    <div class="mobile-cart-title">${nomeExibir}</div>
+                    ${htmlMargemMobile}
+                    
                     <div class="mobile-cart-details">
-                        <div>
-                            <div style="font-size:0.8rem; color:#888;">Preço Unit.</div>
-                            <div style="font-weight:bold;">${formatarMoeda(precoFinal)}</div>
+                        <div style="text-align:left;">
+                            <div style="font-size:0.8rem; color:#888;">Unitário</div>
+                            <div style="font-weight:bold; color:#333;">${formatarMoeda(precoFinal)}</div>
                         </div>
                         <div class="mobile-qty-box">
                             <button onclick="alterarQuantidade(${item.id}, -1)">-</button>
@@ -232,28 +248,35 @@ async function carregarPaginaCarrinho() {
                         </div>
                     </div>
 
-                    <div style="margin-top:15px; font-size:1.2rem; color:#27ae60; font-weight:800;">
-                        Total: ${formatarMoeda(subtotal)}
+                    <div style="margin-top:15px; display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:1.1rem; color:#27ae60; font-weight:800;">Total: ${formatarMoeda(subtotalItem)}</span>
                     </div>
 
-                    <button class="mobile-remove-btn" onclick="removerItem(${item.id})">
-                        Remover Item
-                    </button>
+                    <button class="mobile-remove-btn" onclick="removerItem(${item.id})">Remover Item</button>
                 `;
-                containerMobile.appendChild(card);
+                cartMobileContainer.appendChild(card);
             }
 
-        } catch (e) {}
+        } catch (e) { console.error(e); }
     }
-
-    // Totais e Botão Limpar (Adiciona no final de cada container)
-    // ... (lógica de totais permanece igual) ...
+    
+    // 3. Atualiza Totais
     if (cartTotalElement) cartTotalElement.innerText = formatarMoeda(totalVenda);
     if (cartSubtotalElement) cartSubtotalElement.innerText = formatarMoeda(totalVenda);
-    
-    if (isAfiliado && rowLucro) {
-        rowLucro.style.display = 'flex';
+
+    if (isAfiliado && rowLucro && valorLucro) {
+        rowLucro.style.display = 'flex'; 
         valorLucro.innerText = formatarMoeda(totalLucro);
+    }
+
+    // 4. CRIA O BOTÃO DE AÇÃO (FINALIZAR)
+    // Recria o botão se o container existir e for afiliado
+    if (divAcoes && isAfiliado) {
+        divAcoes.innerHTML = `
+            <button onclick="window.location.href='checkout.html'" class="btn-place-order" style="width:100%; margin-top:15px;">
+                <i class="ph ph-whatsapp-logo"></i> Finalizar / Gerar Link
+            </button>
+        `;
     }
 }
 

@@ -560,6 +560,41 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         background-color: #1a252f !important;
         transform: scale(0.98);
     }
+
+    /* 1. O container que segura o Logo, o Carrinho e os Botões */
+    header .container, 
+    .navbar { 
+        display: flex;
+        flex-direction: column; /* Isso faz um ficar embaixo do outro */
+        align-items: center;    /* Centraliza tudo */
+        gap: 15px;              /* Dá um espaço entre o logo e os botões */
+        padding-bottom: 10px;
+    }
+
+    /* 2. O Logo */
+    .logo, .brand {
+        width: 100%;
+        text-align: center;
+        margin-bottom: 5px;
+    }
+
+    /* 3. A área dos botões (Painel, Login, Carrinho) */
+    .menu-icons, 
+    .user-actions {
+        display: flex;
+        justify-content: center; /* Centraliza os ícones */
+        align-items: center;
+        width: 100%;
+        gap: 20px; /* Espaço entre o botão do painel, login e carrinho */
+        flex-wrap: wrap; /* Se tiver muita coisa, quebra linha de novo */
+    }
+
+    /* Opcional: Diminuir um pouco o tamanho da fonte dos links no mobile */
+    .menu-icons a, 
+    .btn-login {
+        font-size: 14px; 
+    }
+
 }
 
 /* FORÇA O BOTÃO DO CARRINHO A APARECER SEMPRE */

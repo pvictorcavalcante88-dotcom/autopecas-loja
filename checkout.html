@@ -3,83 +3,196 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Finalizar Compra - AutoPeças Veloz</title>
+    <title>Finalizar Pedido | AutoPeças Veloz</title>
+    
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <link rel="stylesheet" href="style.css?v=2.1">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+    <link rel="stylesheet" href="style.css?v=5"> 
+    
+    <style>
+        /* =========================================
+           ESTILOS EXCLUSIVOS DO CHECKOUT
+           ========================================= */
+        body { background-color: #f4f7fa; }
+
+        .checkout-container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: 2fr 1fr; /* PC: Formulário grande na Esq, Resumo pequeno na Dir */
+            gap: 30px;
+        }
+
+        /* CARD BRANCO GERAL */
+        .checkout-card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        h2 { margin-bottom: 20px; font-size: 1.5rem; color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        
+        /* FORMULÁRIO */
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 8px; color: #555; }
+        
+        /* Linha com 2 campos lado a lado */
+        .form-row { display: flex; gap: 15px; } 
+        
+        input[type="text"], input[type="email"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: 0.3s;
+        }
+        input:focus { border-color: #3498db; outline: none; }
+
+        /* RESUMO DO PEDIDO */
+        .order-summary-box h3 { font-size: 1.2rem; margin-bottom: 15px; }
+        .summary-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 0.95rem; }
+        
+        /* Área de rolagem para muitos itens */
+        .summary-item-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            padding-right: 5px; /* Espaço para barra de rolagem */
+        }
+
+        .summary-total { font-size: 1.4rem; font-weight: 800; color: #2c3e50; margin-top: 20px; display: flex; justify-content: space-between; border-top: 2px solid #eee; padding-top: 15px; }
+
+        /* BOTÕES (Estilo Base) */
+        .btn-place-order {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            color: white;
+            margin-bottom: 10px;
+        }
+        .btn-place-order:hover { transform: translateY(-2px); opacity: 0.9; }
+        
+        /* Link de Voltar */
+        .back-link { display: block; text-align: center; margin-top: 15px; color: #7f8c8d; font-size: 0.9rem; }
+        .back-link:hover { text-decoration: underline; color: #3498db; }
+
+        /* =========================================
+           📱 MOBILE (CELULAR)
+           ========================================= */
+        @media (max-width: 768px) {
+            .checkout-container {
+                display: flex;
+                flex-direction: column; /* Empilha: Formulário em cima, Resumo embaixo */
+                padding: 10px;
+                margin-top: 20px; 
+            }
+
+            .form-row { 
+                flex-direction: column; /* Campos que eram lado a lado ficam um embaixo do outro */
+                gap: 15px; 
+            }
+
+            .checkout-card { padding: 20px; }
+
+            /* Ajuste para o cabeçalho fixo não cobrir o topo */
+            body { padding-top: 100px; } 
+        }
+    </style>
 </head>
 <body>
 
-    <header class="main-header">
+    <div id="barra-parceiro"></div> <header class="main-header">
         <div class="header-container">
             <a href="index.html" class="logo">
-                <i class="ph ph-car-profile"></i>
-                AutoPeças <span>Veloz</span>
+                <i class="ph ph-car-profile"></i> AutoPeças <span>Veloz</span>
             </a>
-            <div class="header-actions">
-                <span style="font-weight: bold; color: #555;"><i class="ph ph-lock-key"></i> Ambiente Seguro</span>
+            
+            <div style="font-size:0.9rem; color:#777;" class="desktop-only">
+                <i class="ph ph-lock-key"></i> Ambiente 100% Seguro
             </div>
         </div>
     </header>
 
-    <main class="cart-page-container">
+    <div class="checkout-container">
         
-        <div class="checkout-form" style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+        <div class="checkout-card">
             <h2><i class="ph ph-map-pin"></i> Dados de Entrega</h2>
             
-            <label for="email">Email</label>
-            <input type="email" id="email" placeholder="seu@email.com">
+            <form id="checkout-form" onsubmit="event.preventDefault();">
+                <div class="form-row">
+                    <div class="form-group" style="flex:1">
+                        <label>Nome Completo</label>
+                        <input type="text" id="email" placeholder="Seu nome ou da Oficina" required>
+                    </div>
+                    <div class="form-group" style="flex:1">
+                         <label>Email (Opcional)</label>
+                        <input type="email" placeholder="email@exemplo.com">
+                    </div>
+                </div>
 
-            <label for="rua">Endereço Completo</label>
-            <input type="text" id="rua" placeholder="Rua, Número e Bairro">
+                <div class="form-group">
+                    <label>Endereço</label>
+                    <input type="text" id="rua" placeholder="Rua, Número e Bairro" required>
+                </div>
 
-            <label for="numero">Complemento (Opcional)</label>
-            <input type="text" id="numero" placeholder="Apto, Bloco...">
+                <div class="form-row">
+                    <div class="form-group" style="flex:1">
+                        <label>Cidade</label>
+                        <input type="text" placeholder="Ex: Maceió">
+                    </div>
+                    <div class="form-group" style="flex:1">
+                        <label>Telefone / Zap</label>
+                        <input type="text" placeholder="(DD) 99999-9999">
+                    </div>
+                </div>
 
-            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
-
-            <h2><i class="ph ph-credit-card"></i> Pagamento</h2>
-            <p style="color: #666; font-size: 0.9rem; margin-bottom: 15px;">
-                O pagamento será processado na entrega ou via PIX após a confirmação.
-            </p>
-            
-            <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; border: 1px solid #ddd;">
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                    <input type="radio" name="pagamento" checked> 
-                    <span>PIX / Boleto / Cartão (Pagar na Entrega)</span>
-                </label>
-            </div>
+                <div style="margin-top: 30px;">
+                    <h2><i class="ph ph-credit-card"></i> Pagamento</h2>
+                    <div style="background:#f9f9f9; padding:15px; border:1px solid #eee; border-radius:6px;">
+                        <input type="radio" checked> <b>PIX / Boleto / Cartão</b> (Acertar na Entrega)
+                        <p style="font-size:0.9rem; color:#666; margin-top:5px;">
+                            O pagamento será processado diretamente com o vendedor ou no ato da entrega.
+                        </p>
+                    </div>
+                </div>
+            </form>
         </div>
 
-        <div class="order-summary-box">
+        <div class="checkout-card order-summary-box">
             <h3>Seu Pedido</h3>
             
-            <div class="summary-item-list" style="max-height: 300px; overflow-y: auto; margin-bottom: 15px;">
-                <p>Carregando...</p>
-            </div>
+            <div class="summary-item-list">
+                </div>
 
-            <div class="summary-row total">
+            <div class="summary-total">
                 <span>Total a Pagar</span>
                 <span id="cart-total">R$ 0,00</span>
             </div>
-            
-            <button class="btn-place-order">
-                Finalizar Pedido
-            </button>
-            
-            <a href="cart.html" style="display: block; text-align: center; margin-top: 15px; font-size: 0.9rem; color: #666;">
-                Voltar ao Carrinho
-            </a>
+
+            <div id="container-botoes-dinamicos" style="margin-top: 25px;"></div>
+
+            <a href="cart.html" class="back-link">Voltar ao Carrinho</a>
         </div>
 
-    </main>
+    </div>
 
-    <footer class="main-footer">
-        <p>© 2025 AutoPeças Veloz. Todos os direitos reservados.</p>
-    </footer>
+    <script src="script.js"></script> 
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script> 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-    <script src="script.js"></script>
 </body>
 </html>

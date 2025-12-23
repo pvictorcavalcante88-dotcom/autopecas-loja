@@ -133,7 +133,7 @@ document.addEventListener("DOMContentLoaded", async function() {
 
 
 // ==============================================================
-// 🛒 CARRINHO HÍBRIDO V3 (COM BOTÃO E IMAGENS CORRIGIDOS)
+// 🛒 CARRINHO FINAL (COM BOTÃO ESVAZIAR NOS DOIS MODOS)
 // ==============================================================
 async function carregarPaginaCarrinho() {
     if (!localStorage.getItem('afiliadoLogado')) {
@@ -142,7 +142,6 @@ async function carregarPaginaCarrinho() {
         return;
     }
 
-    // --- PEGA OS ELEMENTOS ---
     const cartItemsContainer = document.getElementById('cart-items-desktop'); // Tabela PC
     const cartMobileContainer = document.getElementById('cart-items-mobile'); // Div Mobile
     
@@ -150,14 +149,14 @@ async function carregarPaginaCarrinho() {
     const cartSubtotalElement = document.getElementById('cart-subtotal');
     const rowLucro = document.getElementById('row-afiliado-lucro');
     const valorLucro = document.getElementById('afiliado-lucro-valor');
-    const divAcoes = document.getElementById('afiliado-cart-actions'); // Container do botão
+    const divAcoes = document.getElementById('afiliado-cart-actions');
 
     let cart = getCarrinho();
     
-    // Limpa tudo antes de começar
+    // Limpa tudo
     if (cartItemsContainer) cartItemsContainer.innerHTML = ''; 
     if (cartMobileContainer) cartMobileContainer.innerHTML = '';
-    if (divAcoes) divAcoes.innerHTML = ''; // Limpa o botão antigo
+    if (divAcoes) divAcoes.innerHTML = '';
     
     let totalVenda = 0;
     let totalLucro = 0; 
@@ -183,18 +182,17 @@ async function carregarPaginaCarrinho() {
 
             const nomeExibir = montarNomeCompleto(item, p);
 
-            // Preços e Margem
+            // Cálculos
             const precoBase = parseFloat(p.price || p.preco_novo);
             let margemAplicada = (item.customMargin !== undefined) ? item.customMargin : ((FATOR_GLOBAL - 1) * 100);
             const precoFinal = precoBase * (1 + (margemAplicada / 100));
-            
             const subtotalItem = precoFinal * item.quantidade;
             const lucroItem = (precoFinal - precoBase) * item.quantidade; 
 
             totalVenda += subtotalItem;
             totalLucro += lucroItem;
 
-            // --- VERSÃO DESKTOP (TABELA) ---
+            // --- VERSÃO DESKTOP ---
             if (cartItemsContainer) {
                 const htmlMargemPC = isAfiliado ? `
                     <div style="margin-top:5px; font-size:0.85rem; color:#e67e22;">
@@ -214,12 +212,12 @@ async function carregarPaginaCarrinho() {
                         <button onclick="alterarQuantidade(${item.id}, 1)">+</button>
                     </td>
                     <td>${formatarMoeda(subtotalItem)}</td>
-                    <td><button onclick="removerItem(${item.id})" style="color:red;border:none;background:none;cursor:pointer;">X</button></td>
+                    <td><button onclick="removerItem(${item.id})" style="color:red;border:none;background:none;cursor:pointer;">&times;</button></td>
                 `;
                 cartItemsContainer.appendChild(row);
             }
 
-            // --- VERSÃO MOBILE (CARDS) ---
+            // --- VERSÃO MOBILE ---
             if (cartMobileContainer) {
                 const htmlMargemMobile = isAfiliado ? `
                     <div class="mobile-lucro-box">
@@ -230,7 +228,6 @@ async function carregarPaginaCarrinho() {
 
                 const card = document.createElement('div');
                 card.className = 'mobile-cart-card';
-                // ADICIONEI O ONERROR AQUI EMBAIXO 👇
                 card.innerHTML = `
                     <img src="${p.image||p.imagem}" class="mobile-cart-img" onerror="this.src='https://placehold.co/100?text=Sem+Imagem'">
                     <div class="mobile-cart-title">${nomeExibir}</div>
@@ -260,7 +257,34 @@ async function carregarPaginaCarrinho() {
         } catch (e) { console.error(e); }
     }
     
-    // 3. Atualiza Totais
+    // --- 3. BOTÃO DE ESVAZIAR (AQUI ESTÁ A CORREÇÃO) ---
+    
+    // Adiciona no Desktop (Tabela)
+    if (cartItemsContainer && cart.length > 0) {
+        const rowLimpar = document.createElement('tr');
+        rowLimpar.innerHTML = `
+            <td colspan="6" style="text-align: right; padding-top: 15px;">
+                <button onclick="limparCarrinho()" style="background:none; border:1px solid #e74c3c; color:#e74c3c; padding:8px 15px; border-radius:4px; cursor:pointer; font-size:0.9rem; display:inline-flex; align-items:center; gap:5px; transition:0.3s;">
+                    <i class="ph ph-trash"></i> Esvaziar Carrinho
+                </button>
+            </td>`;
+        cartItemsContainer.appendChild(rowLimpar);
+    }
+
+    // Adiciona no Mobile (Lista)
+    if (cartMobileContainer && cart.length > 0) {
+        const btnLimparMobile = document.createElement('div');
+        btnLimparMobile.style.textAlign = 'center';
+        btnLimparMobile.style.marginTop = '20px';
+        btnLimparMobile.innerHTML = `
+            <button onclick="limparCarrinho()" style="background:white; border:1px solid #e74c3c; color:#e74c3c; padding:12px; width:100%; border-radius:8px; cursor:pointer; font-weight:bold; display:flex; justify-content:center; align-items:center; gap:8px;">
+                <i class="ph ph-trash" style="font-size:1.2rem;"></i> Esvaziar Todo o Carrinho
+            </button>
+        `;
+        cartMobileContainer.appendChild(btnLimparMobile);
+    }
+
+    // 4. Atualiza Totais
     if (cartTotalElement) cartTotalElement.innerText = formatarMoeda(totalVenda);
     if (cartSubtotalElement) cartSubtotalElement.innerText = formatarMoeda(totalVenda);
 
@@ -269,9 +293,8 @@ async function carregarPaginaCarrinho() {
         valorLucro.innerText = formatarMoeda(totalLucro);
     }
 
-    // 4. CRIA O BOTÃO DE AÇÃO (FINALIZAR)
-    // Recria o botão se o container existir e for afiliado
-    if (divAcoes && isAfiliado) {
+    // 5. Botão Finalizar
+    if (divAcoes && isAfiliado && cart.length > 0) {
         divAcoes.innerHTML = `
             <button onclick="window.location.href='checkout.html'" class="btn-place-order" style="width:100%; margin-top:15px;">
                 <i class="ph ph-whatsapp-logo"></i> Finalizar / Gerar Link

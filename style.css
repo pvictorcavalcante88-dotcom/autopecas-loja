@@ -561,7 +561,57 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         transform: scale(0.98);
     }
 
+    /* 1. Transforma o cabeçalho em uma coluna vertical */
+    .header-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 15px 10px;
+        gap: 15px; /* Espaço entre Logo, Busca e Botões */
+        height: auto !important; /* Remove altura fixa se houver */
+    }
+
+    /* 2. Centraliza a Logo */
+    .logo {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        margin-right: 0; /* Remove margem lateral se houver */
+    }
+
+    /* 3. Ajusta a Barra de Busca para ocupar a largura total */
+    .search-container {
+        width: 100%;
+        max-width: 100%; /* Garante que não estoure a tela */
+        margin: 0;
+        order: 2; /* Mantém a busca no meio */
+    }
+
+    .search-container input {
+        width: 100%; /* Input ocupa todo o espaço */
+    }
+
+    /* 4. Arruma os botões (Sino, Entrar, Carrinho) */
+    .header-actions {
+        width: 100%;
+        display: flex;
+        justify-content: center; /* Centraliza os ícones na tela */
+        align-items: center;
+        gap: 25px; /* Espaço generoso entre os ícones */
+        margin-left: 0; /* Remove margens antigas */
+        order: 3; /* Fica por último */
+    }
+
+    /* DICA DE OURO: Esconde o texto "Entrar" e "Carrinho" no celular */
+    /* Deixa apenas os ícones para ficar mais limpo. Se quiser o texto, apague essa parte abaixo */
+    .header-actions .action-button span:not(.badge) {
+        display: none;
+    }
     
+    /* Aumenta um pouco os ícones para facilitar o toque */
+    .header-actions i {
+        font-size: 24px;
+    }
 
 }
 

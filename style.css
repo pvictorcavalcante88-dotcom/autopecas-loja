@@ -408,28 +408,38 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
 .btn-banner:hover { transform: scale(1.05); }
 
 /* ========================================================================
-   📱 CSS HÍBRIDO (SIMPLES E INFALÍVEL)
+   📱 CSS HÍBRIDO E LAYOUT (SOLUÇÃO FINAL)
    ======================================================================== */
 
-/* Por padrão (PC), esconde a versão mobile */
+/* 1. COMPORTAMENTO PADRÃO (DESKTOP) */
 .mobile-only {
-    display: none !important;
+    display: none !important; /* Esconde cards de celular no PC */
 }
 
-/* No Celular (até 768px) */
+/* 2. COMPORTAMENTO MOBILE (Até 768px) */
 @media (max-width: 768px) {
     
-    /* Esconde a Tabela inteira (Tchau problemas!) */
+    /* --- ESTRUTURA DA PÁGINA (ARRUMA O GRID QUEBRADO) --- */
+    .cart-page-container {
+        display: flex !important;       /* Desliga o Grid */
+        flex-direction: column !important; /* Empilha: Lista em cima, Resumo embaixo */
+        width: 100% !important;
+        padding: 10px !important;
+        gap: 30px !important;
+    }
+
+    /* Esconde a Tabela de PC */
     .desktop-only {
         display: none !important;
     }
 
-    /* Mostra a versão de Cards */
+    /* Mostra os Cards de Celular */
     .mobile-only {
         display: block !important;
+        width: 100% !important;
     }
 
-    /* Estilo do Card Mobile (Livre de tabelas!) */
+    /* --- ESTILO DO CARD (MOBILE) --- */
     .mobile-cart-card {
         background: white;
         border: 1px solid #ddd;
@@ -441,7 +451,6 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         flex-direction: column;
         align-items: center;
         text-align: center;
-        position: relative;
     }
 
     .mobile-cart-img {
@@ -458,7 +467,7 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         margin-bottom: 10px;
     }
 
-    /* Box do Lucro Mobile */
+    /* Lucro (Box Amarelo) */
     .mobile-lucro-box {
         background: #fff8e1;
         border: 1px dashed #e67e22;
@@ -475,9 +484,10 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         text-align: center;
         border: 1px solid #ccc;
         border-radius: 4px;
+        font-size: 1rem;
     }
 
-    /* Linha de Preços e Qtd */
+    /* Detalhes (Preço e Qtd) */
     .mobile-cart-details {
         width: 100%;
         display: flex;
@@ -497,7 +507,7 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         border-radius: 6px;
     }
 
-    /* Botão Remover Grande */
+    /* Botão Remover */
     .mobile-remove-btn {
         width: 100%;
         margin-top: 15px;
@@ -508,5 +518,12 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         border-radius: 6px;
         font-weight: bold;
         cursor: pointer;
+    }
+
+    /* --- ARRUMA O RESUMO DO PEDIDO --- */
+    .cart-total-box {
+        width: 100% !important; /* Ocupa a largura toda */
+        margin-top: 0 !important;
+        position: relative !important; /* Tira qualquer fixação estranha */
     }
 }

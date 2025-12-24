@@ -661,7 +661,7 @@ function gerarPayloadUrl() {
 
 // FINALIZAR PEDIDO (CLIENTE)
 async function finalizarPedido(itens) {
-    alert("Opa! O botão no celular funcionou!");
+    
     const email = document.getElementById('email').value;
     const rua = document.getElementById('rua').value;
     if(!email || !rua) return alert("Preencha dados.");

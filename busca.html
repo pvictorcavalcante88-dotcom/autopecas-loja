@@ -3,57 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resultados da Busca - AutoPeças Veloz</title>
+    <title>Resultados da Busca | AutoPeças Veloz</title>
+    
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <link rel="stylesheet" href="style.css?v=1.2">
+    
+    <link rel="stylesheet" href="style.css?v=5">
+
+    <style>
+        /* =========================================
+           📱 MOBILE (CELULAR) - CORREÇÃO DO TOPO
+           ========================================= */
+        @media (max-width: 768px) {
+            /* 1. EMPURRA O CONTEÚDO PARA BAIXO */
+            /* Igual fizemos no product.html */
+            body {
+                padding-top: 260px !important; 
+            }
+
+            /* Ajuste extra para o título não ficar colado na borda */
+            .main-content {
+                padding-top: 20px;
+            }
+        }
+        
+        /* Ajuste do grid de resultados */
+        .promo-section h2 {
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            color: #2c3e50;
+            padding-left: 10px;
+            border-left: 5px solid #e67e22;
+        }
+    </style>
 </head>
 <body>
 
-    <header class="main-header">
-    <div class="header-container">
-        <a href="index.html" class="logo">
-            <i class="ph ph-car-profile"></i>
-            AutoPeças <span>Veloz</span>
-        </a>
+    <div id="barra-parceiro"></div>
 
-        <div class="search-container">
-            <input type="text" id="search-input" placeholder="O que você está procurando?">
-            
-            <button class="search-button" id="search-button" aria-label="Buscar">
-                <i class="ph ph-magnifying-glass"></i>
-            </button>
-            
-            
-            <div class="search-dropdown-menu" id="search-dropdown-menu">
-                <a href="#" data-value="">Todas as Categorias</a>
-                <a href="#" data-value="Motor">Motor</a>
-                <a href="#" data-value="Freios">Freios</a>
-                <a href="#" data-value="Suspensão">Suspensão</a>
-                <a href="#" data-value="Elétrica">Elétrica</a>
-                <a href="#" data-value="Câmbio">Câmbio</a>
-                <a href="#" data-value="Acessórios">Acessórios</a>
+    <header class="main-header">
+        <div class="header-container">
+            <a href="index.html" class="logo">
+                <i class="ph ph-car-profile"></i> AutoPeças <span>Veloz</span>
+            </a>
+
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="O que você procura?">
+                <button class="search-button" id="search-button" aria-label="Buscar">
+                    <i class="ph ph-magnifying-glass"></i>
+                </button>
+            </div>
+
+            <div class="header-actions">
+                <div class="notification-container" id="box-sino">
+                    <div class="action-button" onclick="abrirNotificacoes()" style="cursor:pointer">
+                        <i class="ph ph-bell bell-icon"></i>
+                        <span id="notif-badge" class="badge">0</span>
+                    </div>
+                    <div id="notif-dropdown" class="notif-dropdown">
+                        <div class="notif-header">Notificações</div>
+                        <div id="notif-list" class="notif-list"></div>
+                    </div>
+                </div>
+
+                <a href="afiliado_login.html" class="action-button" id="btn-login-header">
+                    <i class="ph ph-user"></i>
+                    <span>Entrar</span>
+                </a>
+
+                <a href="cart.html" class="action-button cart-button">
+                    <i class="ph ph-shopping-cart"></i>
+                    <span>Carrinho</span>
+                    <span>0</span> 
+                </a>
             </div>
         </div>
-
-        <div class="header-actions">
-            <a href="#" class="action-button">
-                <i class="ph ph-user"></i>
-                <span>Entrar</span>
-            </a>
-            <a href="cart.html" class="action-button cart-button">
-                <i class="ph ph-shopping-cart"></i>
-                <span>Carrinho</span>
-                <span>0</span> 
-            </a>
-        </div>
-    </div>
-</header>
+    </header>
 
     <main class="main-content">
-        <section class="promo-section"> <h2><span id="titulo-busca">...</span></h2>
+        <section class="promo-section"> 
+            <h2><span id="titulo-busca">Pesquisando...</span></h2>
             
             <div id="search-track">
-                <p>Pesquisando...</p>
+                <p style="padding: 20px;">Carregando resultados...</p>
             </div>
         </section>
     </main>
@@ -62,6 +93,6 @@
         <p>© 2025 AutoPeças Veloz. Todos os direitos reservados.</p>
     </footer>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=5"></script>
 </body>
 </html>

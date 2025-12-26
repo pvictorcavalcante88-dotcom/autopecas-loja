@@ -5,30 +5,80 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Admin AutoPeças</title>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
     <style>
         /* =========================================
-           ESTILOS GERAIS (PC)
+           ESTILOS GERAIS E VARIÁVEIS
            ========================================= */
-        :root { --primary: #2c3e50; --accent: #e67e22; --bg: #f4f6f8; --blue: #005fb9; }
+        :root {
+            --primary: #2c3e50;
+            --accent: #e67e22;
+            --bg: #f4f6f8;
+            --white: #ffffff;
+            --blue: #005fb9;
+        }
 
         * { box-sizing: border-box; outline: none; }
 
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; display: flex; min-height: 100vh; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: var(--bg);
+            margin: 0;
+            display: flex; /* Layout Lado a Lado no PC */
+            min-height: 100vh;
+        }
 
-        /* MENU LATERAL */
-        aside { width: 250px; background: var(--primary); color: white; height: 100vh; position: fixed; top: 0; left: 0; z-index: 100; overflow-y: auto; }
-        aside h3 { text-align: center; padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); margin: 0; }
-        aside nav a { display: flex; align-items: center; gap: 10px; padding: 15px 20px; color: #bdc3c7; text-decoration: none; transition: 0.3s; }
-        aside nav a:hover, aside nav a.active { background: rgba(255,255,255,0.1); color: var(--accent); border-left: 4px solid var(--accent); }
+        /* =========================================
+           MENU LATERAL (DESKTOP)
+           ========================================= */
+        aside.sidebar {
+            width: 250px;
+            background: var(--primary);
+            color: white;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+        }
 
-        /* CONTEÚDO PRINCIPAL */
-        main { margin-left: 250px; padding: 30px; width: 100%; }
+        aside h3 {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin: 0;
+        }
 
-        header h1 { margin: 0; color: var(--primary); font-size: 1.5rem; }
+        aside nav a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px 20px;
+            color: #bdc3c7;
+            text-decoration: none;
+            transition: 0.3s;
+        }
+
+        aside nav a:hover, aside nav a.active {
+            background: rgba(255,255,255,0.1);
+            color: var(--accent);
+            border-left: 4px solid var(--accent);
+        }
+
+        /* =========================================
+           CONTEÚDO PRINCIPAL (DESKTOP)
+           ========================================= */
+        main.main-content {
+            margin-left: 250px; /* Espaço do Menu */
+            padding: 30px;
+            width: 100%;
+        }
+
+        header h1 { margin: 0; color: var(--primary); }
         header p { color: #666; margin-top: 5px; }
 
-        /* GRIDS E CARDS */
+        /* CARDS E GRIDS */
         .dashboard-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -37,16 +87,31 @@
         }
 
         .stat-card {
-            background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            display: flex; flex-direction: column;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
         }
+
         .stat-card h3 { font-size: 0.9rem; color: #666; margin: 0 0 10px 0; font-weight: normal; }
         .stat-card .value { font-size: 1.8rem; font-weight: bold; color: var(--blue); }
         .stat-card i { font-size: 2rem; margin-bottom: 10px; color: var(--blue); }
 
-        /* TABELA DE PEDIDOS RECENTES */
-        .card-table-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .table-responsive { width: 100%; overflow-x: auto; }
+        /* TABELA */
+        .card-table-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto; /* Permite rolagem lateral */
+        }
+
         table { width: 100%; border-collapse: collapse; margin-top: 15px; white-space: nowrap; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
         th { background-color: #f8f9fa; color: #555; }
@@ -58,7 +123,7 @@
             body { flex-direction: column; } 
 
             /* 1. Menu vira topo deslizante */
-            aside { 
+            aside.sidebar { 
                 width: 100%; height: auto; position: relative; padding-bottom: 10px; overflow-y: visible; 
             }
             aside nav { 
@@ -82,7 +147,7 @@
             }
 
             /* 2. Conteúdo ocupa tudo */
-            main { margin-left: 0; padding: 15px; width: 100%; }
+            main.main-content { margin-left: 0; padding: 15px; width: 100%; }
 
             /* 3. Cards empilhados */
             .dashboard-grid { grid-template-columns: 1fr; }
@@ -91,7 +156,7 @@
 </head>
 <body>
 
-    <aside>
+    <aside class="sidebar">
         <h3>Admin AutoPeças</h3>
         <nav>
             <a href="admin_dashboard.html" class="active"><i class="ph ph-gauge"></i> Dashboard</a>
@@ -103,7 +168,7 @@
         </nav>
     </aside>
 
-    <main>
+    <main class="main-content">
         <header>
             <h1>Visão Geral</h1>
             <p>Bem-vindo ao painel de controle.</p>
@@ -155,69 +220,90 @@
                         </tr>
                     </thead>
                     <tbody id="ultimos-pedidos-list">
-                        <tr><td colspan="4" align="center">Carregando dados...</td></tr>
+                        <tr><td colspan="4" align="center">Carregando dados reais...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
-
     </main>
 
     <script>
-        // Mesmo Script do admin.js para carregar dashboard
-        const API_URL = ''; 
-        
-        async function carregarDashboard() {
-            const token = localStorage.getItem('adminToken');
-            // if(!token) return window.location.href = 'admin_login.html';
-
-            try {
-                // Tenta carregar dados reais
-                const res = await fetch(`${API_URL}/admin/dashboard`, { headers: { 'Authorization': `Bearer ${token}` } });
-                const dados = await res.json();
-                
-                document.getElementById('total-vendas').innerText = parseFloat(dados.faturamentoTotal || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
-                document.getElementById('total-comissoes').innerText = parseFloat(dados.comissoesPendentes || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
-                document.getElementById('total-pedidos').innerText = dados.totalPedidos || 0;
-                document.getElementById('total-produtos').innerText = dados.totalProdutos || 0;
-                document.getElementById('estoque-baixo').innerText = dados.estoqueBaixo || 0;
-
-                // Tabela
-                const tbody = document.getElementById('ultimos-pedidos-list');
-                tbody.innerHTML = '';
-                if(dados.ultimosPedidos && dados.ultimosPedidos.length > 0) {
-                    dados.ultimosPedidos.forEach(p => {
-                        tbody.innerHTML += `
-                            <tr>
-                                <td>#${p.id}</td>
-                                <td>${p.clienteNome}</td>
-                                <td>${parseFloat(p.valorTotal).toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</td>
-                                <td>${new Date(p.createdAt).toLocaleDateString('pt-BR')}</td>
-                            </tr>
-                        `;
-                    });
-                } else {
-                    tbody.innerHTML = '<tr><td colspan="4" align="center">Sem pedidos recentes.</td></tr>';
-                }
-
-            } catch (e) {
-                // Simulação se estiver offline
-                console.log("Offline ou erro:", e);
-                document.getElementById('total-vendas').innerText = "R$ 1.519,80";
-                document.getElementById('total-comissoes').innerText = "R$ 95,40";
-                document.getElementById('total-pedidos').innerText = "12";
-                document.getElementById('total-produtos').innerText = "48";
-                document.getElementById('estoque-baixo').innerText = "3";
-                document.getElementById('ultimos-pedidos-list').innerHTML = '<tr><td colspan="4" align="center">Dados simulados (Offline)</td></tr>';
-            }
-        }
-        
-        document.getElementById('logout-button').addEventListener('click', () => {
-            localStorage.removeItem('adminToken');
-            window.location.href = 'admin_login.html';
+        document.addEventListener("DOMContentLoaded", function() {
+            carregarDadosReais();
         });
 
-        carregarDashboard();
+        function carregarDadosReais() {
+            // 1. Ler o "Banco de Dados" do Navegador
+            // Se não existir, retorna array vazio []
+            const vendas = JSON.parse(localStorage.getItem('db_vendas') || '[]');
+            
+            // Tenta ler produtos (se você já tiver salvado algum no admin_produtos)
+            // Caso contrário, fica 0
+            const produtos = JSON.parse(localStorage.getItem('db_produtos') || '[]'); 
+            // NOTA: Se os produtos estiverem apenas no script.js e não no localStorage, 
+            // aqui vai dar 0, mas as vendas vão aparecer.
+
+            // 2. Calcular Totais
+            let faturamento = 0;
+            let comissoes = 0;
+            let qtdPedidos = vendas.length;
+            
+            // Loop para somar valores
+            vendas.forEach(v => {
+                // Ignora pedidos cancelados na soma (opcional)
+                if(v.status !== 'CANCELADO') {
+                    faturamento += parseFloat(v.total || v.valorTotal || 0); // Tenta ler total ou valorTotal
+                    comissoes += parseFloat(v.comissao || v.comissaoGerada || 0);
+                }
+            });
+
+            // 3. Estoque Baixo (Conta produtos com menos de 5 unidades)
+            let estoqueCritico = 0;
+            if(produtos.length > 0) {
+                estoqueCritico = produtos.filter(p => p.estoque < 5).length;
+            }
+
+            // 4. Preencher a Tela (DOM)
+            document.getElementById('total-vendas').innerText = faturamento.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+            document.getElementById('total-comissoes').innerText = comissoes.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+            document.getElementById('total-pedidos').innerText = qtdPedidos;
+            document.getElementById('total-produtos').innerText = produtos.length > 0 ? produtos.length : 0;
+            document.getElementById('estoque-baixo').innerText = estoqueCritico;
+
+            // 5. Preencher a Tabela com os Últimos 5 Pedidos
+            const tbody = document.getElementById('ultimos-pedidos-list');
+            tbody.innerHTML = '';
+
+            if (vendas.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" align="center">Nenhuma venda registrada ainda.</td></tr>';
+            } else {
+                // Pega os últimos 5 (inverte a lista e corta)
+                const ultimasVendas = vendas.slice().reverse().slice(0, 5);
+
+                ultimasVendas.forEach(v => {
+                    const nomeCliente = v.cliente || v.clienteNome || "Cliente";
+                    const valorVenda = parseFloat(v.total || v.valorTotal || 0).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+                    const dataVenda = v.data || new Date(v.createdAt).toLocaleDateString('pt-BR');
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>#${v.id}</td>
+                            <td>${nomeCliente}</td>
+                            <td style="color:#27ae60; font-weight:bold;">${valorVenda}</td>
+                            <td>${dataVenda}</td>
+                        </tr>
+                    `;
+                });
+            }
+        }
+
+        // Botão Sair
+        document.getElementById('logout-button').addEventListener('click', () => {
+            if(confirm("Sair do Painel Admin?")) {
+                localStorage.removeItem('adminToken');
+                window.location.href = 'admin_login.html';
+            }
+        });
     </script>
 </body>
 </html>

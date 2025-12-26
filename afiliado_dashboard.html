@@ -115,14 +115,25 @@
                     <div class="value" id="qtd-vendas">0</div>
                 </div>
 
-                <div class="card" style="border-left: 4px solid #3498db;">
-                    <h3>📅 Vendas por Dia</h3>
-                    <div style="margin-bottom: 5px;">
-                        <input type="date" id="filtro-data" onchange="calcularVendasPorData()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit;">
-                    </div>
-                    <div style="font-size: 0.85rem; color: #666;">Total neste dia:</div>
-                    <div class="value" id="total-dia-valor" style="color: #2980b9;">R$ 0,00</div>
-                </div>
+<div class="card" style="border-left: 4px solid #3498db;">
+    <h3>📅 Vendas por Período</h3>
+    
+    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+        <div style="flex: 1;">
+            <small style="font-size: 0.75rem; color: #666;">De:</small>
+            <input type="date" id="data-inicio" onchange="calcularVendasPorPeriodo()" 
+                   style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit;">
+        </div>
+        <div style="flex: 1;">
+            <small style="font-size: 0.75rem; color: #666;">Até:</small>
+            <input type="date" id="data-fim" onchange="calcularVendasPorPeriodo()" 
+                   style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit;">
+        </div>
+    </div>
+
+    <div style="font-size: 0.85rem; color: #666;">Total no período:</div>
+    <div class="value" id="total-periodo-valor" style="color: #2980b9;">R$ 0,00</div>
+</div>
 
                 <div class="card">
                     <h3>Seu Código</h3>

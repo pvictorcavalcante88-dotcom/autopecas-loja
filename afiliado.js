@@ -105,7 +105,7 @@ async function carregarDashboardCompleto() {
     }
 }
 
-// 🟢 NOVA FUNÇÃO: CALCULAR VENDAS POR PERÍODO (RANGE)
+// 🟢 FUNÇÃO ATUALIZADA: SÓ SOMA APROVADOS/ENTREGUES
 function calcularVendasPorPeriodo() {
     const elInicio = document.getElementById('data-inicio');
     const elFim = document.getElementById('data-fim');
@@ -113,8 +113,6 @@ function calcularVendasPorPeriodo() {
     
     if(!elInicio || !elFim || !elTotal) return;
 
-    // Pegamos as datas em formato string "YYYY-MM-DD"
-    // Isso é mais seguro para comparação do que criar objetos Date e lidar com fuso horário
     const inicioStr = elInicio.value; 
     const fimStr = elFim.value;
 
@@ -122,17 +120,19 @@ function calcularVendasPorPeriodo() {
 
     let totalPeriodo = 0;
 
-    // Percorre a lista que carregamos da API
     if (window.TODAS_VENDAS) {
         window.TODAS_VENDAS.forEach(v => {
-            // Ignora cancelados
-            if (v.status !== 'CANCELADO') {
-                // Pega a data da venda (formato ISO "2025-01-01T15:00:00...")
-                // O .split('T')[0] pega só a parte da data "2025-01-01"
+            // ==========================================================
+            // AQUI ESTÁ A MUDANÇA:
+            // Só entra na soma se o status for APROVADO ou ENTREGUE.
+            // Pendentes e Cancelados são ignorados.
+            // ==========================================================
+            if (v.status === 'APROVADO' || v.status === 'ENTREGUE') {
+                
+                // Pega a data da venda
                 const dataVendaStr = new Date(v.createdAt).toISOString().split('T')[0];
 
-                // Compara as Strings (Funciona perfeitamente para datas ISO)
-                // Se dataVenda for MAIOR/IGUAL inicio E MENOR/IGUAL fim
+                // Verifica se está dentro do período selecionado
                 if (dataVendaStr >= inicioStr && dataVendaStr <= fimStr) {
                     totalPeriodo += parseFloat(v.valorTotal || 0);
                 }

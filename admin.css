@@ -166,3 +166,71 @@ th { background-color: #f8f9fa; }
     max-width: 400px;
     text-align: center;
 }
+
+/* ==============================================================
+   KIT SALVA-VIDAS: ADMIN MOBILE
+   (Cole isso no final do seu CSS do Admin)
+   ============================================================== */
+
+@media (max-width: 768px) {
+    
+    /* 1. O Menu Lateral vira Menu de Topo */
+    aside {
+        width: 100% !important;
+        height: auto !important;
+        position: relative !important;
+        min-height: auto !important;
+        display: flex;
+        flex-direction: column;
+        padding-bottom: 10px;
+    }
+
+    aside nav {
+        display: flex;
+        overflow-x: auto; /* Permite rolar os ícones para o lado */
+        gap: 10px;
+        padding: 0 10px;
+    }
+    
+    aside nav a {
+        flex: 0 0 auto; /* Não deixa os botões encolherem */
+        border-radius: 50px;
+        background: rgba(255,255,255,0.1);
+        padding: 8px 15px;
+        border-left: none !important;
+        font-size: 0.85rem;
+    }
+
+    /* 2. O Conteúdo Principal ocupa a tela toda */
+    main {
+        margin-left: 0 !important;
+        width: 100% !important;
+        padding: 15px !important;
+    }
+
+    /* 3. MÁGICA DAS TABELAS (Evita quebrar o site) */
+    /* Se a tabela não tiver uma div em volta, o CSS força */
+    table {
+        display: block;
+        width: 100%;
+        overflow-x: auto; /* Cria barra de rolagem horizontal */
+        white-space: nowrap; /* Impede que o texto quebre e fique feio */
+    }
+
+    /* 4. Formulários e Grids viram Coluna */
+    .form-row, 
+    .dashboard-cards,
+    div[style*="display: grid"], 
+    div[style*="display: flex"] {
+        display: flex !important;
+        flex-direction: column !important;
+        grid-template-columns: 1fr !important; /* Força 1 coluna */
+        gap: 15px !important;
+    }
+
+    /* Exceção para botões pequenos ou ícones que devem ficar juntos */
+    .actions, .btn-group {
+        flex-direction: row !important;
+        justify-content: flex-start !important;
+    }
+}

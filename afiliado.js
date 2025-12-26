@@ -5,12 +5,19 @@ const API_URL = ''; // Deixe vazio se estiver no mesmo domínio
 // ============================================================
 document.addEventListener("DOMContentLoaded", () => {
     verificarLogin();
+    
+    // Configura a data de hoje no input ao carregar
+    const elData = document.getElementById('filtro-data');
+    if(elData) {
+        elData.value = new Date().toISOString().split('T')[0];
+    }
 });
 
 let AFILIADO_TOKEN = null;
+window.TODAS_VENDAS = []; // 🟢 NOVA VARIÁVEL GLOBAL PARA GUARDAR AS VENDAS
 
 function verificarLogin() {
-    // Tenta pegar o login (antigo ou novo)
+    // Tenta pegar o login
     const dadosAntigos = localStorage.getItem('afiliadoLogado');
     const tokenSimples = localStorage.getItem('afiliadoToken');
 
@@ -36,10 +43,9 @@ function verificarLogin() {
         }
     }
 
-    // CARREGA TUDO DE UMA VEZ
+    // CARREGA TUDO
     carregarDashboardCompleto();
     carregarMeusOrcamentos();
-    // A lista de clientes é carregada quando clica na aba, mas vamos carregar logo pra garantir
     carregarMeusClientes();
     carregarMeusSaques();
     iniciarNotificacoes();
@@ -58,7 +64,13 @@ async function carregarDashboardCompleto() {
 
         const dados = await res.json();
 
-        // 1. Preenche Topo (Nome, Saldo, Link)
+        // 🟢 GUARDA AS VENDAS NA VARIÁVEL GLOBAL PARA O FILTRO DE DATA
+        window.TODAS_VENDAS = dados.vendas || [];
+        
+        // Chama o cálculo inicial (para o dia de hoje)
+        calcularVendasPorData();
+
+        // 1. Preenche Topo
         const elNome = document.getElementById('nome-afiliado');
         if(elNome) elNome.innerText = `Olá, ${dados.nome}!`;
 
@@ -67,7 +79,6 @@ async function carregarDashboardCompleto() {
 
         const elQtd = document.getElementById('qtd-vendas');
         if(elQtd && dados.vendas) {
-            // Conta apenas as aprovadas
             const aprovadas = dados.vendas.filter(v => v.status === 'APROVADO').length;
             elQtd.innerText = aprovadas;
         }
@@ -77,16 +88,11 @@ async function carregarDashboardCompleto() {
             elLink.value = `${window.location.origin}/index.html?ref=${dados.codigo}`;
         }
 
-        // 2. PREENCHE AS TABELAS DE VENDAS (O PULO DO GATO 🐱)
-        // Aqui preenchemos EXPLICITAMENTE as duas tabelas separadas
-        
-        // Tabela 1: Resumo (Visão Geral) - Só as 5 últimas
+        // 2. PREENCHE AS TABELAS
         preencherTabelaVendas('lista-ultimas-vendas', dados.vendas.slice(0, 5));
-        
-        // Tabela 2: Completa (Aba Vendas) - Todas
         preencherTabelaVendas('lista-todas-vendas', dados.vendas);
 
-        // 3. Preenche Dados Bancários nos inputs
+        // 3. Preenche Dados Bancários
         if(document.getElementById('input-pix')) document.getElementById('input-pix').value = dados.chavePix || '';
 
     } catch (error) {
@@ -94,12 +100,41 @@ async function carregarDashboardCompleto() {
     }
 }
 
-// Função auxiliar para desenhar tabelas de vendas
+// 🟢 NOVA FUNÇÃO: CALCULAR VENDAS POR DATA
+function calcularVendasPorData() {
+    const elData = document.getElementById('filtro-data');
+    const elTotalDia = document.getElementById('total-dia-valor');
+    
+    if(!elData || !elTotalDia) return;
+
+    const dataSelecionada = elData.value; // Formato YYYY-MM-DD
+    if (!dataSelecionada) return;
+
+    let totalDia = 0;
+
+    // Percorre a lista que carregamos da API
+    window.TODAS_VENDAS.forEach(v => {
+        // Ignora cancelados
+        if (v.status !== 'CANCELADO') {
+            // Pega a data da venda (formato ISO do banco de dados)
+            // Ex: "2023-10-25T14:30:00.000Z" -> pega só "2023-10-25"
+            const dataVenda = new Date(v.createdAt).toISOString().split('T')[0];
+
+            if (dataVenda === dataSelecionada) {
+                totalDia += parseFloat(v.valorTotal || 0);
+            }
+        }
+    });
+
+    elTotalDia.innerText = totalDia.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+}
+
+// Função auxiliar para desenhar tabelas
 function preencherTabelaVendas(elementId, vendas) {
     const tbody = document.getElementById(elementId);
-    if(!tbody) return; // Se a tabela não existir na tela, ignora
+    if(!tbody) return;
 
-    tbody.innerHTML = ''; // Limpa o "Carregando..."
+    tbody.innerHTML = ''; 
 
     if (!vendas || vendas.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">Nenhuma venda encontrada.</td></tr>';
@@ -141,7 +176,7 @@ async function carregarMeusOrcamentos() {
         });
         const lista = await res.json();
 
-        tbody.innerHTML = ''; // Limpa o carregando
+        tbody.innerHTML = '';
 
         if (!lista || lista.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#7f8c8d;">Nenhum orçamento salvo ainda.</td></tr>';
@@ -175,25 +210,13 @@ async function carregarMeusOrcamentos() {
     }
 }
 
-// ATUALIZE ESTA FUNÇÃO NO SEU ARQUIVO afiliado.js
-
 function restaurarOrcamento(itensEncoded) {
     if(!confirm("Isso vai substituir o carrinho atual pelo deste orçamento. Continuar?")) return;
-
     try {
-        // 1. Decodifica os dados que vieram do banco
         const itensString = decodeURIComponent(itensEncoded);
-
-        // 2. Verifica se é um JSON válido (só pra garantir)
         JSON.parse(itensString);
-
-        // 3. Salva DIRETAMENTE no navegador (LocalStorage)
-        // Assim, quando a página carregar, os itens já estarão lá.
         localStorage.setItem('nossoCarrinho', itensString);
-
-        // 4. Redireciona direto para o CARRINHO
         window.location.href = 'cart.html'; 
-
     } catch(e) {
         console.error("Erro ao restaurar:", e);
         alert("Erro ao processar os itens deste orçamento.");
@@ -207,7 +230,7 @@ async function excluirOrcamento(id) {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` }
         });
-        carregarMeusOrcamentos(); // Recarrega a lista
+        carregarMeusOrcamentos();
     } catch(e) { alert("Erro ao excluir"); }
 }
 
@@ -289,31 +312,26 @@ async function salvarDadosBancarios() {
 }
 
 // ============================================================
-// 5. SISTEMA DE NOTIFICAÇÕES (ADAPTADO DO SEU INDEX)
+// 5. SISTEMA DE NOTIFICAÇÕES
 // ============================================================
-
 function iniciarNotificacoes() {
-    verificarNotificacoes(); // Chama na hora que abre
-    setInterval(verificarNotificacoes, 15000); // Verifica a cada 15 segundos
+    verificarNotificacoes(); 
+    setInterval(verificarNotificacoes, 15000); 
 }
 
 async function verificarNotificacoes() {
     if(!AFILIADO_TOKEN) return;
-
     try {
         const res = await fetch(`${API_URL}/afiliado/notificacoes`, {
             headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` }
         });
-        
-        if(!res.ok) return; // Se der erro silencioso, ignora
+        if(!res.ok) return;
 
         const dados = await res.json();
-        
         const total = dados.mensagens.length + dados.vendas.length;
         const badge = document.getElementById('notif-badge');
         const lista = document.getElementById('notif-list');
 
-        // Atualiza a bolinha
         if(badge) {
             if(total > 0) {
                 badge.style.display = 'block';
@@ -323,7 +341,6 @@ async function verificarNotificacoes() {
             }
         }
 
-        // Se o menu não existir na tela, para por aqui (evita erro)
         if(!lista) return;
 
         lista.innerHTML = '';
@@ -332,7 +349,6 @@ async function verificarNotificacoes() {
             return;
         }
 
-        // Renderiza Vendas (Verde)
         dados.vendas.forEach(v => {
             const valor = parseFloat(v.valorTotal).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
             lista.innerHTML += `
@@ -345,7 +361,6 @@ async function verificarNotificacoes() {
                 </div>`;
         });
 
-        // Renderiza Mensagens (Azul)
         dados.mensagens.forEach(m => {
             lista.innerHTML += `
                 <div class="notif-item" style="border-left: 4px solid #3498db;">
@@ -361,37 +376,31 @@ async function verificarNotificacoes() {
     } catch(e) { console.error("Erro no sino:", e); }
 }
 
-// Abrir/Fechar o Menu
 function abrirNotificacoes() {
     const dropdown = document.getElementById('notif-dropdown');
     if(!dropdown) return;
-
     if(dropdown.style.display === 'block') {
         dropdown.style.display = 'none';
     } else {
         dropdown.style.display = 'block';
-        marcarLidas(); // Marca como lido ao abrir
+        marcarLidas(); 
     }
 }
 
-// Marcar tudo como lido no servidor
 async function marcarLidas() {
     if(!AFILIADO_TOKEN) return;
     try {
         await fetch(`${API_URL}/afiliado/notificacoes/ler`, {
             method: 'POST', headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` }
         });
-        // Esconde a bolinha visualmente na hora
         const badge = document.getElementById('notif-badge');
         if(badge) badge.style.display = 'none';
     } catch(e) { console.error("Erro ao marcar lidas", e); }
 }
 
-// Fecha ao clicar fora (UX Importante)
 window.addEventListener('click', (e) => {
     const container = document.getElementById('box-sino');
     const dropdown = document.getElementById('notif-dropdown');
-    // Se clicou fora do container e o dropdown existe
     if (container && dropdown && !container.contains(e.target)) {
         dropdown.style.display = 'none';
     }
@@ -401,48 +410,37 @@ window.addEventListener('click', (e) => {
 // FUNÇÃO DE SOLICITAR SAQUE
 // ============================================================
 async function solicitarSaque() {
-    // 1. Confirmação
     if(!confirm("Deseja solicitar o saque de todo o saldo disponível?")) return;
-
-    // 2. Efeito Visual (Pega o botão pelo ID novo)
     const btn = document.getElementById('btn-saque'); 
     const textoOriginal = btn ? btn.innerText : "Solicitar Saque";
     
     if(btn) {
         btn.innerText = "Processando...";
-        btn.disabled = true; // Impede clicar 2 vezes
+        btn.disabled = true;
         btn.style.opacity = "0.7";
     }
 
     try {
-        // 3. Chama o servidor
         const res = await fetch(`${API_URL}/afiliado/saque`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` }
         });
-
         const data = await res.json();
 
         if (res.ok) {
-            // SUCESSO
             alert(
                 "✅ Solicitação Enviada com Sucesso!\n\n" +
                 `Valor Solicitado: R$ ${parseFloat(data.valor).toFixed(2)}\n\n` +
                 "🕒 O pagamento será realizado em até 3 dias úteis."
             );
-            
-            // Recarrega a tela para zerar o saldo
             carregarDashboardCompleto();
         } else {
-            // ERRO (Ex: Saldo zero)
             alert("Atenção: " + (data.erro || "Falha ao solicitar."));
         }
 
     } catch (e) {
         alert("Erro de conexão com o servidor.");
-        console.error(e);
     } finally {
-        // 4. Volta o botão ao normal
         if(btn) {
             btn.innerText = textoOriginal;
             btn.disabled = false;
@@ -452,7 +450,7 @@ async function solicitarSaque() {
 }
 
 // ============================================================
-// 4. CARREGAR MEUS SAQUES (COM BOTÃO DE COMPROVANTE)
+// 4. CARREGAR MEUS SAQUES
 // ============================================================
 async function carregarMeusSaques() {
     const tbody = document.getElementById('lista-saques');
@@ -463,9 +461,7 @@ async function carregarMeusSaques() {
             headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` }
         });
         const saques = await res.json();
-
         tbody.innerHTML = '';
-
         if (!saques || saques.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" align="center" style="color:#777; padding:15px;">Nenhum saque solicitado.</td></tr>';
             return;
@@ -476,16 +472,13 @@ async function carregarMeusSaques() {
             const dataPag = s.dataPagamento ? new Date(s.dataPagamento).toLocaleDateString('pt-BR') : '-';
             const valor = parseFloat(s.valor).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
             
-            // Status Badge
             let statusBadge = `<span style="background:#fff3cd; color:#856404; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.7rem;">PENDENTE ⏳</span>`;
             if(s.status === 'PAGO') {
                 statusBadge = `<span style="background:#d4edda; color:#155724; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.7rem;">PAGO ✅</span>`;
             }
 
-            // Botão Comprovante
             let btnComprovante = '-';
             if (s.comprovante) {
-                // Corrige barras invertidas do Windows se houver
                 const link = s.comprovante.replace(/\\/g, '/');
                 btnComprovante = `
                     <a href="${API_URL}/${link}" target="_blank" style="background:#3498db; color:white; padding:4px 8px; border-radius:4px; text-decoration:none; font-size:0.8rem; display:inline-flex; align-items:center; gap:3px;">
@@ -504,7 +497,6 @@ async function carregarMeusSaques() {
             `;
             tbody.appendChild(tr);
         });
-
     } catch(e) {
         console.error(e);
         tbody.innerHTML = '<tr><td colspan="5" align="center" style="color:red">Erro ao carregar saques.</td></tr>';

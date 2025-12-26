@@ -222,47 +222,5 @@
 
     <script src="afiliado.js"></script>
 
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            // Define a data de hoje no input automaticamente
-            const hoje = new Date().toISOString().split('T')[0];
-            document.getElementById('filtro-data').value = hoje;
-            
-            // Calcula o valor de hoje
-            setTimeout(calcularVendasPorData, 500); // Pequeno delay para garantir que o afiliado.js carregou
-        });
-
-        function calcularVendasPorData() {
-            const dataSelecionada = document.getElementById('filtro-data').value;
-            if (!dataSelecionada) return;
-
-            // Busca as vendas (simulando acesso ao localStorage que seu sistema usa)
-            const todasVendas = JSON.parse(localStorage.getItem('db_vendas') || '[]');
-            const afiliadoLogado = JSON.parse(localStorage.getItem('afiliado_logado'));
-
-            if (!afiliadoLogado) return;
-
-            let totalDia = 0;
-
-            todasVendas.forEach(v => {
-                // Verifica se a venda é deste afiliado
-                // Nota: Ajuste 'v.afiliadoId' ou 'v.afiliadoCodigo' conforme seu banco de dados
-                let pertenceAoAfiliado = false;
-                if (v.afiliado && v.afiliado.id === afiliadoLogado.id) pertenceAoAfiliado = true;
-                if (v.afiliadoCodigo === afiliadoLogado.codigo) pertenceAoAfiliado = true;
-
-                if (pertenceAoAfiliado && v.status !== 'CANCELADO') {
-                    // Pega a data da venda (formato ISO YYYY-MM-DD)
-                    const dataVenda = new Date(v.createdAt || v.data).toISOString().split('T')[0];
-
-                    if (dataVenda === dataSelecionada) {
-                        totalDia += parseFloat(v.total || v.valorTotal || 0);
-                    }
-                }
-            });
-
-            document.getElementById('total-dia-valor').innerText = totalDia.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
-        }
-    </script>
 </body>
 </html>

@@ -6,11 +6,16 @@ const API_URL = ''; // Deixe vazio se estiver no mesmo domínio
 document.addEventListener("DOMContentLoaded", () => {
     verificarLogin();
     
-    // Configura a data de hoje no input ao carregar
-    const elData = document.getElementById('filtro-data');
-    if(elData) {
-        elData.value = new Date().toISOString().split('T')[0];
-    }
+    // CONFIGURAÇÃO DAS DATAS PADRÃO (Primeiro dia do mês -> Hoje)
+    const hoje = new Date();
+    const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+
+    const elInicio = document.getElementById('data-inicio');
+    const elFim = document.getElementById('data-fim');
+
+    // Formata para YYYY-MM-DD (necessário para o input type="date")
+    if(elInicio) elInicio.value = primeiroDia.toISOString().split('T')[0];
+    if(elFim) elFim.value = hoje.toISOString().split('T')[0];
 });
 
 let AFILIADO_TOKEN = null;
@@ -67,8 +72,8 @@ async function carregarDashboardCompleto() {
         // 🟢 GUARDA AS VENDAS NA VARIÁVEL GLOBAL PARA O FILTRO DE DATA
         window.TODAS_VENDAS = dados.vendas || [];
         
-        // Chama o cálculo inicial (para o dia de hoje)
-        calcularVendasPorData();
+        // CHAMA O CÁLCULO INICIAL (Pelo período padrão)
+        calcularVendasPorPeriodo();
 
         // 1. Preenche Topo
         const elNome = document.getElementById('nome-afiliado');
@@ -100,33 +105,42 @@ async function carregarDashboardCompleto() {
     }
 }
 
-// 🟢 NOVA FUNÇÃO: CALCULAR VENDAS POR DATA
-function calcularVendasPorData() {
-    const elData = document.getElementById('filtro-data');
-    const elTotalDia = document.getElementById('total-dia-valor');
+// 🟢 NOVA FUNÇÃO: CALCULAR VENDAS POR PERÍODO (RANGE)
+function calcularVendasPorPeriodo() {
+    const elInicio = document.getElementById('data-inicio');
+    const elFim = document.getElementById('data-fim');
+    const elTotal = document.getElementById('total-periodo-valor');
     
-    if(!elData || !elTotalDia) return;
+    if(!elInicio || !elFim || !elTotal) return;
 
-    const dataSelecionada = elData.value; // Formato YYYY-MM-DD
-    if (!dataSelecionada) return;
+    // Pegamos as datas em formato string "YYYY-MM-DD"
+    // Isso é mais seguro para comparação do que criar objetos Date e lidar com fuso horário
+    const inicioStr = elInicio.value; 
+    const fimStr = elFim.value;
 
-    let totalDia = 0;
+    if (!inicioStr || !fimStr) return;
+
+    let totalPeriodo = 0;
 
     // Percorre a lista que carregamos da API
-    window.TODAS_VENDAS.forEach(v => {
-        // Ignora cancelados
-        if (v.status !== 'CANCELADO') {
-            // Pega a data da venda (formato ISO do banco de dados)
-            // Ex: "2023-10-25T14:30:00.000Z" -> pega só "2023-10-25"
-            const dataVenda = new Date(v.createdAt).toISOString().split('T')[0];
+    if (window.TODAS_VENDAS) {
+        window.TODAS_VENDAS.forEach(v => {
+            // Ignora cancelados
+            if (v.status !== 'CANCELADO') {
+                // Pega a data da venda (formato ISO "2025-01-01T15:00:00...")
+                // O .split('T')[0] pega só a parte da data "2025-01-01"
+                const dataVendaStr = new Date(v.createdAt).toISOString().split('T')[0];
 
-            if (dataVenda === dataSelecionada) {
-                totalDia += parseFloat(v.valorTotal || 0);
+                // Compara as Strings (Funciona perfeitamente para datas ISO)
+                // Se dataVenda for MAIOR/IGUAL inicio E MENOR/IGUAL fim
+                if (dataVendaStr >= inicioStr && dataVendaStr <= fimStr) {
+                    totalPeriodo += parseFloat(v.valorTotal || 0);
+                }
             }
-        }
-    });
+        });
+    }
 
-    elTotalDia.innerText = totalDia.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+    elTotal.innerText = totalPeriodo.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
 }
 
 // Função auxiliar para desenhar tabelas

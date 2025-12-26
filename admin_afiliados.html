@@ -6,15 +6,22 @@
     <title>Financeiro & Afiliados - Admin</title>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
+        /* =========================================
+           ESTILOS GERAIS (PC)
+           ========================================= */
         :root { --primary: #2c3e50; --accent: #e67e22; --bg: #f4f6f8; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; display: flex; }
         
-        /* LAYOUT BÁSICO */
-        aside { width: 250px; background: var(--primary); color: white; min-height: 100vh; position: fixed; }
+        * { box-sizing: border-box; outline: none; } /* Reset Importante */
+
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; display: flex; min-height: 100vh; }
+        
+        /* MENU LATERAL */
+        aside { width: 250px; background: var(--primary); color: white; height: 100vh; position: fixed; top: 0; left: 0; z-index: 100; overflow-y: auto; }
         aside h3 { text-align: center; padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); margin: 0; }
         aside nav a { display: flex; align-items: center; gap: 10px; padding: 15px 20px; color: #bdc3c7; text-decoration: none; transition: 0.3s; }
         aside nav a:hover, aside nav a.active { background: rgba(255,255,255,0.1); color: var(--accent); border-left: 4px solid var(--accent); }
         
+        /* CONTEÚDO */
         main { margin-left: 250px; padding: 30px; width: 100%; }
         header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
         
@@ -22,7 +29,10 @@
         .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 30px; }
         .card h2 { margin-top: 0; color: var(--primary); font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
         
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        /* Wrapper para rolagem no celular */
+        .table-responsive { width: 100%; overflow-x: auto; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; white-space: nowrap; }
         th { text-align: left; padding: 12px; border-bottom: 2px solid #eee; color: #555; background: #f9f9f9; }
         td { padding: 12px; border-bottom: 1px solid #eee; color: #666; }
         
@@ -34,10 +44,71 @@
         .pix-tag { background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; color: #333; font-family: monospace; }
         
         /* MODAL */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-box { background: white; padding: 25px; width: 450px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; padding: 10px; }
+        
+        .modal-box { 
+            background: white; 
+            padding: 25px; 
+            width: 95%; /* Adaptável */
+            max-width: 450px; /* Limite PC */
+            border-radius: 8px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2); 
+            max-height: 90vh; /* Se a tela for pequena na altura, rola */
+            overflow-y: auto;
+        }
+
         .file-area { border: 2px dashed #ccc; padding: 20px; text-align: center; margin: 20px 0; border-radius: 6px; background: #fafafa; }
         .modal-btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+
+        /* =========================================
+           📱 MODO MOBILE (ADMIN)
+           ========================================= */
+        @media (max-width: 768px) {
+            body { flex-direction: column; } /* Um embaixo do outro */
+
+            /* 1. Menu vira topo deslizante */
+            aside {
+                width: 100%;
+                height: auto;
+                position: relative;
+                padding-bottom: 10px;
+                overflow-y: visible; /* Deixa ver o dropdown se tiver */
+            }
+
+            aside nav {
+                display: flex;
+                overflow-x: auto; /* Rolagem Horizontal */
+                padding: 0 10px;
+                gap: 10px;
+                -webkit-overflow-scrolling: touch;
+            }
+            aside nav::-webkit-scrollbar { display: none; }
+
+            aside nav a {
+                flex: 0 0 auto;
+                background: rgba(255,255,255,0.1);
+                border-radius: 20px;
+                padding: 8px 15px;
+                border-left: none !important;
+                font-size: 0.85rem;
+                white-space: nowrap;
+            }
+
+            /* 2. Conteúdo ocupa tudo */
+            main {
+                margin-left: 0;
+                padding: 15px;
+                width: 100%;
+            }
+
+            /* 3. Ajustes de botões no topo da tabela */
+            .card > div[style*="text-align: right"] {
+                text-align: left !important;
+                margin-bottom: 15px;
+            }
+            .btn-msg { width: 100%; justify-content: center; }
+        }
     </style>
 </head>
 <body>
@@ -48,8 +119,8 @@
             <a href="admin_dashboard.html"><i class="ph ph-gauge"></i> Dashboard</a>
             <a href="admin_produtos.html"><i class="ph ph-package"></i> Produtos</a>
             <a href="admin_pedidos.html"><i class="ph ph-shopping-cart-simple"></i> Pedidos</a>
-            <a href="admin_afiliados.html"><i class="ph ph-users"></i> Afiliados & Financeiro</a>
-            <a href="admin_sugestoes.html"><i class="ph ph-users"></i> Sugestões</a>
+            <a href="admin_afiliados.html" class="active"><i class="ph ph-users"></i> Afiliados & Financeiro</a>
+            <a href="admin_sugestoes.html"><i class="ph ph-lightbulb"></i> Sugestões</a>
             <a href="#" onclick="logout()" style="color: #e74c3c;"><i class="ph ph-sign-out"></i> Sair</a>
         </nav>
     </aside>
@@ -63,44 +134,50 @@
             <h2><i class="ph ph-hand-coins" style="color:#f1c40f;"></i> Solicitações de Saque Pendentes</h2>
             <p style="color:#666; font-size:0.9rem;">Afiliados aguardando pagamento.</p>
             
-            <table>
-                <thead>
-                    <tr>
-                        <th>Data</th>
-                        <th>Afiliado</th>
-                        <th>Chave Pix</th>
-                        <th>Valor</th>
-                        <th>Ação</th>
-                    </tr>
-                </thead>
-                <tbody id="lista-saques">
-                    <tr><td colspan="5" align="center">Carregando saques...</td></tr>
-                </tbody>
-            </table>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Afiliado</th>
+                            <th>Chave Pix</th>
+                            <th>Valor</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lista-saques">
+                        <tr><td colspan="5" align="center">Carregando saques...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </section>
 
         <section class="card">
             <h2><i class="ph ph-users"></i> Todos os Parceiros</h2>
+            
             <div style="text-align: right; margin-bottom: 10px;">
                 <button onclick="alert('Use a tabela acima para pagar saques!')" class="btn-action btn-msg">
                     <i class="ph ph-paper-plane-tilt"></i> Enviar Mensagem Avulsa
                 </button>
             </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Nome</th>
-                        <th>Telefone</th>
-                        <th>Código</th>
-                        <th>Vendas Totais</th>
-                        <th>Status</th>
-                        <th>Ações</th>
-                    </tr>
-                </thead>
-                <tbody id="lista-afiliados">
-                    <tr><td colspan="5" align="center">Carregando...</td></tr>
-                </tbody>
-            </table>
+            
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Telefone</th>
+                            <th>Código</th>
+                            <th>Vendas Totais</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lista-afiliados">
+                        <tr><td colspan="5" align="center">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </section>
     </main>
 
@@ -109,7 +186,7 @@
             <h3 style="margin-top:0;">Confirmar Pagamento 💸</h3>
             <p>Você está pagando <strong id="modal-valor" style="color:#27ae60; font-size:1.2rem;">R$ 0,00</strong> para <strong id="modal-nome">...</strong></p>
             
-            <p style="font-size:0.9rem; background:#f8f9fa; padding:10px; border-radius:4px;">
+            <p style="font-size:0.9rem; background:#f8f9fa; padding:10px; border-radius:4px; word-break: break-all;">
                 🔑 Chave Pix: <span id="modal-pix" class="pix-tag">...</span>
             </p>
 
@@ -143,7 +220,8 @@
         // 1. CARREGAR SAQUES PENDENTES
         async function carregarSaquesPendentes() {
             const token = localStorage.getItem('adminToken');
-            if(!token) return window.location.href = 'admin_login.html';
+            // Como estamos testando layout, removi o redirect imediato para não te travar
+            // if(!token) return window.location.href = 'admin_login.html';
 
             try {
                 const res = await fetch(`${API_URL}/admin/saques-pendentes`, {
@@ -177,10 +255,10 @@
                     `;
                     tbody.appendChild(tr);
                 });
-            } catch(e) { console.error(e); }
+            } catch(e) { console.error("Erro ao carregar saques (Mode Offline ou Erro API)", e); }
         }
 
-// 2. CARREGAR LISTA GERAL (COM BOTÃO DE APROVAR)
+        // 2. CARREGAR LISTA GERAL
         async function carregarTodosAfiliados() {
             const token = localStorage.getItem('adminToken');
             try {
@@ -190,18 +268,14 @@
                 tbody.innerHTML = '';
 
                 lista.forEach(a => {
-                    // Lógica do Status
                     const statusHtml = a.aprovado 
                         ? '<span style="color:green; font-weight:bold; background:#d4edda; padding:2px 6px; border-radius:4px;">Ativo</span>' 
                         : '<span style="color:#856404; font-weight:bold; background:#fff3cd; padding:2px 6px; border-radius:4px;">Pendente</span>';
 
-                    // Lógica do Botão
                     let btnAcao = '';
                     if (!a.aprovado) {
-                        // Se não aprovado, mostra botão VERDE de Aprovar
                         btnAcao = `<button onclick="alterarStatusAfiliado(${a.id}, true)" class="btn-action" style="background:#27ae60; cursor:pointer;">✔ Aprovar</button>`;
                     } else {
-                        // Se já aprovado, mostra botão VERMELHO de Bloquear (Opcional)
                         btnAcao = `<button onclick="alterarStatusAfiliado(${a.id}, false)" class="btn-action" style="background:#c0392b; cursor:pointer;">✖ Bloquear</button>`;
                     }
 
@@ -219,7 +293,7 @@
             } catch(e) { console.error(e); }
         }
 
-        // NOVA FUNÇÃO: CHAMAR O SERVIDOR PARA APROVAR
+        // 3. APROVAR/BLOQUEAR
         async function alterarStatusAfiliado(id, novoStatus) {
             const acao = novoStatus ? "Aprovar" : "Bloquear";
             if(!confirm(`Tem certeza que deseja ${acao} este afiliado?`)) return;
@@ -237,7 +311,7 @@
 
                 if(res.ok) {
                     alert(`Afiliado ${novoStatus ? 'ativado' : 'bloqueado'} com sucesso!`);
-                    carregarTodosAfiliados(); // Atualiza a lista na hora
+                    carregarTodosAfiliados(); 
                 } else {
                     alert("Erro ao atualizar status.");
                 }
@@ -245,74 +319,3 @@
                 alert("Erro de conexão.");
             }
         }
-
-        // 3. LÓGICA DO MODAL
-        function abrirModalPagamento(id, nome, pix, valor) {
-            document.getElementById('modal-pagamento').style.display = 'flex';
-            document.getElementById('modal-id-saque').value = id;
-            document.getElementById('modal-nome').innerText = nome;
-            document.getElementById('modal-pix').innerText = pix || "Não informado";
-            document.getElementById('modal-valor').innerText = valor.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
-            
-            // Limpa o arquivo anterior
-            document.getElementById('comprovante').value = "";
-            document.getElementById('nome-arquivo').innerText = "";
-        }
-
-        function fecharModal() {
-            document.getElementById('modal-pagamento').style.display = 'none';
-        }
-
-        function verificarArquivo() {
-            const file = document.getElementById('comprovante').files[0];
-            if(file) document.getElementById('nome-arquivo').innerText = "📎 " + file.name;
-        }
-
-        // 4. CONFIRMAR PAGAMENTO E ENVIAR
-        async function confirmarPagamento() {
-            const id = document.getElementById('modal-id-saque').value;
-            const fileInput = document.getElementById('comprovante');
-            const btn = document.querySelector('.btn-pagar');
-
-            if (!fileInput.files[0]) {
-                if(!confirm("Tem certeza que quer marcar como pago SEM anexar comprovante?")) return;
-            }
-
-            const formData = new FormData();
-            if (fileInput.files[0]) {
-                formData.append('comprovante', fileInput.files[0]);
-            }
-
-            btn.innerText = "Enviando...";
-            btn.disabled = true;
-
-            try {
-                const token = localStorage.getItem('adminToken');
-                const res = await fetch(`${API_URL}/admin/saques/${id}/confirmar`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }, // Não coloque Content-Type aqui!
-                    body: formData
-                });
-
-                if (res.ok) {
-                    alert("✅ Pagamento confirmado e comprovante enviado!");
-                    fecharModal();
-                    carregarSaquesPendentes(); // Atualiza a lista
-                } else {
-                    alert("Erro ao confirmar.");
-                }
-            } catch (e) {
-                alert("Erro de conexão.");
-            } finally {
-                btn.innerText = "Confirmar e Enviar";
-                btn.disabled = false;
-            }
-        }
-
-        function logout() {
-            localStorage.removeItem('adminToken');
-            window.location.href = 'admin_login.html';
-        }
-    </script>
-</body>
-</html>

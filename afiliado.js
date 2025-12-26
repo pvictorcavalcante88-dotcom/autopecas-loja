@@ -7,10 +7,10 @@ document.addEventListener("DOMContentLoaded", () => {
     verificarLogin();
     
     // Configura a data de hoje no input ao carregar
-    // const elData = document.getElementById('filtro-data');
-    // if(elData) {
-    //     elData.value = new Date().toISOString().split('T')[0];
-    // }
+     const elData = document.getElementById('filtro-data');
+     if(elData) {
+         elData.value = new Date().toISOString().split('T')[0];
+     }
     
 
     const hoje = new Date();

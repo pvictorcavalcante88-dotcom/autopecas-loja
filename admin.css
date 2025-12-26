@@ -167,70 +167,73 @@ th { background-color: #f8f9fa; }
     text-align: center;
 }
 
-/* ==============================================================
-   KIT SALVA-VIDAS: ADMIN MOBILE
-   (Cole isso no final do seu CSS do Admin)
-   ============================================================== */
-
+/* =============================================================
+   📱 MODO MOBILE PARA O ADMIN (DONO DA LOJA)
+   Cole isso no final do CSS dos seus arquivos de admin
+   ============================================================= */
 @media (max-width: 768px) {
     
-    /* 1. O Menu Lateral vira Menu de Topo */
+    /* 1. O Menu Lateral vira Menu de Topo (igual Instagram/Apps) */
     aside {
         width: 100% !important;
         height: auto !important;
-        position: relative !important;
         min-height: auto !important;
+        position: relative !important;
         display: flex;
         flex-direction: column;
-        padding-bottom: 10px;
+        padding-bottom: 5px;
+        z-index: 999;
     }
 
     aside nav {
         display: flex;
-        overflow-x: auto; /* Permite rolar os ícones para o lado */
+        overflow-x: auto; /* Permite rolar para o lado com o dedo */
+        padding: 5px 10px;
         gap: 10px;
-        padding: 0 10px;
+        -webkit-overflow-scrolling: touch;
     }
     
+    /* Esconde barra de rolagem feia */
+    aside nav::-webkit-scrollbar { display: none; }
+
     aside nav a {
-        flex: 0 0 auto; /* Não deixa os botões encolherem */
-        border-radius: 50px;
+        flex: 0 0 auto;
+        white-space: nowrap; /* Texto não quebra */
         background: rgba(255,255,255,0.1);
+        border-radius: 20px;
         padding: 8px 15px;
         border-left: none !important;
         font-size: 0.85rem;
+        margin-bottom: 5px;
     }
 
-    /* 2. O Conteúdo Principal ocupa a tela toda */
+    /* 2. Conteúdo ocupa a tela toda */
     main {
         margin-left: 0 !important;
         width: 100% !important;
         padding: 15px !important;
     }
 
-    /* 3. MÁGICA DAS TABELAS (Evita quebrar o site) */
-    /* Se a tabela não tiver uma div em volta, o CSS força */
-    table {
+    /* 3. TABELAS COM ROLAGEM (O Segredo!) */
+    /* Isso impede que a tabela quebre o site. Ela ganha rolagem própria. */
+    .table-responsive, table {
         display: block;
         width: 100%;
-        overflow-x: auto; /* Cria barra de rolagem horizontal */
-        white-space: nowrap; /* Impede que o texto quebre e fique feio */
+        overflow-x: auto;
+        white-space: nowrap;
     }
 
-    /* 4. Formulários e Grids viram Coluna */
-    .form-row, 
-    .dashboard-cards,
-    div[style*="display: grid"], 
-    div[style*="display: flex"] {
+    /* 4. Formulários um embaixo do outro */
+    .form-row, .grid-container, .dashboard-cards {
         display: flex !important;
         flex-direction: column !important;
-        grid-template-columns: 1fr !important; /* Força 1 coluna */
+        grid-template-columns: 1fr !important;
         gap: 15px !important;
     }
 
-    /* Exceção para botões pequenos ou ícones que devem ficar juntos */
-    .actions, .btn-group {
-        flex-direction: row !important;
-        justify-content: flex-start !important;
+    /* Ajuste para inputs não ficarem pequenos */
+    input, select, textarea {
+        width: 100% !important;
+        max-width: 100% !important;
     }
 }

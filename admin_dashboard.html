@@ -59,30 +59,31 @@
         th { background-color: #f8f9fa; color: #555; }
 
         /* =========================================
-           📱 MODO MOBILE (ADMIN)
+           📱 MOBILE (CELULAR) - CORREÇÃO
            ========================================= */
         @media (max-width: 768px) {
-            body { flex-direction: column; } 
+            .admin-container { flex-direction: column; } /* Menu em cima, conteúdo embaixo */
 
             /* 1. Menu vira topo deslizante */
-            aside { width: 100%; height: auto; position: relative; padding-bottom: 10px; overflow-y: visible; }
-            aside nav { display: flex; overflow-x: auto; padding: 0 10px; gap: 10px; -webkit-overflow-scrolling: touch; }
+            aside.sidebar { 
+                width: 100%; height: auto; position: relative; min-height: auto;
+                padding-bottom: 10px; overflow-y: visible;
+            }
+            aside nav { 
+                display: flex; overflow-x: auto; padding: 0 10px; gap: 10px; -webkit-overflow-scrolling: touch;
+            }
             aside nav::-webkit-scrollbar { display: none; }
-            aside nav a { flex: 0 0 auto; background: rgba(255,255,255,0.1); border-radius: 20px; padding: 8px 15px; border-left: none !important; font-size: 0.85rem; white-space: nowrap; }
+
+            aside nav a { 
+                flex: 0 0 auto; background: rgba(255,255,255,0.1); border-radius: 20px; 
+                padding: 8px 15px; border-left: none !important; font-size: 0.85rem; white-space: nowrap; 
+            }
 
             /* 2. Conteúdo ocupa tudo */
-            main { margin-left: 0; padding: 15px; width: 100%; }
+            main.main-content { margin-left: 0; padding: 15px; width: 100%; }
 
-            /* 3. Ajuste do Modal e Formulário */
-            .modal-content { width: 95%; margin: 10px auto; padding: 15px; }
-            .form-grid { grid-template-columns: 1fr; /* Tudo vira 1 coluna */ }
-            .form-group.full { grid-column: span 1; } /* Remove span 2 */
-            
-            /* 4. Busca full width */
-            #search-admin { width: 100% !important; }
-
-            /* 5. Ajuste Botão Flutuante */
-            .add-btn-float { bottom: 20px; right: 20px; width: 50px; height: 50px; font-size: 24px; }
+            /* 3. Grid empilha */
+            .dashboard-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>

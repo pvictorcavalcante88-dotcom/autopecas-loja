@@ -198,16 +198,43 @@
         </div>
 
         <div id="vendas" class="tab-content">
-            <h2 class="section-title">Histórico Completo de Vendas</h2>
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead>
-                        <tr><th>Data</th><th>Cliente</th><th>Valor</th><th>Sua Comissão</th><th>Status</th></tr>
-                    </thead>
-                    <tbody id="lista-todas-vendas"></tbody>
-                </table>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+        <h2 class="section-title">Histórico Completo de Vendas</h2>
+        
+        <div class="date-filter" style="display:flex; gap:10px; align-items:flex-end; background:#f8f9fa; padding:10px; border-radius:8px;">
+            <div>
+                <label style="font-size:0.8rem; display:block; color:#666;">De:</label>
+                <input type="date" id="filtro-inicio" style="padding:5px; border:1px solid #ccc; border-radius:4px;">
             </div>
+            <div>
+                <label style="font-size:0.8rem; display:block; color:#666;">Até:</label>
+                <input type="date" id="filtro-fim" style="padding:5px; border:1px solid #ccc; border-radius:4px;">
+            </div>
+            <button onclick="filtrarHistoricoVendas()" style="padding:6px 15px; background:#2c3e50; color:white; border:none; border-radius:4px; cursor:pointer;">
+                <i class="ph ph-funnel"></i> Filtrar
+            </button>
+            <button onclick="limparFiltroVendas()" style="padding:6px 10px; background:#bdc3c7; color:white; border:none; border-radius:4px; cursor:pointer;" title="Limpar Filtro">
+                <i class="ph ph-x"></i>
+            </button>
         </div>
+    </div>
+
+    <div class="table-responsive" style="margin-top:15px;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Cliente</th>
+                    <th>Valor</th>
+                    <th>Sua Comissão</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="lista-todas-vendas">
+                </tbody>
+        </table>
+    </div>
+</div>
 
         <div id="orcamentos" class="tab-content">
             <h2 class="section-title">Meus Orçamentos Salvos</h2>

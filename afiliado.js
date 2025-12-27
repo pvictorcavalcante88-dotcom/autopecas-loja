@@ -3,6 +3,9 @@ const API_URL = ''; // Deixe vazio se estiver no mesmo domínio
 // ============================================================
 // INICIALIZAÇÃO
 // ============================================================
+
+let VENDAS_ORIGINAIS = [];
+
 document.addEventListener("DOMContentLoaded", () => {
     verificarLogin();
     
@@ -71,9 +74,13 @@ async function carregarDashboardCompleto() {
 
         // 🟢 GUARDA AS VENDAS NA VARIÁVEL GLOBAL PARA O FILTRO DE DATA
         window.TODAS_VENDAS = dados.vendas || [];
+        VENDAS_ORIGINAIS = data.vendas || [];
         
         // CHAMA O CÁLCULO INICIAL (Pelo período padrão)
         calcularVendasPorPeriodo();
+
+        // Renderiza a tabela inicial com tudo
+        renderizarTabelaVendas(VENDAS_ORIGINAIS);
 
         // 1. Preenche Topo
         const elNome = document.getElementById('nome-afiliado');
@@ -515,4 +522,74 @@ async function carregarMeusSaques() {
         console.error(e);
         tbody.innerHTML = '<tr><td colspan="5" align="center" style="color:red">Erro ao carregar saques.</td></tr>';
     }
+}
+
+// 3. Função para Desenhar a Tabela (reutilizável)
+function renderizarTabelaVendas(lista) {
+    const tbody = document.getElementById('lista-todas-vendas');
+    tbody.innerHTML = '';
+
+    if (lista.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" align="center">Nenhuma venda encontrada neste período.</td></tr>';
+        return;
+    }
+
+    lista.forEach(v => {
+        // Formatação de data e moeda
+        const dataFormatada = new Date(v.createdAt).toLocaleDateString('pt-BR');
+        const valorFormatado = parseFloat(v.valorTotal).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+        const comissaoFormatada = parseFloat(v.comissaoGerada || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+        
+        // Cores do Status
+        let statusClass = 'status-pendente'; // Defina classes CSS ou style inline
+        let corStatus = '#f39c12';
+        if(v.status === 'APROVADO') corStatus = '#27ae60';
+        if(v.status === 'CANCELADO') corStatus = '#c0392b';
+        if(v.status === 'PAGO') corStatus = '#2980b9';
+
+        tbody.innerHTML += `
+            <tr>
+                <td>${dataFormatada}</td>
+                <td>${v.clienteNome}</td>
+                <td>${valorFormatado}</td>
+                <td style="color:#27ae60; font-weight:bold;">+ ${comissaoFormatada}</td>
+                <td><span style="background:${corStatus}; color:white; padding:3px 8px; border-radius:4px; font-size:0.8rem;">${v.status}</span></td>
+            </tr>
+        `;
+    });
+}
+
+
+// 4. Função de Filtrar (Acionada pelo botão)
+function filtrarHistoricoVendas() {
+    const inicioVal = document.getElementById('filtro-inicio').value;
+    const fimVal = document.getElementById('filtro-fim').value;
+
+    if (!inicioVal || !fimVal) {
+        alert("Por favor, selecione a Data Inicial e a Data Final.");
+        return;
+    }
+
+    // Converte inputs para Data (Zera horas para comparar corretamente)
+    const dataInicio = new Date(inicioVal);
+    dataInicio.setHours(0,0,0,0);
+    
+    const dataFim = new Date(fimVal);
+    dataFim.setHours(23,59,59,999); // Final do dia
+
+    // Filtra o array original
+    const vendasFiltradas = VENDAS_ORIGINAIS.filter(v => {
+        const dataVenda = new Date(v.createdAt);
+        // Verifica se a data da venda está entre inicio e fim
+        return dataVenda >= dataInicio && dataVenda <= dataFim;
+    });
+
+    renderizarTabelaVendas(vendasFiltradas);
+}
+
+// 5. Função para Limpar Filtro
+function limparFiltroVendas() {
+    document.getElementById('filtro-inicio').value = '';
+    document.getElementById('filtro-fim').value = '';
+    renderizarTabelaVendas(VENDAS_ORIGINAIS); // Restaura tudo
 }

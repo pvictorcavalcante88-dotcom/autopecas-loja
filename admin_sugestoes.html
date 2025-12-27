@@ -4,11 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sugestões - Admin</title>
-    <link rel="stylesheet" href="admin.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
         /* =========================================
-           ESTILOS (Igual ao Dashboard)
+           ESTILOS (Padronizado com seus outros arquivos)
            ========================================= */
         :root { --primary: #2c3e50; --accent: #e67e22; --bg: #f4f6f8; --blue: #005fb9; }
         * { box-sizing: border-box; outline: none; }
@@ -16,27 +15,39 @@
         
         .admin-container { display: flex; width: 100%; min-height: 100vh; }
 
-        /* MENU */
-        aside.sidebar { width: 250px; background: var(--primary); color: white; min-height: 100vh; position: fixed; top: 0; left: 0; z-index: 1000; display: flex; flex-direction: column; }
+        /* MENU LATERAL */
+        aside.sidebar { 
+            width: 250px; background: var(--primary); color: white; min-height: 100vh; 
+            position: fixed; top: 0; left: 0; z-index: 1000; overflow-y: auto; display: flex; flex-direction: column;
+        }
         aside h3 { text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(255,255,255,0.1); margin: 0; }
-        aside nav a { display: flex; align-items: center; gap: 10px; padding: 15px 20px; color: #bdc3c7; text-decoration: none; transition: 0.3s; cursor: pointer; }
+        aside nav a { 
+            display: flex; align-items: center; gap: 10px; padding: 15px 20px; 
+            color: #bdc3c7; text-decoration: none; transition: 0.3s; cursor: pointer;
+        }
         aside nav a:hover, aside nav a.active { background: rgba(255,255,255,0.1); color: var(--accent); border-left: 4px solid var(--accent); }
 
         /* CONTEÚDO */
         main.main-content { margin-left: 250px; padding: 30px; width: 100%; flex: 1; }
         header h1 { margin: 0; color: var(--primary); }
 
-        /* TABELA */
-        .card-table { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 20px; }
+        /* CARD & TABLE */
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 20px; }
         .table-responsive { width: 100%; overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; white-space: nowrap; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #f9f9f9; color: #555; }
-
+        
+        table { width: 100%; border-collapse: collapse; white-space: nowrap; margin-top: 10px; }
+        th { text-align: left; padding: 15px; border-bottom: 2px solid #eee; background: #f9f9f9; color: #555; }
+        td { padding: 15px; border-bottom: 1px solid #eee; color: #444; vertical-align: middle; }
+        
         /* BOTÕES */
-        .btn-action { border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; font-size: 0.85rem; }
+        .btn-action { border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; font-size: 0.85rem; transition: 0.2s; }
         .btn-accept { background: #27ae60; }
+        .btn-accept:hover { background: #219150; }
         .btn-reject { background: #c0392b; margin-left: 5px; }
+        .btn-reject:hover { background: #a93226; }
+
+        /* IMAGEM PRODUTO */
+        .prod-img { width: 40px; height: 40px; object-fit: contain; border: 1px solid #eee; border-radius: 4px; vertical-align: middle; margin-right: 10px; }
 
         /* MOBILE */
         @media (max-width: 768px) {
@@ -45,11 +56,12 @@
             aside nav { display: flex; overflow-x: auto; padding: 0 10px; gap: 10px; }
             aside nav::-webkit-scrollbar { display: none; }
             aside nav a { flex: 0 0 auto; background: rgba(255,255,255,0.1); border-radius: 20px; padding: 8px 15px; border-left: none !important; }
-            main.main-content { margin-left: 0; padding: 15px; }
+            main.main-content { margin-left: 0; padding: 15px; width: 100%; }
         }
     </style>
 </head>
 <body>
+
     <div class="admin-container">
         <aside class="sidebar">
             <h3>Admin AutoPeças</h3>
@@ -65,23 +77,23 @@
 
         <main class="main-content">
             <header>
-                <h1>Sugestões de Busca</h1>
-                <p style="color:#666;">Aprove os termos sugeridos pelos parceiros.</p>
+                <h1>Revisão de Sugestões</h1>
+                <p style="color:#666;">Aprove o conhecimento dos seus parceiros para melhorar a busca.</p>
             </header>
 
-            <div class="card-table">
+            <div class="card">
                 <div class="table-responsive">
                     <table>
                         <thead>
                             <tr>
                                 <th>Produto</th>
-                                <th>Termo Sugerido</th>
+                                <th>Sugestão (Termo)</th>
                                 <th>Quem sugeriu</th>
                                 <th>Ação</th>
                             </tr>
                         </thead>
                         <tbody id="lista-sugestoes">
-                            <tr><td colspan="4" align="center">Carregando...</td></tr>
+                            <tr><td colspan="4" align="center" style="padding:20px;">Carregando...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -92,25 +104,37 @@
     <script src="admin.js"></script>
 
     <script>
+        document.addEventListener("DOMContentLoaded", carregarSugestoes);
+
         function carregarSugestoes() {
+            // LÊ OS BANCOS DE DADOS DO LOCALSTORAGE
             const sugestoes = JSON.parse(localStorage.getItem('db_sugestoes') || '[]');
+            const produtos = JSON.parse(localStorage.getItem('db_produtos') || '[]');
+
             const tbody = document.getElementById('lista-sugestoes');
             tbody.innerHTML = '';
-
+            
             if(sugestoes.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#999;">Nenhuma sugestão pendente.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="4" style="padding:20px; text-align:center; color:#999;">Tudo limpo! Nenhuma sugestão pendente.</td></tr>';
                 return;
             }
 
             sugestoes.forEach((s, index) => {
-                const prodNome = s.produtoNome || `Produto ID ${s.produtoId}`;
-                const afiliado = s.afiliadoNome || "Anônimo";
+                // Tenta achar a imagem do produto atualizada
+                const produtoReal = produtos.find(p => p.id == s.produtoId);
+                const imgUrl = produtoReal ? produtoReal.image : 'https://placehold.co/40';
+                const prodNome = produtoReal ? produtoReal.name : (s.produtoNome || 'Produto não encontrado');
 
                 tbody.innerHTML += `
                     <tr>
-                        <td><strong>${prodNome}</strong></td>
+                        <td>
+                            <div style="display:flex; align-items:center;">
+                                <img src="${imgUrl}" class="prod-img"> 
+                                <strong>${prodNome}</strong>
+                            </div>
+                        </td>
                         <td style="font-weight:bold; color:#2980b9;">${s.termo}</td>
-                        <td>${afiliado}</td>
+                        <td>${s.afiliadoNome || 'Anônimo'}</td>
                         <td>
                             <button onclick="aceitarSugestao(${index})" class="btn-action btn-accept"><i class="ph ph-check"></i> Aceitar</button>
                             <button onclick="recusarSugestao(${index})" class="btn-action btn-reject"><i class="ph ph-x"></i> Recusar</button>
@@ -127,36 +151,44 @@
 
             if (!item) return;
 
-            // Busca o produto e adiciona o termo
-            const prodIndex = produtos.findIndex(p => p.id == item.produtoId);
-            if (prodIndex !== -1) {
-                const termoAtual = produtos[prodIndex].pesquisa || "";
+            // 1. Encontra o produto no banco de dados
+            const produtoIndex = produtos.findIndex(p => p.id == item.produtoId);
+            
+            if (produtoIndex !== -1) {
+                // 2. Adiciona o termo na lista de pesquisa do produto
+                const termoAtual = produtos[produtoIndex].pesquisa || "";
+                
+                // Evita duplicatas (se já tiver o termo, avisa)
                 if (!termoAtual.toLowerCase().includes(item.termo.toLowerCase())) {
-                    produtos[prodIndex].pesquisa = termoAtual + ", " + item.termo;
+                    produtos[produtoIndex].pesquisa = termoAtual + ", " + item.termo;
+                    
+                    // Salva a alteração no produto
                     localStorage.setItem('db_produtos', JSON.stringify(produtos));
-                    alert(`Termo "${item.termo}" adicionado ao produto!`);
+                    alert(`✅ Termo "${item.termo}" adicionado ao produto com sucesso!`);
                 } else {
-                    alert("O produto já tem esse termo.");
+                    alert("⚠️ Este termo já existe no produto. Apenas removendo da lista.");
                 }
             } else {
-                alert("Produto não encontrado.");
+                alert("❌ Erro: Produto original não encontrado (pode ter sido excluído).");
             }
 
-            // Remove da lista
+            // 3. Remove a sugestão da lista de pendentes
             sugestoes.splice(index, 1);
             localStorage.setItem('db_sugestoes', JSON.stringify(sugestoes));
+            
+            // 4. Recarrega a tabela
             carregarSugestoes();
         }
 
         function recusarSugestao(index) {
-            if(!confirm("Rejeitar sugestão?")) return;
+            if(!confirm("Tem certeza que deseja recusar esta sugestão?")) return;
+
             const sugestoes = JSON.parse(localStorage.getItem('db_sugestoes') || '[]');
-            sugestoes.splice(index, 1);
+            sugestoes.splice(index, 1); // Remove apenas este item
             localStorage.setItem('db_sugestoes', JSON.stringify(sugestoes));
+            
             carregarSugestoes();
         }
-
-        document.addEventListener("DOMContentLoaded", carregarSugestoes);
     </script>
 </body>
 </html>

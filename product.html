@@ -177,6 +177,7 @@
                 </button>
             </div>
 
+
             <div class="security-badges" style="margin-top:20px; display:flex; gap:15px; font-size:0.8rem; color:#777; justify-content:center;">
                 <div class="badge-item"><i class="ph ph-shield-check"></i> Compra Segura</div>
                 <div class="badge-item"><i class="ph ph-truck"></i> Entrega Rápida</div>
@@ -199,7 +200,7 @@
             <input type="text" id="termo-sugestao" placeholder="Digite o termo..." style="width:100%; padding:12px; margin:10px 0; border:1px solid #ddd; border-radius:4px;">
             <div style="text-align:right; gap:10px; display:flex; justify-content:flex-end;">
                 <button onclick="document.getElementById('modal-sugestao').style.display='none'" style="padding:10px 15px; border:none; background:#eee; cursor:pointer; border-radius:4px;">Cancelar</button>
-                <button onclick="enviarSugestao()" style="padding:10px 15px; border:none; background:#27ae60; color:white; font-weight:bold; cursor:pointer; border-radius:4px;">Enviar</button>
+                <button id="btn-enviar-sugestao" onclick="enviarSugestao()" style="padding:10px 15px; border:none; background:#27ae60; color:white; font-weight:bold; cursor:pointer; border-radius:4px;">Enviar</button>
             </div>
         </div>
     </div>

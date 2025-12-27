@@ -4,59 +4,72 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sugestões - Admin</title>
+    <link rel="stylesheet" href="admin.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
         /* =========================================
-           ESTILOS (Padronizado com seus outros arquivos)
+           ESTILOS GERAIS
            ========================================= */
-        :root { --primary: #2c3e50; --accent: #e67e22; --bg: #f4f6f8; --blue: #005fb9; }
+        :root { --primary: #2c3e50; --accent: #e67e22; --bg: #f4f6f8; }
         * { box-sizing: border-box; outline: none; }
+        
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; min-height: 100vh; }
         
         .admin-container { display: flex; width: 100%; min-height: 100vh; }
 
-        /* MENU LATERAL */
-        aside.sidebar { 
-            width: 250px; background: var(--primary); color: white; min-height: 100vh; 
-            position: fixed; top: 0; left: 0; z-index: 1000; overflow-y: auto; display: flex; flex-direction: column;
-        }
-        aside h3 { text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(255,255,255,0.1); margin: 0; }
-        aside nav a { 
-            display: flex; align-items: center; gap: 10px; padding: 15px 20px; 
-            color: #bdc3c7; text-decoration: none; transition: 0.3s; cursor: pointer;
-        }
+        /* SIDEBAR */
+        aside.sidebar { width: 250px; background: var(--primary); color: white; min-height: 100vh; position: fixed; top: 0; left: 0; z-index: 1000; }
+        aside h3 { text-align: center; padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); margin: 0; }
+        aside nav a { display: flex; align-items: center; gap: 10px; padding: 15px 20px; color: #bdc3c7; text-decoration: none; transition: 0.3s; }
         aside nav a:hover, aside nav a.active { background: rgba(255,255,255,0.1); color: var(--accent); border-left: 4px solid var(--accent); }
 
-        /* CONTEÚDO */
+        /* MAIN */
         main.main-content { margin-left: 250px; padding: 30px; width: 100%; flex: 1; }
-        header h1 { margin: 0; color: var(--primary); }
-
-        /* CARD & TABLE */
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 20px; }
+        
+        /* UTILITÁRIO PARA TABELA RESPONSIVA */
         .table-responsive { width: 100%; overflow-x: auto; }
-        
-        table { width: 100%; border-collapse: collapse; white-space: nowrap; margin-top: 10px; }
-        th { text-align: left; padding: 15px; border-bottom: 2px solid #eee; background: #f9f9f9; color: #555; }
-        td { padding: 15px; border-bottom: 1px solid #eee; color: #444; vertical-align: middle; }
-        
-        /* BOTÕES */
-        .btn-action { border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; font-size: 0.85rem; transition: 0.2s; }
-        .btn-accept { background: #27ae60; }
-        .btn-accept:hover { background: #219150; }
-        .btn-reject { background: #c0392b; margin-left: 5px; }
-        .btn-reject:hover { background: #a93226; }
 
-        /* IMAGEM PRODUTO */
-        .prod-img { width: 40px; height: 40px; object-fit: contain; border: 1px solid #eee; border-radius: 4px; vertical-align: middle; margin-right: 10px; }
-
-        /* MOBILE */
+        /* =========================================
+           📱 MOBILE (ADMIN) - CSS NOVO
+           ========================================= */
         @media (max-width: 768px) {
-            .admin-container { flex-direction: column; }
-            aside.sidebar { width: 100%; height: auto; position: relative; padding-bottom: 10px; }
-            aside nav { display: flex; overflow-x: auto; padding: 0 10px; gap: 10px; }
+            .admin-container { flex-direction: column; } /* Um embaixo do outro */
+
+            /* 1. Menu vira topo deslizante */
+            aside.sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+                padding-bottom: 10px;
+                overflow-y: visible;
+                min-height: auto;
+            }
+
+            aside nav {
+                display: flex;
+                overflow-x: auto; /* Rolagem Horizontal */
+                padding: 0 10px;
+                gap: 10px;
+                -webkit-overflow-scrolling: touch;
+            }
             aside nav::-webkit-scrollbar { display: none; }
-            aside nav a { flex: 0 0 auto; background: rgba(255,255,255,0.1); border-radius: 20px; padding: 8px 15px; border-left: none !important; }
-            main.main-content { margin-left: 0; padding: 15px; width: 100%; }
+
+            aside nav a {
+                flex: 0 0 auto;
+                background: rgba(255,255,255,0.1);
+                border-radius: 20px;
+                padding: 8px 15px;
+                border-left: none !important;
+                font-size: 0.85rem;
+                white-space: nowrap;
+            }
+
+            /* 2. Conteúdo ocupa tudo */
+            main.main-content {
+                margin-left: 0;
+                padding: 15px;
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -64,131 +77,84 @@
 
     <div class="admin-container">
         <aside class="sidebar">
-            <h3>Admin AutoPeças</h3>
+            <h3>Admin</h3>
             <nav>
                 <a href="admin_dashboard.html"><i class="ph ph-gauge"></i> Dashboard</a>
                 <a href="admin_produtos.html"><i class="ph ph-package"></i> Produtos</a>
                 <a href="admin_pedidos.html"><i class="ph ph-shopping-cart-simple"></i> Pedidos</a>
                 <a href="admin_afiliados.html"><i class="ph ph-users"></i> Afiliados & Financeiro</a>
-                <a href="admin_sugestoes.html" class="active"><i class="ph ph-lightbulb"></i> Sugestões</a>
-                <a href="#" id="logout-button" style="color:#e74c3c;"><i class="ph ph-sign-out"></i> Sair</a>
+                <a href="admin_sugestoes.html"><i class="ph ph-users"></i> Sugestões</a>
+                <a href="#" onclick="logout()" style="margin-top:20px; color:#e74c3c;"><i class="ph ph-sign-out"></i> Sair</a>
             </nav>
         </aside>
 
         <main class="main-content">
-            <header>
-                <h1>Revisão de Sugestões</h1>
-                <p style="color:#666;">Aprove o conhecimento dos seus parceiros para melhorar a busca.</p>
-            </header>
+            <h1>Revisão de Sugestões</h1>
+            <p>Aprove o conhecimento dos seus parceiros para melhorar a busca.</p>
 
-            <div class="card">
+            <div class="card" style="background:white; padding:20px; margin-top:20px; border-radius:8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
                 <div class="table-responsive">
-                    <table>
+                    <table style="width:100%; border-collapse:collapse; white-space: nowrap;">
                         <thead>
-                            <tr>
-                                <th>Produto</th>
-                                <th>Sugestão (Termo)</th>
-                                <th>Quem sugeriu</th>
-                                <th>Ação</th>
+                            <tr style="text-align:left; border-bottom:2px solid #eee;">
+                                <th style="padding:10px;">Produto</th>
+                                <th style="padding:10px;">Sugestão (Termo)</th>
+                                <th style="padding:10px;">Quem sugeriu</th>
+                                <th style="padding:10px;">Ação</th>
                             </tr>
                         </thead>
-                        <tbody id="lista-sugestoes">
-                            <tr><td colspan="4" align="center" style="padding:20px;">Carregando...</td></tr>
-                        </tbody>
+                        <tbody id="lista-sugestoes"></tbody>
                     </table>
                 </div>
             </div>
         </main>
     </div>
 
-    <script src="admin.js"></script>
-
     <script>
-        document.addEventListener("DOMContentLoaded", carregarSugestoes);
+        const API_URL = '';
 
-        function carregarSugestoes() {
-            // LÊ OS BANCOS DE DADOS DO LOCALSTORAGE
-            const sugestoes = JSON.parse(localStorage.getItem('db_sugestoes') || '[]');
-            const produtos = JSON.parse(localStorage.getItem('db_produtos') || '[]');
-
+        async function carregar() {
+            const token = localStorage.getItem('adminToken');
+            
+            // Seu fetch original
+            const res = await fetch(`${API_URL}/admin/sugestoes`, { headers: {'Authorization': `Bearer ${token}`} });
+            const lista = await res.json();
+            
             const tbody = document.getElementById('lista-sugestoes');
             tbody.innerHTML = '';
             
-            if(sugestoes.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" style="padding:20px; text-align:center; color:#999;">Tudo limpo! Nenhuma sugestão pendente.</td></tr>';
-                return;
-            }
+            if(lista.length === 0) tbody.innerHTML = '<tr><td colspan="4" style="padding:20px; text-align:center;">Tudo limpo! Nenhuma sugestão pendente.</td></tr>';
 
-            sugestoes.forEach((s, index) => {
-                // Tenta achar a imagem do produto atualizada
-                const produtoReal = produtos.find(p => p.id == s.produtoId);
-                const imgUrl = produtoReal ? produtoReal.image : 'https://placehold.co/40';
-                const prodNome = produtoReal ? produtoReal.name : (s.produtoNome || 'Produto não encontrado');
-
+            lista.forEach(s => {
                 tbody.innerHTML += `
-                    <tr>
-                        <td>
-                            <div style="display:flex; align-items:center;">
-                                <img src="${imgUrl}" class="prod-img"> 
-                                <strong>${prodNome}</strong>
-                            </div>
+                    <tr style="border-bottom:1px solid #eee;">
+                        <td style="padding:10px;">
+                            <img src="${s.produto.image}" width="30" style="vertical-align:middle; border-radius:4px; margin-right:5px;">
+                            ${s.produto.name}
                         </td>
-                        <td style="font-weight:bold; color:#2980b9;">${s.termo}</td>
-                        <td>${s.afiliadoNome || 'Anônimo'}</td>
-                        <td>
-                            <button onclick="aceitarSugestao(${index})" class="btn-action btn-accept"><i class="ph ph-check"></i> Aceitar</button>
-                            <button onclick="recusarSugestao(${index})" class="btn-action btn-reject"><i class="ph ph-x"></i> Recusar</button>
+                        <td style="padding:10px; font-weight:bold; color:#2980b9;">${s.termo}</td>
+                        <td style="padding:10px;">${s.afiliado.nome}</td>
+                        <td style="padding:10px;">
+                            <button onclick="decidir(${s.id}, 'aprovar')" style="background:#27ae60; color:white; border:none; padding:5px 10px; cursor:pointer; border-radius:4px;">Aceitar</button>
+                            <button onclick="decidir(${s.id}, 'rejeitar')" style="background:#c0392b; color:white; border:none; padding:5px 10px; cursor:pointer; border-radius:4px;">Recusar</button>
                         </td>
                     </tr>
                 `;
             });
         }
 
-        function aceitarSugestao(index) {
-            const sugestoes = JSON.parse(localStorage.getItem('db_sugestoes') || '[]');
-            const produtos = JSON.parse(localStorage.getItem('db_produtos') || '[]');
-            const item = sugestoes[index];
-
-            if (!item) return;
-
-            // 1. Encontra o produto no banco de dados
-            const produtoIndex = produtos.findIndex(p => p.id == item.produtoId);
-            
-            if (produtoIndex !== -1) {
-                // 2. Adiciona o termo na lista de pesquisa do produto
-                const termoAtual = produtos[produtoIndex].pesquisa || "";
-                
-                // Evita duplicatas (se já tiver o termo, avisa)
-                if (!termoAtual.toLowerCase().includes(item.termo.toLowerCase())) {
-                    produtos[produtoIndex].pesquisa = termoAtual + ", " + item.termo;
-                    
-                    // Salva a alteração no produto
-                    localStorage.setItem('db_produtos', JSON.stringify(produtos));
-                    alert(`✅ Termo "${item.termo}" adicionado ao produto com sucesso!`);
-                } else {
-                    alert("⚠️ Este termo já existe no produto. Apenas removendo da lista.");
-                }
-            } else {
-                alert("❌ Erro: Produto original não encontrado (pode ter sido excluído).");
-            }
-
-            // 3. Remove a sugestão da lista de pendentes
-            sugestoes.splice(index, 1);
-            localStorage.setItem('db_sugestoes', JSON.stringify(sugestoes));
-            
-            // 4. Recarrega a tabela
-            carregarSugestoes();
+        async function decidir(id, acao) {
+            const token = localStorage.getItem('adminToken');
+            await fetch(`${API_URL}/admin/sugestoes/${id}/${acao}`, { method: 'POST', headers: {'Authorization': `Bearer ${token}`} });
+            carregar();
         }
 
-        function recusarSugestao(index) {
-            if(!confirm("Tem certeza que deseja recusar esta sugestão?")) return;
-
-            const sugestoes = JSON.parse(localStorage.getItem('db_sugestoes') || '[]');
-            sugestoes.splice(index, 1); // Remove apenas este item
-            localStorage.setItem('db_sugestoes', JSON.stringify(sugestoes));
-            
-            carregarSugestoes();
+        function logout() {
+            localStorage.removeItem('adminToken');
+            window.location.href = 'admin_login.html';
         }
+
+        carregar();
     </script>
 </body>
 </html>

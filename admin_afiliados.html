@@ -10,9 +10,9 @@
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; display: flex; }
         
         /* LAYOUT BÁSICO */
-        aside { width: 250px; background: var(--primary); color: white; min-height: 100vh; position: fixed; z-index: 1000; }
+        aside { width: 250px; background: var(--primary); color: white; min-height: 100vh; position: fixed; }
         aside h3 { text-align: center; padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); margin: 0; }
-        aside nav a { display: flex; align-items: center; gap: 10px; padding: 15px 20px; color: #bdc3c7; text-decoration: none; transition: 0.3s; cursor: pointer; }
+        aside nav a { display: flex; align-items: center; gap: 10px; padding: 15px 20px; color: #bdc3c7; text-decoration: none; transition: 0.3s; }
         aside nav a:hover, aside nav a.active { background: rgba(255,255,255,0.1); color: var(--accent); border-left: 4px solid var(--accent); }
         
         main { margin-left: 250px; padding: 30px; width: 100%; }
@@ -22,7 +22,10 @@
         .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 30px; }
         .card h2 { margin-top: 0; color: var(--primary); font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
         
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        /* Ajuste para tabela não quebrar layout */
+        .table-responsive { width: 100%; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; white-space: nowrap; }
+        
         th { text-align: left; padding: 12px; border-bottom: 2px solid #eee; color: #555; background: #f9f9f9; }
         td { padding: 12px; border-bottom: 1px solid #eee; color: #666; }
         
@@ -34,16 +37,61 @@
         .pix-tag { background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; color: #333; font-family: monospace; }
         
         /* MODAL */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
         .modal-box { background: white; padding: 25px; width: 450px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
         .file-area { border: 2px dashed #ccc; padding: 20px; text-align: center; margin: 20px 0; border-radius: 6px; background: #fafafa; }
         .modal-btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 
-        /* Ajuste Mobile para o Menu */
+        /* =========================================
+           📱 MODO MOBILE (ADMIN) - ADICIONADO
+           ========================================= */
         @media (max-width: 768px) {
-            body { flex-direction: column; }
-            aside { width: 100%; height: auto; position: relative; padding-bottom: 10px; }
-            main { margin-left: 0; padding: 15px; }
+            body { flex-direction: column; } /* Um embaixo do outro */
+
+            /* 1. Menu vira topo deslizante */
+            aside {
+                width: 100%;
+                height: auto;
+                position: relative;
+                padding-bottom: 10px;
+                overflow-y: visible; /* Deixa ver o dropdown se tiver */
+                min-height: auto;
+            }
+
+            aside nav {
+                display: flex;
+                overflow-x: auto; /* Rolagem Horizontal */
+                padding: 0 10px;
+                gap: 10px;
+                -webkit-overflow-scrolling: touch;
+            }
+            aside nav::-webkit-scrollbar { display: none; }
+
+            aside nav a {
+                flex: 0 0 auto;
+                background: rgba(255,255,255,0.1);
+                border-radius: 20px;
+                padding: 8px 15px;
+                border-left: none !important;
+                font-size: 0.85rem;
+                white-space: nowrap;
+            }
+
+            /* 2. Conteúdo ocupa tudo */
+            main {
+                margin-left: 0;
+                padding: 15px;
+                width: 100%;
+            }
+
+            /* 3. Ajustes de botões no topo da tabela */
+            .card > div[style*="text-align: right"] {
+                text-align: left !important;
+                margin-bottom: 15px;
+            }
+            .btn-msg { width: 100%; justify-content: center; }
+            
+            /* Ajuste Modal Mobile */
             .modal-box { width: 90%; }
         }
     </style>
@@ -56,8 +104,8 @@
             <a href="admin_dashboard.html"><i class="ph ph-gauge"></i> Dashboard</a>
             <a href="admin_produtos.html"><i class="ph ph-package"></i> Produtos</a>
             <a href="admin_pedidos.html"><i class="ph ph-shopping-cart-simple"></i> Pedidos</a>
-            <a href="admin_afiliados.html" class="active"><i class="ph ph-users"></i> Afiliados & Financeiro</a>
-            <a href="admin_sugestoes.html"><i class="ph ph-lightbulb"></i> Sugestões</a>
+            <a href="admin_afiliados.html"><i class="ph ph-users"></i> Afiliados & Financeiro</a>
+            <a href="admin_sugestoes.html"><i class="ph ph-users"></i> Sugestões</a>
             <a href="#" onclick="logout()" style="color: #e74c3c;"><i class="ph ph-sign-out"></i> Sair</a>
         </nav>
     </aside>
@@ -71,7 +119,7 @@
             <h2><i class="ph ph-hand-coins" style="color:#f1c40f;"></i> Solicitações de Saque Pendentes</h2>
             <p style="color:#666; font-size:0.9rem;">Afiliados aguardando pagamento.</p>
             
-            <div style="overflow-x:auto;">
+            <div class="table-responsive">
                 <table>
                     <thead>
                         <tr>
@@ -92,11 +140,12 @@
         <section class="card">
             <h2><i class="ph ph-users"></i> Todos os Parceiros</h2>
             <div style="text-align: right; margin-bottom: 10px;">
-                <button onclick="alert('Funcionalidade em desenvolvimento!')" class="btn-action btn-msg">
+                <button onclick="alert('Use a tabela acima para pagar saques!')" class="btn-action btn-msg">
                     <i class="ph ph-paper-plane-tilt"></i> Enviar Mensagem Avulsa
                 </button>
             </div>
-            <div style="overflow-x:auto;">
+            
+            <div class="table-responsive">
                 <table>
                     <thead>
                         <tr>
@@ -109,7 +158,7 @@
                         </tr>
                     </thead>
                     <tbody id="lista-afiliados">
-                        <tr><td colspan="6" align="center">Carregando...</td></tr>
+                        <tr><td colspan="5" align="center">Carregando...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -131,7 +180,7 @@
                 <label for="comprovante" style="cursor:pointer; display:block;">
                     <i class="ph ph-upload-simple" style="font-size:2rem; color:#aaa;"></i><br>
                     <span style="font-weight:bold; color:#555;">Anexar Comprovante</span><br>
-                    <small style="color:#888;">PDF ou Imagem (Simulado)</small>
+                    <small style="color:#888;">PDF ou Imagem</small>
                 </label>
                 <input type="file" id="comprovante" style="display:none;" onchange="verificarArquivo()">
                 <div id="nome-arquivo" style="margin-top:10px; color:#27ae60; font-weight:bold; font-size:0.85rem;"></div>
@@ -145,109 +194,120 @@
     </div>
 
     <script>
+        const API_URL = '';
+
         document.addEventListener("DOMContentLoaded", () => {
             carregarSaquesPendentes();
             carregarTodosAfiliados();
         });
 
-        // 1. CARREGAR SAQUES (Lendo db_saques do navegador)
-        function carregarSaquesPendentes() {
-            // Se não existir, cria array vazio
-            const saques = JSON.parse(localStorage.getItem('db_saques') || '[]');
-            const tbody = document.getElementById('lista-saques');
-            tbody.innerHTML = '';
+        // 1. CARREGAR SAQUES PENDENTES
+        async function carregarSaquesPendentes() {
+            const token = localStorage.getItem('adminToken');
+            if(!token) return window.location.href = 'admin_login.html';
 
-            // Filtra só os pendentes
-            const pendentes = saques.filter(s => s.status === 'PENDENTE');
-
-            if(pendentes.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" align="center" style="padding:20px; color:#999;">Nenhuma solicitação pendente.</td></tr>';
-                return;
-            }
-
-            pendentes.forEach(s => {
-                const data = new Date(s.dataSolicitacao).toLocaleDateString('pt-BR');
-                const valor = parseFloat(s.valor).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+            try {
+                const res = await fetch(`${API_URL}/admin/saques-pendentes`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const saques = await res.json();
                 
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${data}</td>
-                    <td><strong>${s.afiliadoNome || 'Parceiro'}</strong></td>
-                    <td><span class="pix-tag">${s.chavePix || 'Não informada'}</span></td>
-                    <td style="color:#c0392b; font-weight:bold;">${valor}</td>
-                    <td>
-                        <button onclick="abrirModalPagamento(${s.id}, '${s.afiliadoNome}', '${s.chavePix}', ${s.valor})" class="btn-action btn-pagar">
-                            <i class="ph ph-check-circle"></i> Pagar
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
+                const tbody = document.getElementById('lista-saques');
+                tbody.innerHTML = '';
 
-        // 2. CARREGAR AFILIADOS (Lendo db_afiliados e db_vendas)
-        function carregarTodosAfiliados() {
-            const afiliados = JSON.parse(localStorage.getItem('db_afiliados') || '[]');
-            const vendas = JSON.parse(localStorage.getItem('db_vendas') || '[]');
-            
-            const tbody = document.getElementById('lista-afiliados');
-            tbody.innerHTML = '';
-
-            if(afiliados.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" align="center" style="padding:20px;">Nenhum parceiro cadastrado.</td></tr>';
-                return;
-            }
-
-            afiliados.forEach(a => {
-                // Calcula vendas desse afiliado
-                // Verifica se a venda tem o código dele ou o objeto afiliado
-                const vendasDoAfiliado = vendas.filter(v => 
-                    (v.afiliadoCodigo === a.codigo || (v.afiliado && v.afiliado.codigo === a.codigo)) && 
-                    (v.status === 'APROVADO' || v.status === 'ENTREGUE')
-                );
-
-                const totalVendas = vendasDoAfiliado.length;
-                
-                // Status HTML
-                const statusHtml = a.aprovado 
-                    ? '<span style="color:green; font-weight:bold; background:#d4edda; padding:2px 6px; border-radius:4px;">Ativo</span>' 
-                    : '<span style="color:#856404; font-weight:bold; background:#fff3cd; padding:2px 6px; border-radius:4px;">Pendente</span>';
-
-                // Botão Aprovar/Bloquear
-                let btnAcao = '';
-                if (!a.aprovado) {
-                    btnAcao = `<button onclick="alterarStatusAfiliado(${a.id}, true)" class="btn-action" style="background:#27ae60;">✔ Aprovar</button>`;
-                } else {
-                    btnAcao = `<button onclick="alterarStatusAfiliado(${a.id}, false)" class="btn-action" style="background:#c0392b;">✖ Bloquear</button>`;
+                if(saques.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" align="center" style="padding:20px; color:#999;">Nenhuma solicitação pendente.</td></tr>';
+                    return;
                 }
 
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${a.nome}</td>
-                    <td>${a.telefone || '-'}</td>
-                    <td><strong>${a.codigo}</strong></td>
-                    <td>${totalVendas}</td>
-                    <td>${statusHtml}</td>
-                    <td>${btnAcao}</td>
-                `;
-                tbody.appendChild(tr);
-            });
+                saques.forEach(s => {
+                    const data = new Date(s.dataSolicitacao).toLocaleDateString('pt-BR');
+                    const valor = parseFloat(s.valor).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+                    
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${data}</td>
+                        <td><strong>${s.afiliado.nome}</strong></td>
+                        <td><span class="pix-tag">${s.afiliado.chavePix || 'Sem Pix'}</span></td>
+                        <td style="color:#c0392b; font-weight:bold;">${valor}</td>
+                        <td>
+                            <button onclick="abrirModalPagamento(${s.id}, '${s.afiliado.nome}', '${s.afiliado.chavePix}', ${s.valor})" class="btn-action btn-pagar">
+                                <i class="ph ph-check-circle"></i> Pagar
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch(e) { console.error(e); }
         }
 
-        // 3. APROVAR OU BLOQUEAR AFILIADO
-        function alterarStatusAfiliado(id, novoStatus) {
-            const afiliados = JSON.parse(localStorage.getItem('db_afiliados') || '[]');
-            const index = afiliados.findIndex(a => a.id === id);
-            
-            if(index !== -1) {
-                afiliados[index].aprovado = novoStatus;
-                localStorage.setItem('db_afiliados', JSON.stringify(afiliados));
-                carregarTodosAfiliados(); // Atualiza a tela
-                alert(novoStatus ? "Afiliado Aprovado!" : "Afiliado Bloqueado.");
+        // 2. CARREGAR LISTA GERAL (COM BOTÃO DE APROVAR)
+        async function carregarTodosAfiliados() {
+            const token = localStorage.getItem('adminToken');
+            try {
+                const res = await fetch(`${API_URL}/admin/afiliados`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const lista = await res.json();
+                const tbody = document.getElementById('lista-afiliados');
+                tbody.innerHTML = '';
+
+                lista.forEach(a => {
+                    // Lógica do Status
+                    const statusHtml = a.aprovado 
+                        ? '<span style="color:green; font-weight:bold; background:#d4edda; padding:2px 6px; border-radius:4px;">Ativo</span>' 
+                        : '<span style="color:#856404; font-weight:bold; background:#fff3cd; padding:2px 6px; border-radius:4px;">Pendente</span>';
+
+                    // Lógica do Botão
+                    let btnAcao = '';
+                    if (!a.aprovado) {
+                        // Se não aprovado, mostra botão VERDE de Aprovar
+                        btnAcao = `<button onclick="alterarStatusAfiliado(${a.id}, true)" class="btn-action" style="background:#27ae60; cursor:pointer;">✔ Aprovar</button>`;
+                    } else {
+                        // Se já aprovado, mostra botão VERMELHO de Bloquear (Opcional)
+                        btnAcao = `<button onclick="alterarStatusAfiliado(${a.id}, false)" class="btn-action" style="background:#c0392b; cursor:pointer;">✖ Bloquear</button>`;
+                    }
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${a.nome}</td>
+                        <td>${a.telefone}</td>
+                        <td><strong>${a.codigo}</strong></td>
+                        <td>${parseFloat(a.vendasTotais || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</td>
+                        <td>${statusHtml}</td>
+                        <td>${btnAcao}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch(e) { console.error(e); }
+        }
+
+        // NOVA FUNÇÃO: CHAMAR O SERVIDOR PARA APROVAR
+        async function alterarStatusAfiliado(id, novoStatus) {
+            const acao = novoStatus ? "Aprovar" : "Bloquear";
+            if(!confirm(`Tem certeza que deseja ${acao} este afiliado?`)) return;
+
+            try {
+                const token = localStorage.getItem('adminToken');
+                const res = await fetch(`${API_URL}/admin/afiliados/${id}/status`, {
+                    method: 'PUT',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ aprovado: novoStatus })
+                });
+
+                if(res.ok) {
+                    alert(`Afiliado ${novoStatus ? 'ativado' : 'bloqueado'} com sucesso!`);
+                    carregarTodosAfiliados(); // Atualiza a lista na hora
+                } else {
+                    alert("Erro ao atualizar status.");
+                }
+            } catch(e) {
+                alert("Erro de conexão.");
             }
         }
 
-        // 4. LÓGICA DO MODAL DE PAGAMENTO
+        // 3. LÓGICA DO MODAL
         function abrirModalPagamento(id, nome, pix, valor) {
             document.getElementById('modal-pagamento').style.display = 'flex';
             document.getElementById('modal-id-saque').value = id;
@@ -255,6 +315,7 @@
             document.getElementById('modal-pix').innerText = pix || "Não informado";
             document.getElementById('modal-valor').innerText = valor.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
             
+            // Limpa o arquivo anterior
             document.getElementById('comprovante').value = "";
             document.getElementById('nome-arquivo').innerText = "";
         }
@@ -268,37 +329,50 @@
             if(file) document.getElementById('nome-arquivo').innerText = "📎 " + file.name;
         }
 
-        function confirmarPagamento() {
-            const idSaque = parseInt(document.getElementById('modal-id-saque').value);
-            const saques = JSON.parse(localStorage.getItem('db_saques') || '[]');
-            
-            const index = saques.findIndex(s => s.id === idSaque);
-            if(index !== -1) {
-                // Atualiza o status para PAGO
-                saques[index].status = 'PAGO';
-                saques[index].dataPagamento = new Date().toISOString();
-                
-                // Simula salvamento de comprovante (apenas nome do arquivo)
-                const fileInput = document.getElementById('comprovante');
-                if(fileInput.files[0]) {
-                    saques[index].comprovante = "uploads/" + fileInput.files[0].name;
-                }
+        // 4. CONFIRMAR PAGAMENTO E ENVIAR
+        async function confirmarPagamento() {
+            const id = document.getElementById('modal-id-saque').value;
+            const fileInput = document.getElementById('comprovante');
+            const btn = document.querySelector('.btn-pagar');
 
-                localStorage.setItem('db_saques', JSON.stringify(saques));
-                
-                alert("✅ Pagamento confirmado com sucesso!");
-                fecharModal();
-                carregarSaquesPendentes();
-            } else {
-                alert("Erro: Saque não encontrado.");
+            if (!fileInput.files[0]) {
+                if(!confirm("Tem certeza que quer marcar como pago SEM anexar comprovante?")) return;
+            }
+
+            const formData = new FormData();
+            if (fileInput.files[0]) {
+                formData.append('comprovante', fileInput.files[0]);
+            }
+
+            btn.innerText = "Enviando...";
+            btn.disabled = true;
+
+            try {
+                const token = localStorage.getItem('adminToken');
+                const res = await fetch(`${API_URL}/admin/saques/${id}/confirmar`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }, // Não coloque Content-Type aqui!
+                    body: formData
+                });
+
+                if (res.ok) {
+                    alert("✅ Pagamento confirmado e comprovante enviado!");
+                    fecharModal();
+                    carregarSaquesPendentes(); // Atualiza a lista
+                } else {
+                    alert("Erro ao confirmar.");
+                }
+            } catch (e) {
+                alert("Erro de conexão.");
+            } finally {
+                btn.innerText = "Confirmar e Enviar";
+                btn.disabled = false;
             }
         }
 
         function logout() {
-            if(confirm("Sair do admin?")) {
-                localStorage.removeItem('adminToken');
-                window.location.href = 'admin_login.html';
-            }
+            localStorage.removeItem('adminToken');
+            window.location.href = 'admin_login.html';
         }
     </script>
 </body>

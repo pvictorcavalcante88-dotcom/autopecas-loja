@@ -30,46 +30,28 @@
         .table-responsive { width: 100%; overflow-x: auto; }
 
         /* =========================================
-           📱 MOBILE (ADMIN) - CSS NOVO
+           📱 MOBILE (ADMIN)
            ========================================= */
         @media (max-width: 768px) {
-            .admin-container { flex-direction: column; } /* Um embaixo do outro */
+            .admin-container { flex-direction: column; } 
 
-            /* 1. Menu vira topo deslizante */
             aside.sidebar {
-                width: 100%;
-                height: auto;
-                position: relative;
-                padding-bottom: 10px;
-                overflow-y: visible;
-                min-height: auto;
+                width: 100%; height: auto; position: relative;
+                padding-bottom: 10px; overflow-y: visible; min-height: auto;
             }
 
             aside nav {
-                display: flex;
-                overflow-x: auto; /* Rolagem Horizontal */
-                padding: 0 10px;
-                gap: 10px;
+                display: flex; overflow-x: auto; padding: 0 10px; gap: 10px;
                 -webkit-overflow-scrolling: touch;
             }
             aside nav::-webkit-scrollbar { display: none; }
 
             aside nav a {
-                flex: 0 0 auto;
-                background: rgba(255,255,255,0.1);
-                border-radius: 20px;
-                padding: 8px 15px;
-                border-left: none !important;
-                font-size: 0.85rem;
-                white-space: nowrap;
+                flex: 0 0 auto; background: rgba(255,255,255,0.1); border-radius: 20px;
+                padding: 8px 15px; border-left: none !important; font-size: 0.85rem; white-space: nowrap;
             }
 
-            /* 2. Conteúdo ocupa tudo */
-            main.main-content {
-                margin-left: 0;
-                padding: 15px;
-                width: 100%;
-            }
+            main.main-content { margin-left: 0; padding: 15px; width: 100%; }
         }
     </style>
 </head>
@@ -116,37 +98,60 @@
         async function carregar() {
             const token = localStorage.getItem('adminToken');
             
-            // Seu fetch original
-            const res = await fetch(`${API_URL}/admin/sugestoes`, { headers: {'Authorization': `Bearer ${token}`} });
-            const lista = await res.json();
-            
-            const tbody = document.getElementById('lista-sugestoes');
-            tbody.innerHTML = '';
-            
-            if(lista.length === 0) tbody.innerHTML = '<tr><td colspan="4" style="padding:20px; text-align:center;">Tudo limpo! Nenhuma sugestão pendente.</td></tr>';
+            try {
+                const res = await fetch(`${API_URL}/admin/sugestoes`, { headers: {'Authorization': `Bearer ${token}`} });
+                const lista = await res.json();
+                
+                const tbody = document.getElementById('lista-sugestoes');
+                tbody.innerHTML = '';
+                
+                if(lista.length === 0) tbody.innerHTML = '<tr><td colspan="4" style="padding:20px; text-align:center;">Tudo limpo! Nenhuma sugestão pendente.</td></tr>';
 
-            lista.forEach(s => {
-                tbody.innerHTML += `
-                    <tr style="border-bottom:1px solid #eee;">
-                        <td style="padding:10px;">
-                            <img src="${s.produto.image}" width="30" style="vertical-align:middle; border-radius:4px; margin-right:5px;">
-                            ${s.produto.name}
-                        </td>
-                        <td style="padding:10px; font-weight:bold; color:#2980b9;">${s.termo}</td>
-                        <td style="padding:10px;">${s.afiliado.nome}</td>
-                        <td style="padding:10px;">
-                            <button onclick="decidir(${s.id}, 'aprovar')" style="background:#27ae60; color:white; border:none; padding:5px 10px; cursor:pointer; border-radius:4px;">Aceitar</button>
-                            <button onclick="decidir(${s.id}, 'rejeitar')" style="background:#c0392b; color:white; border:none; padding:5px 10px; cursor:pointer; border-radius:4px;">Recusar</button>
-                        </td>
-                    </tr>
-                `;
-            });
+                lista.forEach(s => {
+                    // Aqui corrigimos para usar os nomes certos do banco de dados
+                    const imagem = s.produto.imagem || 'https://placehold.co/50';
+                    const titulo = s.produto.titulo || 'Produto sem nome';
+                    const referencia = s.produto.referencia || 'Sem Ref.';
+
+                    tbody.innerHTML += `
+                        <tr style="border-bottom:1px solid #eee;">
+                            <td style="padding:10px;">
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <img src="${imagem}" width="40" height="40" style="object-fit:cover; border-radius:4px; border:1px solid #eee;">
+                                    <div>
+                                        <strong style="display:block; font-size:0.9rem;">${titulo}</strong>
+                                        <small style="color:#666;">Ref: ${referencia}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="padding:10px; font-weight:bold; color:#2980b9;">${s.termo}</td>
+                            <td style="padding:10px;">${s.afiliado ? s.afiliado.nome : 'Anônimo'}</td>
+                            <td style="padding:10px;">
+                                <button onclick="decidir(${s.id}, 'aprovar')" style="background:#27ae60; color:white; border:none; padding:5px 10px; cursor:pointer; border-radius:4px;">Aceitar</button>
+                                <button onclick="decidir(${s.id}, 'rejeitar')" style="background:#c0392b; color:white; border:none; padding:5px 10px; cursor:pointer; border-radius:4px;">Recusar</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (error) {
+                console.error("Erro ao carregar sugestões:", error);
+            }
         }
 
         async function decidir(id, acao) {
             const token = localStorage.getItem('adminToken');
-            await fetch(`${API_URL}/admin/sugestoes/${id}/${acao}`, { method: 'POST', headers: {'Authorization': `Bearer ${token}`} });
-            carregar();
+            if(!confirm("Tem certeza?")) return;
+            
+            try {
+                const res = await fetch(`${API_URL}/admin/sugestoes/${id}/${acao}`, { method: 'POST', headers: {'Authorization': `Bearer ${token}`} });
+                if(res.ok) {
+                    carregar();
+                } else {
+                    alert("Erro ao processar.");
+                }
+            } catch(e) {
+                alert("Erro de conexão.");
+            }
         }
 
         function logout() {

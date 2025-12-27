@@ -117,9 +117,8 @@ async function carregarDashboardCompleto() {
 }
 
 // ============================================================
-// 🟢 NOVAS FUNÇÕES DE FILTRO (TABELA COMPLETA)
+// 🟢 FUNÇÃO DE FILTRO CORRIGIDA (SEM ERRO DE FUSO HORÁRIO)
 // ============================================================
-
 function filtrarHistoricoVendas() {
     const inicioVal = document.getElementById('filtro-inicio').value;
     const fimVal = document.getElementById('filtro-fim').value;
@@ -129,18 +128,22 @@ function filtrarHistoricoVendas() {
         return;
     }
 
-    // Cria datas ajustadas para comparar corretamente
-    const dataInicio = new Date(inicioVal);
-    dataInicio.setHours(0,0,0,0);
-    
-    const dataFim = new Date(fimVal);
-    dataFim.setHours(23,59,59,999);
-
     if (window.TODAS_VENDAS.length > 0) {
         const filtradas = window.TODAS_VENDAS.filter(v => {
-            const dataVenda = new Date(v.createdAt);
-            // Compara se está entre as datas (INCLUI todos os status)
-            return dataVenda >= dataInicio && dataVenda <= dataFim;
+            // 1. Cria a data da venda
+            const dataObj = new Date(v.createdAt);
+            
+            // 2. Extrai ANO, MÊS e DIA locais (do seu computador/celular)
+            const ano = dataObj.getFullYear();
+            // getMonth vai de 0 a 11, por isso +1. padStart garante o zero à esquerda (09, 05...)
+            const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
+            const dia = String(dataObj.getDate()).padStart(2, '0');
+            
+            // 3. Monta a string "YYYY-MM-DD" local
+            const dataVendaStr = `${ano}-${mes}-${dia}`;
+
+            // 4. Compara texto com texto (Ex: "2025-12-27" >= "2025-12-27")
+            return dataVendaStr >= inicioVal && dataVendaStr <= fimVal;
         });
 
         preencherTabelaVendas('lista-todas-vendas', filtradas);
@@ -150,16 +153,13 @@ function filtrarHistoricoVendas() {
 }
 
 function limparFiltroVendas() {
-    // Reseta inputs
     document.getElementById('filtro-inicio').value = '';
     document.getElementById('filtro-fim').value = '';
-    
-    // Restaura a lista completa
     preencherTabelaVendas('lista-todas-vendas', window.TODAS_VENDAS);
 }
 
 // ============================================================
-// CÁLCULO DO WIDGET (TOPO) - Apenas Aprovados/Entregues
+// 🟢 CÁLCULO DO WIDGET (TOPO) - CORRIGIDO
 // ============================================================
 function calcularVendasPorPeriodo() {
     const elInicio = document.getElementById('data-inicio');
@@ -177,13 +177,15 @@ function calcularVendasPorPeriodo() {
 
     if (window.TODAS_VENDAS) {
         window.TODAS_VENDAS.forEach(v => {
-            // Regra de Negócio: Só soma no widget se tiver ganhado comissão (Aprovado)
             if (v.status === 'APROVADO' || v.status === 'ENTREGUE') {
-                const dataVendaStr = new Date(v.createdAt).toISOString().split('T')[0];
+                // CORREÇÃO AQUI TAMBÉM:
+                const dataObj = new Date(v.createdAt);
+                const ano = dataObj.getFullYear();
+                const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
+                const dia = String(dataObj.getDate()).padStart(2, '0');
+                const dataVendaStr = `${ano}-${mes}-${dia}`;
+
                 if (dataVendaStr >= inicioStr && dataVendaStr <= fimStr) {
-                    // Soma a COMISSÃO ou o VALOR TOTAL? 
-                    // Geralmente afiliado quer ver quanto VENDEU no total, ou sua COMISSÃO.
-                    // Abaixo soma o valor total da venda:
                     totalPeriodo += parseFloat(v.valorTotal || 0);
                 }
             }

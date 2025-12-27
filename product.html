@@ -441,13 +441,51 @@
             document.getElementById('modal-sugestao').style.display = 'flex';
         }
 
-        async function enviarSugestao() {
+                async function enviarSugestao() {
             const termo = document.getElementById('termo-sugestao').value;
             if(!termo) return alert("Digite algo!");
             
-            alert("Obrigado! Sua sugestão foi enviada para análise.");
-            document.getElementById('modal-sugestao').style.display = 'none';
-            document.getElementById('termo-sugestao').value = '';
+            // Pega os dados do afiliado logado para autenticar
+            const afLogadoStr = localStorage.getItem('afiliadoLogado');
+            if(!afLogadoStr) {
+                return alert("Você precisa estar logado novamente para sugerir.");
+            }
+            const afLogado = JSON.parse(afLogadoStr);
+            
+            const btn = document.getElementById('btn-enviar-sugestao');
+            const textoOriginal = btn.innerText;
+            btn.innerText = "Enviando...";
+            btn.disabled = true;
+
+            try {
+                // CHAMA O SEU SERVER.JS NA ROTA REAL
+                const res = await fetch(`${BASE_API}/afiliado/sugestoes`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${afLogado.token}` // Usa o token real
+                    },
+                    body: JSON.stringify({
+                        produtoId: PRODUTO_ATUAL.id,
+                        termo: termo,
+                        motivo: "Sugestão via página do produto"
+                    })
+                });
+
+                if(res.ok) {
+                    alert("✅ Obrigado! Sua sugestão foi enviada para o Admin.");
+                    document.getElementById('modal-sugestao').style.display = 'none';
+                    document.getElementById('termo-sugestao').value = '';
+                } else {
+                    alert("Erro ao enviar sugestão. Tente novamente.");
+                }
+            } catch(e) {
+                console.error(e);
+                alert("Erro de conexão com o servidor.");
+            } finally {
+                btn.innerText = textoOriginal;
+                btn.disabled = false;
+            }
         }
     </script>
 </body>

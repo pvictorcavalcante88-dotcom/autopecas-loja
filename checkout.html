@@ -6,143 +6,104 @@
     <title>Finalizar Pedido | AutoPeças Veloz</title>
     
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-
     <link rel="stylesheet" href="style.css?v=5"> 
     
     <style>
         /* =========================================
-           ESTILOS EXCLUSIVOS DO CHECKOUT
+           ESTILOS DO CHECKOUT
            ========================================= */
-        body { background-color: #f4f7fa; }
-
+        body { background-color: #f4f7fa; padding-top: 0; }
+        
         .checkout-container {
-            max-width: 1200px;
-            margin: 40px auto;
-            padding: 0 20px;
-            display: grid;
-            grid-template-columns: 2fr 1fr; /* PC: Formulário grande na Esq, Resumo pequeno na Dir */
-            gap: 30px;
+            max-width: 1200px; margin: 40px auto; padding: 0 20px;
+            display: grid; grid-template-columns: 2fr 1fr; gap: 30px;
         }
 
-        /* CARD BRANCO GERAL */
         .checkout-card {
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            background: white; padding: 30px; border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px;
         }
 
         h2 { margin-bottom: 20px; font-size: 1.5rem; color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; }
         
-        /* FORMULÁRIO */
         .form-group { margin-bottom: 20px; }
         .form-group label { display: block; font-weight: bold; margin-bottom: 8px; color: #555; }
-        
-        /* Linha com 2 campos lado a lado */
         .form-row { display: flex; gap: 15px; } 
         
         input[type="text"], input[type="email"] {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 1rem;
-            transition: 0.3s;
+            width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; transition: 0.3s;
         }
         input:focus { border-color: #3498db; outline: none; }
 
-        /* RESUMO DO PEDIDO */
-        .order-summary-box h3 { font-size: 1.2rem; margin-bottom: 15px; }
-        .summary-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 0.95rem; }
-        
-        /* Área de rolagem para muitos itens */
-        .summary-item-list {
-            max-height: 300px;
-            overflow-y: auto;
-            margin-bottom: 15px;
-            padding-right: 5px; /* Espaço para barra de rolagem */
+        /* BUSCA DE CLIENTE (NOVO) */
+        .client-search-box {
+            background: #e8f6f3; border: 1px solid #d4efdf; padding: 15px; border-radius: 8px; margin-bottom: 25px;
+            display: flex; gap: 10px; align-items: flex-end;
         }
+        .btn-buscar {
+            background: #27ae60; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold;
+        }
+        .btn-buscar:hover { background: #219150; }
 
+        /* Resumo e Botões */
+        .order-summary-box h3 { font-size: 1.2rem; margin-bottom: 15px; }
+        .summary-item-list { max-height: 300px; overflow-y: auto; margin-bottom: 15px; padding-right: 5px; }
         .summary-total { font-size: 1.4rem; font-weight: 800; color: #2c3e50; margin-top: 20px; display: flex; justify-content: space-between; border-top: 2px solid #eee; padding-top: 15px; }
-
-        /* BOTÕES (Estilo Base) */
+        
         .btn-place-order {
-            width: 100%;
-            padding: 15px;
-            border: none;
-            border-radius: 8px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: transform 0.2s;
-            text-align: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            color: white;
-            margin-bottom: 10px;
+            width: 100%; padding: 15px; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold;
+            cursor: pointer; transition: transform 0.2s; text-align: center; display: flex; align-items: center; justify-content: center; gap: 10px; color: white; margin-bottom: 10px;
         }
         .btn-place-order:hover { transform: translateY(-2px); opacity: 0.9; }
-        
-        /* Link de Voltar */
         .back-link { display: block; text-align: center; margin-top: 15px; color: #7f8c8d; font-size: 0.9rem; }
-        .back-link:hover { text-decoration: underline; color: #3498db; }
 
-        /* =========================================
-           📱 MOBILE (CELULAR)
-           ========================================= */
         @media (max-width: 768px) {
-            .checkout-container {
-                display: flex;
-                flex-direction: column; /* Empilha: Formulário em cima, Resumo embaixo */
-                padding: 10px;
-                margin-top: 20px; 
-            }
-
-            .form-row { 
-                flex-direction: column; /* Campos que eram lado a lado ficam um embaixo do outro */
-                gap: 15px; 
-            }
-
+            .checkout-container { display: flex; flex-direction: column; padding: 10px; margin-top: 80px; }
+            .form-row { flex-direction: column; gap: 15px; }
             .checkout-card { padding: 20px; }
-
-            /* Ajuste para o cabeçalho fixo não cobrir o topo */
-            body { padding-top: 100px; } 
+            .client-search-box { flex-direction: column; align-items: stretch; }
         }
     </style>
 </head>
 <body>
 
-    <div id="barra-parceiro"></div> <header class="main-header">
+    <header class="main-header">
         <div class="header-container">
-            <a href="index.html" class="logo">
-                <i class="ph ph-car-profile"></i> AutoPeças <span>Veloz</span>
-            </a>
-            
-            <div style="font-size:0.9rem; color:#777;" class="desktop-only">
-                <i class="ph ph-lock-key"></i> Ambiente 100% Seguro
-            </div>
+            <a href="index.html" class="logo"><i class="ph ph-car-profile"></i> AutoPeças <span>Veloz</span></a>
+            <div style="font-size:0.9rem; color:#777;" class="desktop-only"><i class="ph ph-lock-key"></i> Ambiente 100% Seguro</div>
         </div>
     </header>
 
     <div class="checkout-container">
         
         <div class="checkout-card">
+            
+            <div id="area-busca-cliente" style="display:none;">
+                <h2><i class="ph ph-users"></i> Preenchimento Rápido</h2>
+                <div class="client-search-box">
+                    <div style="flex:1;">
+                        <label style="font-size:0.9rem; color:#27ae60; font-weight:bold;">Buscar Cliente Cadastrado</label>
+                        <input type="text" id="doc-busca" placeholder="Digite o CPF ou CNPJ do cliente...">
+                    </div>
+                    <button class="btn-buscar" onclick="buscarClienteAuto()">
+                        <i class="ph ph-magnifying-glass"></i> Buscar
+                    </button>
+                </div>
+            </div>
+
             <h2><i class="ph ph-map-pin"></i> Dados de Entrega</h2>
             
             <form id="checkout-form" onsubmit="event.preventDefault();">
                 <div class="form-row">
                     <div class="form-group" style="flex:1">
-                        <label>Nome Completo</label>
-                        <input type="text" id="email" placeholder="Seu nome ou da Oficina" required>
+                        <label>Nome Completo / Razão Social</label>
+                        <input type="text" id="input-nome" placeholder="Seu nome ou da Oficina" required>
                     </div>
                     <div class="form-group" style="flex:1">
                          <label>Email (Opcional)</label>
-                        <input type="email" placeholder="email@exemplo.com">
+                        <input type="email" id="input-email" placeholder="email@exemplo.com">
                     </div>
                 </div>
 
@@ -154,11 +115,11 @@
                 <div class="form-row">
                     <div class="form-group" style="flex:1">
                         <label>Cidade</label>
-                        <input type="text" placeholder="Ex: Maceió">
+                        <input type="text" id="input-cidade" placeholder="Ex: Maceió">
                     </div>
                     <div class="form-group" style="flex:1">
                         <label>Telefone / Zap</label>
-                        <input type="text" placeholder="(DD) 99999-9999">
+                        <input type="text" id="input-telefone" placeholder="(DD) 99999-9999">
                     </div>
                 </div>
 
@@ -176,9 +137,7 @@
 
         <div class="checkout-card order-summary-box">
             <h3>Seu Pedido</h3>
-            
-            <div class="summary-item-list">
-                </div>
+            <div class="summary-item-list" id="lista-resumo"></div>
 
             <div class="summary-total">
                 <span>Total a Pagar</span>
@@ -192,7 +151,185 @@
 
     </div>
 
-    <script src="script.js"></script> 
+    <script>
+        const API_URL = ''; 
+
+        // 1. Ao carregar, verifica se é afiliado para mostrar a busca
+        document.addEventListener("DOMContentLoaded", () => {
+            const token = localStorage.getItem('afiliadoToken');
+            if(token) {
+                document.getElementById('area-busca-cliente').style.display = 'block';
+            }
+            
+            // Renderiza o resumo do carrinho (função simplificada aqui ou vinda do script.js)
+            carregarResumoCheckout();
+        });
+
+        // 2. Função de Buscar e Preencher
+        async function buscarClienteAuto() {
+            const doc = document.getElementById('doc-busca').value;
+            const token = localStorage.getItem('afiliadoToken');
+
+            if(!doc) return alert("Digite um CPF ou CNPJ.");
+            if(!token) return alert("Você precisa estar logado como afiliado.");
+
+            const btn = document.querySelector('.btn-buscar');
+            btn.innerText = "Buscando...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`${API_URL}/afiliado/buscar-cliente/${doc}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+
+                if(data.found) {
+                    const c = data.cliente;
+                    
+                    // Preenche os campos automaticamente
+                    if(document.getElementById('input-nome')) document.getElementById('input-nome').value = c.nome;
+                    if(document.getElementById('rua')) document.getElementById('rua').value = c.endereco || '';
+                    if(document.getElementById('input-telefone')) document.getElementById('input-telefone').value = c.telefone || '';
+                    if(document.getElementById('input-email')) document.getElementById('input-email').value = c.email || '';
+                    
+                    // Tenta extrair cidade do endereço se possível, ou deixa em branco
+                    // (Aqui é um preenchimento básico)
+                    
+                    alert("✅ Cliente encontrado! Campos preenchidos.");
+                } else {
+                    alert("❌ Cliente não encontrado na sua base de dados.");
+                }
+            } catch(e) {
+                console.error(e);
+                alert("Erro ao buscar cliente.");
+            } finally {
+                btn.innerHTML = '<i class="ph ph-magnifying-glass"></i> Buscar';
+                btn.disabled = false;
+            }
+        }
+        
+        // FUNÇÃO AUXILIAR PARA RENDERIZAR O RESUMO (Para garantir que funcione aqui)
+        function carregarResumoCheckout() {
+            const carrinho = JSON.parse(localStorage.getItem('nossoCarrinho')) || [];
+            const lista = document.querySelector('.summary-item-list');
+            const totalEl = document.getElementById('cart-total');
+            const containerBotoes = document.getElementById('container-botoes-dinamicos');
+
+            lista.innerHTML = '';
+            let total = 0;
+
+            if(carrinho.length === 0) {
+                lista.innerHTML = '<p>Carrinho vazio.</p>';
+                return;
+            }
+
+            carrinho.forEach(item => {
+                total += item.preco * item.quantidade;
+                lista.innerHTML += `
+                    <div class="summary-item" style="display:flex; justify-content:space-between; margin-bottom:10px; border-bottom:1px solid #eee; padding-bottom:5px;">
+                        <div>
+                            <div style="font-weight:bold; font-size:0.9rem;">${item.tituloOriginal}</div>
+                            <div style="font-size:0.8rem; color:#666;">Qtd: ${item.quantidade}</div>
+                        </div>
+                        <div style="font-weight:bold;">R$ ${(item.preco * item.quantidade).toFixed(2)}</div>
+                    </div>
+                `;
+            });
+
+            totalEl.innerText = total.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+
+            // CRIA OS BOTÕES DE AÇÃO (Finalizar Pedido / Orçamento PDF)
+            containerBotoes.innerHTML = `
+                <button class="btn-place-order" style="background:#27ae60;" onclick="finalizarPedidoCheckout('VENDA')">
+                    <i class="ph ph-check-circle"></i> Confirmar Pedido
+                </button>
+                <button class="btn-place-order" style="background:#e67e22;" onclick="gerarPDFCheckout()">
+                    <i class="ph ph-printer"></i> Baixar Orçamento PDF
+                </button>
+            `;
+        }
+
+        // FUNÇÃO QUE GERA O PDF COM OS DADOS DO FORMULÁRIO ATUAL
+        function gerarPDFCheckout() {
+            const nome = document.getElementById('input-nome').value;
+            const endereco = document.getElementById('rua').value;
+            const telefone = document.getElementById('input-telefone').value;
+            
+            if(!nome) return alert("Preencha pelo menos o Nome para gerar o orçamento.");
+
+            // Cria um objeto cliente temporário com o que está escrito no formulário
+            const clienteTemp = {
+                nome: nome,
+                endereco: endereco,
+                telefone: telefone,
+                documento: document.getElementById('doc-busca').value || '-',
+                tipo: 'Cliente'
+            };
+
+            // Chama a função global que criamos no passo anterior (se estiver carregada)
+            // Ou recriamos uma versão simplificada aqui:
+            imprimirOrcamentoDireto(clienteTemp);
+        }
+
+        function imprimirOrcamentoDireto(cliente) {
+             const carrinho = JSON.parse(localStorage.getItem('nossoCarrinho')) || [];
+             let totalGeral = 0;
+             
+             let linhas = carrinho.map(item => {
+                const tot = item.preco * item.quantidade;
+                totalGeral += tot;
+                return `<tr>
+                    <td style="padding:5px; border-bottom:1px solid #eee;">${item.tituloOriginal}</td>
+                    <td style="padding:5px; border-bottom:1px solid #eee; text-align:center;">${item.quantidade}</td>
+                    <td style="padding:5px; border-bottom:1px solid #eee; text-align:right;">R$ ${item.preco.toFixed(2)}</td>
+                    <td style="padding:5px; border-bottom:1px solid #eee; text-align:right;">R$ ${tot.toFixed(2)}</td>
+                </tr>`;
+             }).join('');
+
+             const html = `
+                <html>
+                <head><title>Orçamento</title></head>
+                <body style="font-family:Arial; padding:20px;">
+                    <div style="border-bottom:2px solid #333; padding-bottom:10px; margin-bottom:20px; display:flex; justify-content:space-between;">
+                        <div><h1>AutoPeças Veloz</h1><p>Orçamento Comercial</p></div>
+                        <div style="text-align:right;">
+                            <h3>Cliente: ${cliente.nome}</h3>
+                            <p>${cliente.endereco}</p>
+                            <p>${cliente.telefone}</p>
+                            <small>Data: ${new Date().toLocaleDateString()}</small>
+                        </div>
+                    </div>
+                    <table style="width:100%; border-collapse:collapse;">
+                        <tr style="background:#eee;">
+                            <th style="text-align:left; padding:8px;">Produto</th>
+                            <th style="padding:8px;">Qtd</th>
+                            <th style="text-align:right; padding:8px;">Unit.</th>
+                            <th style="text-align:right; padding:8px;">Total</th>
+                        </tr>
+                        ${linhas}
+                    </table>
+                    <h2 style="text-align:right; margin-top:20px;">Total: R$ ${totalGeral.toFixed(2)}</h2>
+                    <script>window.print()<\/script>
+                </body>
+                </html>
+             `;
+             const win = window.open('','','width=800,height=600');
+             win.document.write(html);
+             win.document.close();
+        }
+
+        // Função placeholder para finalizar pedido (você já deve ter a sua no script.js, mas aqui conecta o botão)
+        function finalizarPedidoCheckout(tipo) {
+            // Aqui você chamaria sua função original de enviar o pedido para o backend
+            // Certifique-se de pegar os valores dos novos IDs (input-nome, etc)
+            // Se precisar de ajuda para integrar com o envio real, me avise!
+            alert("Redirecionando para finalização...");
+            // Exemplo: window.enviarPedido(tipo);
+        }
+
+    </script>
+    
+    <script src="script.js"></script>
 
 </body>
 </html>

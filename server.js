@@ -441,6 +441,31 @@ app.post('/finalizar-pedido', async (req, res) => {
     }
 });
 
+// Adicione junto com as outras rotas de /afiliado/
+
+app.get('/afiliado/buscar-cliente/:doc', authenticateToken, async (req, res) => {
+    try {
+        const { doc } = req.params;
+        
+        // Busca cliente pelo Documento (CPF/CNPJ) E que pertença a este afiliado
+        const cliente = await prisma.clienteAfiliado.findFirst({
+            where: {
+                documento: doc,
+                afiliadoId: req.user.id
+            }
+        });
+
+        if (cliente) {
+            res.json({ found: true, cliente });
+        } else {
+            res.json({ found: false });
+        }
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ erro: "Erro ao buscar cliente" });
+    }
+});
+
 // =================================================================
 // 👑 ÁREA ADMIN (ADMINISTRAÇÃO)
 // =================================================================

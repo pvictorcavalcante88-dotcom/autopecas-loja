@@ -64,6 +64,7 @@ function verificarLogin() {
     carregarMeusClientes();
     carregarMeusSaques();
     iniciarNotificacoes();
+    carregarClientesCadastrados();
 }
 
 // ============================================================

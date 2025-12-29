@@ -248,66 +248,54 @@
         </div>
 
         <div id="clientes" class="tab-content">
-            <h2 class="section-title">Carteira de Clientes</h2>
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead><tr><th>Nome</th><th>Email / Contato</th><th>Total Gasto</th><th>Última Compra</th></tr></thead>
-                    <tbody id="lista-clientes"></tbody>
-                </table>
+    
+    <div class="card" style="border-left: 5px solid #e67e22; margin-bottom: 30px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <div>
+                <h3 style="margin:0; color:#e67e22; font-size:1.1rem;">Meus Clientes (Orçamentos)</h3>
+                <small style="color:#666;">Cadastrados por você para gerar PDF.</small>
             </div>
+            <button onclick="abrirModalCliente()" style="background:#2c3e50; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:bold;">
+                <i class="ph ph-plus"></i> Novo Cliente
+            </button>
+        </div>
 
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-        <h2 class="section-title">Meus Clientes</h2>
-        <button onclick="abrirModalCliente()" style="background:#2c3e50; color:white; border:none; padding:10px 15px; border-radius:5px; cursor:pointer;">
-            <i class="ph ph-plus"></i> Novo Cliente
-        </button>
-    </div>
-
-    <div class="card">
         <div class="table-responsive">
             <table class="data-table">
                 <thead>
                     <tr>
                         <th>Nome / Razão Social</th>
                         <th>Tipo</th>
-                        <th>Documento (CPF/CNPJ)</th>
+                        <th>Documento</th>
                         <th>Telefone</th>
-                        <th>Ação</th>
+                        <th style="text-align:center;">Ação</th>
                     </tr>
                 </thead>
                 <tbody id="lista-clientes-cadastrados">
+                    <tr><td colspan="5" align="center">Carregando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3 style="margin:0 0 15px 0; color:#2c3e50;">Histórico de Compradores (Site)</h3>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Contato</th>
+                        <th>Total Gasto</th>
+                        <th>Última Compra</th>
+                    </tr>
+                </thead>
+                <tbody id="lista-clientes">
                     </tbody>
             </table>
         </div>
     </div>
 </div>
-
-<div id="modal-novo-cliente" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:2000; justify-content:center; align-items:center; padding:10px;">
-    <div style="background:white; padding:25px; width:100%; max-width:500px; border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
-        <h3>Cadastrar Cliente</h3>
-        
-        <div style="display:flex; gap:15px; margin-bottom:15px;">
-            <label><input type="radio" name="tipoPessoa" value="PF" checked onclick="alternarTipo('PF')"> Pessoa Física</label>
-            <label><input type="radio" name="tipoPessoa" value="PJ" onclick="alternarTipo('PJ')"> Pessoa Jurídica</label>
-        </div>
-
-        <input type="text" id="cli-nome" placeholder="Nome Completo ou Razão Social" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:4px;">
-        
-        <input type="text" id="cli-doc" placeholder="CPF" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:4px;">
-        
-        <input type="text" id="cli-tel" placeholder="Telefone / Whatsapp" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:4px;">
-        
-        <input type="email" id="cli-email" placeholder="Email (Opcional)" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:4px;">
-        
-        <textarea id="cli-endereco" placeholder="Endereço Completo (Rua, Nº, Bairro, Cidade)" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:4px; height:80px;"></textarea>
-
-        <div style="text-align:right; gap:10px; display:flex; justify-content:flex-end;">
-            <button onclick="document.getElementById('modal-novo-cliente').style.display='none'" style="padding:10px 15px; border:none; background:#eee; cursor:pointer; border-radius:4px;">Cancelar</button>
-            <button onclick="salvarNovoCliente()" style="padding:10px 15px; border:none; background:#27ae60; color:white; font-weight:bold; cursor:pointer; border-radius:4px;">Salvar</button>
-        </div>
-    </div>
-
-        </div>
 
     </main>
 

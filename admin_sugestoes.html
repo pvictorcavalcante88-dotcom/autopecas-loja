@@ -4,9 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sugestões - Admin</title>
+    
     <link rel="stylesheet" href="admin.css">
+    
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-<style>
+    
+    <style>
         /* =========================================
            ESTILOS GERAIS (PC)
            ========================================= */
@@ -16,15 +19,17 @@
         
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; min-height: 100vh; }
         
-        /* CONTAINER PRINCIPAL */
+        /* LAYOUT PADRÃO */
         .admin-container { display: flex; width: 100%; min-height: 100vh; }
 
-        /* MENU LATERAL (PC) */
         aside.sidebar { 
             width: 250px; background: var(--primary); color: white; min-height: 100vh; 
             position: fixed; top: 0; left: 0; display: flex; flex-direction: column; z-index: 1000;
         }
+        
         aside h3 { text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(255,255,255,0.1); margin: 0; }
+        
+        aside nav { display: flex; flex-direction: column; } /* No PC é coluna */
         
         aside nav a { 
             display: flex; align-items: center; gap: 10px; padding: 15px 20px; 
@@ -32,25 +37,13 @@
         }
         aside nav a:hover, aside nav a.active { background: rgba(255,255,255,0.1); color: var(--accent); border-left: 4px solid var(--accent); }
 
-        /* CONTEÚDO (PC) */
         main.main-content { margin-left: 250px; padding: 30px; width: 100%; flex: 1; }
 
         header h1 { margin: 0; color: var(--primary); }
         header p { color: #666; margin-top: 5px; }
 
-        /* CARDS */
-        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; margin-top: 20px; }
-        
-        .stat-card { 
-            background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
-            display: flex; flex-direction: column; 
-        }
-        .stat-card h3 { font-size: 0.9rem; color: #666; margin: 0 0 10px 0; font-weight: normal; }
-        .stat-card .value { font-size: 1.8rem; font-weight: bold; color: var(--blue); }
-        .stat-card i { font-size: 2rem; margin-bottom: 10px; color: var(--blue); }
-
         /* TABELA */
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 20px; }
         .table-responsive { width: 100%; overflow-x: auto; }
         
         table { width: 100%; border-collapse: collapse; margin-top: 15px; white-space: nowrap; }
@@ -58,55 +51,67 @@
         th { background-color: #f8f9fa; color: #555; }
 
         /* =========================================
-           📱 MOBILE (CELULAR) - FORÇANDO CORREÇÃO (!important)
+           📱 MOBILE (CELULAR) - VERSÃO BLINDADA
            ========================================= */
         @media (max-width: 768px) {
             
-            /* 1. Força um layout de coluna (um embaixo do outro) */
-            .admin-container { 
+            /* 1. Remove qualquer flexbox que trave a coluna */
+            html body .admin-container { 
                 flex-direction: column !important; 
                 display: flex !important;
             }
 
-            /* 2. Destrava o Menu Lateral (deixa de ser fixo e vira cabeçalho) */
-            aside.sidebar { 
+            /* 2. Sidebar vira cabeçalho solto */
+            html body aside.sidebar { 
+                position: relative !important; 
                 width: 100% !important; 
                 height: auto !important; 
-                position: relative !important; /* Importante: Remove o fixed */
                 min-height: auto !important;
-                padding-bottom: 10px !important; 
-                overflow-y: visible !important;
-                top: auto !important;
+                top: auto !important; 
                 left: auto !important;
+                display: block !important;
+                padding-bottom: 10px !important;
             }
 
-            /* Menu Horizontal com rolagem */
-            aside nav { 
+            /* 3. Título menor */
+            html body aside h3 {
+                font-size: 1.2rem !important;
+                padding: 10px !important;
+            }
+
+            /* 4. FORÇA O MENU HORIZONTAL */
+            html body aside nav { 
                 display: flex !important; 
-                overflow-x: auto !important; 
-                padding: 0 10px !important; 
-                gap: 10px !important; 
+                flex-direction: row !important; /* Garante linha */
+                overflow-x: auto !important;    /* Garante rolagem */
+                width: 100% !important;
+                padding: 0 10px !important;
+                gap: 10px !important;
+                align-items: center !important;
             }
-            aside nav a { 
+            
+            /* Remove barra de rolagem feia */
+            html body aside nav::-webkit-scrollbar { display: none; }
+
+            /* 5. ITENS DO MENU (BOTÕES) */
+            html body aside nav a { 
                 flex: 0 0 auto !important; 
-                background: rgba(255,255,255,0.1); 
-                border-radius: 20px; 
-                padding: 8px 15px !important; 
-                border-left: none !important; 
-                font-size: 0.85rem; 
+                display: inline-flex !important;
+                width: auto !important;
+                margin: 0 !important;
+                font-size: 0.85rem !important;
+                white-space: nowrap !important;
+                background: rgba(255,255,255,0.1) !important;
+                border-radius: 50px !important;
+                padding: 8px 15px !important;
+                border: 1px solid rgba(255,255,255,0.1) !important;
             }
 
-            /* 3. Conteúdo Principal (Remove a margem esquerda que empurrava o conteúdo) */
-            main.main-content { 
+            /* 6. Conteúdo Principal */
+            html body main.main-content { 
                 margin-left: 0 !important; 
                 padding: 15px !important; 
                 width: 100% !important; 
-                flex: none !important;
-            }
-
-            /* 4. Grid de Cards (Um por linha) */
-            .dashboard-grid { 
-                grid-template-columns: 1fr !important; 
             }
         }
     </style>
@@ -115,13 +120,13 @@
 
     <div class="admin-container">
         <aside class="sidebar">
-            <h3>Admin</h3>
+            <h3>Admin AutoPeças</h3>
             <nav>
                 <a href="admin_dashboard.html"><i class="ph ph-gauge"></i> Dashboard</a>
                 <a href="admin_produtos.html"><i class="ph ph-package"></i> Produtos</a>
                 <a href="admin_pedidos.html"><i class="ph ph-shopping-cart-simple"></i> Pedidos</a>
                 <a href="admin_afiliados.html"><i class="ph ph-users"></i> Afiliados & Financeiro</a>
-                <a href="admin_sugestoes.html"><i class="ph ph-users"></i> Sugestões</a>
+                <a href="admin_sugestoes.html" class="active"><i class="ph ph-lightbulb"></i> Sugestões</a>
                 <a href="#" onclick="logout()" style="margin-top:20px; color:#e74c3c;"><i class="ph ph-sign-out"></i> Sair</a>
             </nav>
         </aside>
@@ -130,7 +135,7 @@
             <h1>Revisão de Sugestões</h1>
             <p>Aprove o conhecimento dos seus parceiros para melhorar a busca.</p>
 
-            <div class="card" style="background:white; padding:20px; margin-top:20px; border-radius:8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <div class="card">
                 <div class="table-responsive">
                     <table style="width:100%; border-collapse:collapse; white-space: nowrap;">
                         <thead>
@@ -164,10 +169,10 @@
                 if(lista.length === 0) tbody.innerHTML = '<tr><td colspan="4" style="padding:20px; text-align:center;">Tudo limpo! Nenhuma sugestão pendente.</td></tr>';
 
                 lista.forEach(s => {
-                    // Aqui corrigimos para usar os nomes certos do banco de dados
-                    const imagem = s.produto.imagem || 'https://placehold.co/50';
-                    const titulo = s.produto.titulo || 'Produto sem nome';
-                    const referencia = s.produto.referencia || 'Sem Ref.';
+                    // Proteção contra undefined
+                    const imagem = (s.produto && s.produto.imagem) ? s.produto.imagem : 'https://placehold.co/50';
+                    const titulo = (s.produto && s.produto.titulo) ? s.produto.titulo : 'Produto Desconhecido';
+                    const referencia = (s.produto && s.produto.referencia) ? s.produto.referencia : '---';
 
                     tbody.innerHTML += `
                         <tr style="border-bottom:1px solid #eee;">

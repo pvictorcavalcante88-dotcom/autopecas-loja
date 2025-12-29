@@ -515,8 +515,10 @@ async function gerarLinkZap(codigo, total) {
 }
 
 async function gerarPDFCustom() {
-    // 1. Salva Primeiro (Manteve sua lógica original)
-    await salvarOrcamentoSilencioso('PDF');
+    // 1. Salva o Orçamento (Manteve sua lógica original)
+    if(typeof salvarOrcamentoSilencioso === 'function') {
+        await salvarOrcamentoSilencioso('PDF');
+    }
 
     // 2. Verifica bibliotecas
     if (!window.jspdf || !window.jspdf.jsPDF) return alert("Erro: Biblioteca PDF não carregada.");
@@ -524,18 +526,24 @@ async function gerarPDFCustom() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     
-    const afiliado = JSON.parse(localStorage.getItem('afiliadoLogado'));
-    const itens = window.ITENS_CHECKOUT || []; // Pega os itens já formatados (com nome do carro)
+    // Pega dados do Afiliado (se houver) e do Carrinho
+    const afiliado = JSON.parse(localStorage.getItem('afiliadoLogado')) || { nome: "Vendedor", telefone: "", codigo: "" };
+    const itens = window.ITENS_CHECKOUT || []; 
+
+    // --- 🟢 CAPTURA OS DADOS DO CLIENTE DO FORMULÁRIO HTML ---
+    // Note que estou usando os IDs que definimos no checkout.html
+    const cliNome = document.getElementById('email').value || "Cliente Não Identificado"; // O ID do nome é 'email' no seu HTML
+    const cliEndereco = document.getElementById('rua').value || "";
+    const cliTelefone = document.getElementById('input-telefone') ? document.getElementById('input-telefone').value : "";
+    const cliEmail = document.getElementById('input-email-contato') ? document.getElementById('input-email-contato').value : "";
 
     // --- CONFIGURAÇÕES DE DESIGN ---
     const corPrimaria = [44, 62, 80];   // Azul Escuro (#2c3e50)
     const corSecundaria = [230, 126, 34]; // Laranja (#e67e22)
     const marginX = 15;
-    let y = 0; // Cursor vertical
+    let y = 0; 
 
-   // --- DENTRO DE gerarPDFCustom NO SCRIPT.JS ---
-
-    // ... (Parte do Fundo Azul continua igual) ...
+    // --- CABEÇALHO (FUNDO AZUL) ---
     doc.setFillColor(...corPrimaria);
     doc.rect(0, 0, 210, 40, 'F'); 
 
@@ -547,77 +555,92 @@ async function gerarPDFCustom() {
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text("Orçamento Personalizado", marginX, 28);
+    doc.text("Orçamento Comercial", marginX, 28);
 
-    // --- LADO DIREITO (DADOS DO AFILIADO/VENDEDOR) ---
-    // Formata o telefone (ex: 8299999999 -> (82) 99999-9999)
-    let telefoneFormatado = afiliado.telefone || "Não informado";
-    if (telefoneFormatado.length >= 10) {
-        telefoneFormatado = `(${telefoneFormatado.slice(0,2)}) ${telefoneFormatado.slice(2,7)}-${telefoneFormatado.slice(7)}`;
-    }
-
+    // --- LADO DIREITO SUPERIOR (DADOS DO AFILIADO/VENDEDOR) ---
+    let telefoneFormatado = afiliado.telefone || "";
+    
     doc.setFontSize(9);
-    // Aqui colocamos o Nome como "Contato" e o Telefone abaixo
     doc.text(`Consultor: ${afiliado.nome}`, 195, 15, { align: "right" });
-    doc.text(`WhatsApp: ${telefoneFormatado}`, 195, 20, { align: "right" });
-    
-    // Se quiser inventar um e-mail baseado no código, descomente a linha abaixo:
-    // doc.text(`Email: ${afiliado.codigo}@autopecasveloz.com.br`, 195, 25, { align: "right" });
-    
-    // CNPJ Fixo da Empresa (bom manter para credibilidade)
+    if(telefoneFormatado) {
+        doc.text(`WhatsApp: ${telefoneFormatado}`, 195, 20, { align: "right" });
+    }
     doc.text("CNPJ: 00.000.000/0001-00", 195, 30, { align: "right" });
 
-    // --- 2. INFORMAÇÕES DO ORÇAMENTO ---
+    // --- 2. DADOS DO CLIENTE E DETALHES (AQUI MUDA!) ---
     y = 55;
     doc.setTextColor(0, 0, 0); // Volta para preto
 
-    // Coluna Esquerda: Consultor
+    // === COLUNA ESQUERDA: DADOS DO CLIENTE (RECUPERADOS DOS INPUTS) ===
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.text("CONSULTOR:", marginX, y);
+    doc.text("DADOS DO CLIENTE:", marginX, y); // Título
+    
+    doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text((afiliado.nome || "Vendedor").toUpperCase(), marginX, y + 6);
-    doc.text(`Código: ${afiliado.codigo}`, marginX, y + 11);
+    
+    // Nome do Cliente
+    doc.text(cliNome.toUpperCase(), marginX, y + 6);
+    
+    // Endereço (Com quebra de linha automática se for muito grande)
+    const enderecoSplit = doc.splitTextToSize(cliEndereco, 90); // Quebra em 90mm
+    doc.text(enderecoSplit, marginX, y + 11);
+    
+    // Calcula onde terminaram as linhas do endereço para colocar o telefone embaixo
+    let alturaEndereco = enderecoSplit.length * 5; 
+    let yAtual = y + 11 + alturaEndereco;
 
-    // Coluna Direita: Dados do Pedido
+    if(cliTelefone) {
+        doc.text(`Tel: ${cliTelefone}`, marginX, yAtual);
+        yAtual += 5;
+    }
+    if(cliEmail) {
+        doc.text(`Email: ${cliEmail}`, marginX, yAtual);
+    }
+
+    // === COLUNA DIREITA: DADOS DO ORÇAMENTO ===
     const dataHoje = new Date().toLocaleDateString('pt-BR');
-    const validade = new Date(); validade.setDate(validade.getDate() + 5); // Validade +5 dias
+    const validade = new Date(); validade.setDate(validade.getDate() + 5); 
     
     doc.setFont("helvetica", "bold");
-    doc.text("DETALHES DO ORÇAMENTO:", 120, y);
+    doc.text("DETALHES:", 120, y);
     doc.setFont("helvetica", "normal");
     doc.text(`Data de Emissão: ${dataHoje}`, 120, y + 6);
     doc.text(`Validade: ${validade.toLocaleDateString('pt-BR')}`, 120, y + 11);
+    
+    // Repete o código do vendedor aqui também se quiser, ou deixa só lá em cima
+    doc.text(`Vendedor: ${afiliado.codigo}`, 120, y + 16);
 
-    // --- 3. TABELA DE PRODUTOS (Mágica do AutoTable) ---
+
+    // --- 3. TABELA DE PRODUTOS ---
     const colunas = ["QTD", "DESCRIÇÃO / PRODUTO", "UNITÁRIO", "TOTAL"];
     
-    // Prepara os dados para a tabela
     const linhas = itens.map(item => [
         item.qtd,
-        item.nome, // Já vem com "Ref: Carro" graças à sua função anterior!
+        item.nome, 
         formatarMoeda(item.unitario),
         formatarMoeda(item.total)
     ]);
 
-    // Calcula Total Geral
     const totalGeral = itens.reduce((acc, item) => acc + item.total, 0);
 
+    // Ajusta o Y da tabela para não bater no endereço do cliente
+    let yTabela = Math.max(yAtual + 10, y + 25); 
+
     doc.autoTable({
-        startY: y + 20,
+        startY: yTabela,
         head: [colunas],
         body: linhas,
-        theme: 'striped', // Estilo zebrado (cinza/branco)
+        theme: 'striped', 
         headStyles: { fillColor: corPrimaria, textColor: [255, 255, 255], fontStyle: 'bold' },
         styles: { fontSize: 9, cellPadding: 3 },
         columnStyles: {
-            0: { halign: 'center', cellWidth: 15 }, // Qtd
-            2: { halign: 'right', cellWidth: 35 },  // Unit
-            3: { halign: 'right', cellWidth: 35 }   // Total
+            0: { halign: 'center', cellWidth: 15 }, 
+            2: { halign: 'right', cellWidth: 35 },  
+            3: { halign: 'right', cellWidth: 35 }   
         }
     });
 
-    // Pega a posição Y onde a tabela terminou
     const finalY = doc.lastAutoTable.finalY + 10;
 
     // --- 4. TOTALIZADORES ---
@@ -627,30 +650,35 @@ async function gerarPDFCustom() {
     doc.text(`TOTAL A PAGAR: ${formatarMoeda(totalGeral)}`, 195, finalY, { align: "right" });
 
     // --- 5. LINK DE PAGAMENTO ---
-    const payload = gerarPayloadUrl();
-    const baseUrl = window.location.origin + window.location.pathname.replace('checkout.html', '') + 'checkout.html';
-    const linkPagamento = `${baseUrl}?restore=${payload}&ref=${afiliado.codigo}`;
+    // Verifica se temos as funções de link disponíveis
+    if(typeof gerarPayloadUrl === 'function') {
+        const payload = gerarPayloadUrl();
+        const baseUrl = window.location.origin + window.location.pathname.replace('checkout.html', '') + 'checkout.html';
+        const linkPagamento = `${baseUrl}?restore=${payload}&ref=${afiliado.codigo}`;
 
-    // Desenha um "Botão" no PDF
-    const btnY = finalY + 15;
-    doc.setFillColor(...corSecundaria); // Laranja
-    doc.roundedRect(marginX, btnY, 180, 12, 3, 3, 'F'); // Caixa do botão
-    
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
-    doc.text("CLIQUE AQUI PARA FINALIZAR A COMPRA ONLINE", 105, btnY + 8, { align: "center" });
-    
-    // Adiciona o link real sobre a área do botão
-    doc.link(marginX, btnY, 180, 12, { url: linkPagamento });
+        const btnY = finalY + 15;
+        doc.setFillColor(...corSecundaria); 
+        doc.roundedRect(marginX, btnY, 180, 12, 3, 3, 'F'); 
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(10);
+        doc.text("CLIQUE AQUI PARA FINALIZAR A COMPRA ONLINE", 105, btnY + 8, { align: "center" });
+        
+        doc.link(marginX, btnY, 180, 12, { url: linkPagamento });
+    }
 
     // --- 6. RODAPÉ ---
     doc.setTextColor(150, 150, 150);
     doc.setFontSize(8);
     doc.text("Este orçamento não garante reserva de estoque até a confirmação do pagamento.", 105, 285, { align: "center" });
     
-    // Salva o arquivo
-    const nomeArquivo = `Orcamento_${afiliado.nome.split(' ')[0]}_${Date.now()}.pdf`;
-    doc.save(nomeArquivo);
+    const nomeLimpo = cliNome.split(' ')[0].replace(/[^a-zA-Z0-9]/g, '');
+    doc.save(`Orcamento_${nomeLimpo}.pdf`);
+}
+
+// Função auxiliar caso não exista no seu escopo global
+function formatarMoeda(valor) {
+    return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 function gerarPayloadUrl() {

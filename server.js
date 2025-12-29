@@ -286,6 +286,42 @@ app.get('/afiliado/meus-clientes', authenticateToken, async (req, res) => {
     } catch (e) { res.status(500).json({ erro: "Erro ao buscar clientes" }); }
 });
 
+// ============================================================
+// 👥 GESTÃO DE CLIENTES (CADASTRO DO AFILIADO)
+// ============================================================
+
+// 1. Cadastrar Novo Cliente (PF ou PJ)
+app.post('/afiliado/cadastrar-cliente', authenticateToken, async (req, res) => {
+    try {
+        const { nome, tipo, documento, telefone, email, endereco } = req.body;
+        
+        await prisma.clienteAfiliado.create({
+            data: {
+                nome, tipo, documento, telefone, email, endereco,
+                afiliadoId: req.user.id
+            }
+        });
+        
+        res.json({ success: true });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ erro: "Erro ao cadastrar cliente." });
+    }
+});
+
+// 2. Listar Clientes Cadastrados
+app.get('/afiliado/meus-clientes-cadastrados', authenticateToken, async (req, res) => {
+    try {
+        const clientes = await prisma.clienteAfiliado.findMany({
+            where: { afiliadoId: req.user.id },
+            orderBy: { nome: 'asc' }
+        });
+        res.json(clientes);
+    } catch (e) {
+        res.status(500).json({ erro: "Erro ao buscar clientes." });
+    }
+});
+
 // 4. ATUALIZAR PERFIL (Pix, Banco)
 app.put('/afiliado/perfil', authenticateToken, async (req, res) => {
     try {

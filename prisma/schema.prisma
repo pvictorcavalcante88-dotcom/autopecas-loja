@@ -37,6 +37,7 @@ model Afiliado {
   mensagens Mensagem[]
   sugestoes   Sugestao[]
   saques      Saque[]
+  clientes    ClienteAfiliado[]
 
   createdAt DateTime @default(now())
 }
@@ -140,4 +141,19 @@ model Saque {
 
   afiliadoId      Int
   afiliado        Afiliado @relation(fields: [afiliadoId], references: [id])
+}
+
+model ClienteAfiliado {
+  id          Int      @id @default(autoincrement())
+  nome        String
+  tipo        String   // "PF" ou "PJ"
+  documento   String?  // CPF ou CNPJ
+  telefone    String?
+  email       String?
+  endereco    String?
+  
+  afiliadoId  Int
+  afiliado    Afiliado @relation(fields: [afiliadoId], references: [id])
+  
+  createdAt   DateTime @default(now())
 }

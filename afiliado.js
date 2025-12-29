@@ -440,3 +440,191 @@ window.addEventListener('click', (e) => {
     const d = document.getElementById('notif-dropdown');
     if (c && d && !c.contains(e.target)) d.style.display = 'none';
 });
+
+// ============================================================
+// 👥 MÓDULO DE CLIENTES E ORÇAMENTOS
+// ============================================================
+
+// 1. Abrir Modal e Alternar PF/PJ
+function abrirModalCliente() {
+    document.getElementById('modal-novo-cliente').style.display = 'flex';
+}
+
+function alternarTipo(tipo) {
+    const docInput = document.getElementById('cli-doc');
+    const nomeInput = document.getElementById('cli-nome');
+    
+    if(tipo === 'PJ') {
+        docInput.placeholder = "CNPJ";
+        nomeInput.placeholder = "Razão Social";
+    } else {
+        docInput.placeholder = "CPF";
+        nomeInput.placeholder = "Nome Completo";
+    }
+}
+
+// 2. Salvar Cliente no Banco
+async function salvarNovoCliente() {
+    const dados = {
+        tipo: document.querySelector('input[name="tipoPessoa"]:checked').value,
+        nome: document.getElementById('cli-nome').value,
+        documento: document.getElementById('cli-doc').value,
+        telefone: document.getElementById('cli-tel').value,
+        email: document.getElementById('cli-email').value,
+        endereco: document.getElementById('cli-endereco').value
+    };
+
+    if(!dados.nome || !dados.documento) return alert("Nome e Documento são obrigatórios.");
+
+    try {
+        const res = await fetch(`${API_URL}/afiliado/cadastrar-cliente`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${AFILIADO_TOKEN}` },
+            body: JSON.stringify(dados)
+        });
+
+        if(res.ok) {
+            alert("Cliente cadastrado!");
+            document.getElementById('modal-novo-cliente').style.display = 'none';
+            carregarClientesCadastrados(); // Atualiza a lista
+        } else {
+            alert("Erro ao cadastrar.");
+        }
+    } catch(e) { console.error(e); }
+}
+
+// 3. Listar Clientes na Tabela
+async function carregarClientesCadastrados() {
+    const tbody = document.getElementById('lista-clientes-cadastrados');
+    if(!tbody) return;
+
+    try {
+        const res = await fetch(`${API_URL}/afiliado/meus-clientes-cadastrados`, {
+            headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` }
+        });
+        const lista = await res.json();
+        
+        tbody.innerHTML = '';
+        lista.forEach(c => {
+            // Botão "Gerar Orçamento" que chama a função de impressão
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${c.nome}</strong></td>
+                    <td>${c.tipo}</td>
+                    <td>${c.documento || '-'}</td>
+                    <td>${c.telefone || '-'}</td>
+                    <td>
+                        <button onclick='gerarOrcamentoPDF(${JSON.stringify(c)})' style="background:#e67e22; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;">
+                            <i class="ph ph-printer"></i> Orçamento
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    } catch(e) { console.error(e); }
+}
+
+// Chame essa função no seu "carregarDashboardCompleto" ou "mudarAba"
+// Ex: carregarClientesCadastrados();
+
+// ============================================================
+// 🖨️ GERADOR DE ORÇAMENTO (PDF / IMPRESSÃO)
+// ============================================================
+function gerarOrcamentoPDF(cliente) {
+    // 1. Pega os itens do Carrinho do LocalStorage
+    const carrinhoStr = localStorage.getItem('nossoCarrinho');
+    let itens = [];
+    if(carrinhoStr) itens = JSON.parse(carrinhoStr);
+
+    if(itens.length === 0) return alert("Seu carrinho está vazio! Adicione produtos primeiro para gerar um orçamento.");
+
+    // 2. Calcula Totais
+    let totalGeral = 0;
+    let linhasItens = itens.map(item => {
+        const totalItem = item.preco * item.quantidade;
+        totalGeral += totalItem;
+        return `
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 8px;">${item.tituloOriginal}</td>
+                <td style="padding: 8px; text-align: center;">${item.quantidade}</td>
+                <td style="padding: 8px; text-align: right;">R$ ${parseFloat(item.preco).toFixed(2)}</td>
+                <td style="padding: 8px; text-align: right;">R$ ${totalItem.toFixed(2)}</td>
+            </tr>
+        `;
+    }).join('');
+
+    // 3. Monta o HTML da Janela de Impressão
+    // Aqui colocamos o Cabeçalho da Empresa e os Dados do Cliente
+    const conteudoHTML = `
+        <html>
+        <head>
+            <title>Orçamento - ${cliente.nome}</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
+                .header { display: flex; justify-content: space-between; margin-bottom: 40px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+                .empresa-info { width: 48%; }
+                .cliente-info { width: 48%; text-align: right; }
+                h1 { margin: 0; color: #2c3e50; font-size: 24px; }
+                h2 { font-size: 16px; margin-bottom: 5px; color: #555; }
+                .table-orcamento { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                .table-orcamento th { background: #f4f6f8; padding: 10px; text-align: left; border-bottom: 2px solid #ddd; }
+                .total-box { margin-top: 30px; text-align: right; font-size: 20px; font-weight: bold; }
+                .footer { margin-top: 50px; font-size: 12px; color: #777; text-align: center; border-top: 1px solid #eee; padding-top: 10px; }
+            </style>
+        </head>
+        <body>
+            
+            <div class="header">
+                <div class="empresa-info">
+                    <h1>AutoPeças Veloz</h1>
+                    <p>CNPJ: 00.000.000/0001-00</p>
+                    <p>Rua das Peças, 123 - Centro</p>
+                    <p>Tel: (11) 9999-9999</p>
+                    <p>Email: contato@autopecasveloz.com.br</p>
+                </div>
+                <div class="cliente-info">
+                    <h2 style="color:#e67e22;">ORÇAMENTO PARA:</h2>
+                    <p><strong>${cliente.nome}</strong></p>
+                    <p>${cliente.tipo} - ${cliente.documento || ''}</p>
+                    <p>${cliente.telefone || ''}</p>
+                    <p>${cliente.endereco || ''}</p>
+                    <br>
+                    <p>Data: ${new Date().toLocaleDateString('pt-BR')}</p>
+                </div>
+            </div>
+
+            <table class="table-orcamento">
+                <thead>
+                    <tr>
+                        <th>Produto / Descrição</th>
+                        <th style="text-align: center;">Qtd</th>
+                        <th style="text-align: right;">Valor Unit.</th>
+                        <th style="text-align: right;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${linhasItens}
+                </tbody>
+            </table>
+
+            <div class="total-box">
+                TOTAL: R$ ${totalGeral.toFixed(2)}
+            </div>
+
+            <div class="footer">
+                <p>Orçamento válido por 5 dias. Sujeito a disponibilidade de estoque.</p>
+                <p>Este documento não possui valor fiscal.</p>
+            </div>
+
+            <script>
+                window.print();
+            </script>
+        </body>
+        </html>
+    `;
+
+    // 4. Abre a janela e imprime
+    const janela = window.open('', '', 'width=900,height=700');
+    janela.document.write(conteudoHTML);
+    janela.document.close();
+}

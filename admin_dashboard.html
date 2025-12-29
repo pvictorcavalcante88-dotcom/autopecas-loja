@@ -4,10 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Admin</title>
+    
     <link rel="stylesheet" href="admin.css">
+    
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-<style>
+    <style>
         /* =========================================
            ESTILOS GERAIS (PC)
            ========================================= */
@@ -17,15 +19,17 @@
         
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; min-height: 100vh; }
         
-        /* CONTAINER PRINCIPAL */
+        /* LAYOUT PADRÃO */
         .admin-container { display: flex; width: 100%; min-height: 100vh; }
 
-        /* MENU LATERAL (PC) */
         aside.sidebar { 
             width: 250px; background: var(--primary); color: white; min-height: 100vh; 
             position: fixed; top: 0; left: 0; display: flex; flex-direction: column; z-index: 1000;
         }
+        
         aside h3 { text-align: center; padding: 20px 0; border-bottom: 1px solid rgba(255,255,255,0.1); margin: 0; }
+        
+        aside nav { display: flex; flex-direction: column; } /* No PC é coluna */
         
         aside nav a { 
             display: flex; align-items: center; gap: 10px; padding: 15px 20px; 
@@ -33,7 +37,6 @@
         }
         aside nav a:hover, aside nav a.active { background: rgba(255,255,255,0.1); color: var(--accent); border-left: 4px solid var(--accent); }
 
-        /* CONTEÚDO (PC) */
         main.main-content { margin-left: 250px; padding: 30px; width: 100%; flex: 1; }
 
         header h1 { margin: 0; color: var(--primary); }
@@ -59,55 +62,74 @@
         th { background-color: #f8f9fa; color: #555; }
 
         /* =========================================
-           📱 MOBILE (CELULAR) - FORÇANDO CORREÇÃO (!important)
+           📱 MOBILE (CELULAR) - VERSÃO BLINDADA
            ========================================= */
         @media (max-width: 768px) {
             
-            /* 1. Força um layout de coluna (um embaixo do outro) */
-            .admin-container { 
+            /* 1. Remove qualquer flexbox que trave a coluna */
+            html body .admin-container { 
                 flex-direction: column !important; 
                 display: flex !important;
             }
 
-            /* 2. Destrava o Menu Lateral (deixa de ser fixo e vira cabeçalho) */
-            aside.sidebar { 
+            /* 2. Sidebar vira cabeçalho solto */
+            html body aside.sidebar { 
+                position: relative !important; 
                 width: 100% !important; 
                 height: auto !important; 
-                position: relative !important; /* Importante: Remove o fixed */
                 min-height: auto !important;
-                padding-bottom: 10px !important; 
-                overflow-y: visible !important;
-                top: auto !important;
+                top: auto !important; 
                 left: auto !important;
+                display: block !important; /* Muda de flex para block */
+                padding-bottom: 10px !important;
             }
 
-            /* Menu Horizontal com rolagem */
-            aside nav { 
+            /* 3. Título menor */
+            html body aside h3 {
+                font-size: 1.2rem !important;
+                padding: 10px !important;
+            }
+
+            /* 4. FORÇA O MENU HORIZONTAL (AQUI ESTAVA O PROBLEMA) */
+            html body aside nav { 
                 display: flex !important; 
-                overflow-x: auto !important; 
-                padding: 0 10px !important; 
-                gap: 10px !important; 
+                flex-direction: row !important; /* Garante linha */
+                overflow-x: auto !important;    /* Garante rolagem */
+                width: 100% !important;
+                padding: 0 10px !important;
+                gap: 10px !important;
+                align-items: center !important;
             }
-            aside nav a { 
-                flex: 0 0 auto !important; 
-                background: rgba(255,255,255,0.1); 
-                border-radius: 20px; 
-                padding: 8px 15px !important; 
-                border-left: none !important; 
-                font-size: 0.85rem; 
+            
+            /* Remove barra de rolagem feia */
+            html body aside nav::-webkit-scrollbar { display: none; }
+
+            /* 5. ITENS DO MENU (BOTÕES) */
+            html body aside nav a { 
+                flex: 0 0 auto !important; /* Impede encolher/esticar */
+                display: inline-flex !important;
+                width: auto !important;
+                margin: 0 !important;
+                font-size: 0.85rem !important;
+                white-space: nowrap !important; /* Impede quebra de linha do texto */
+                background: rgba(255,255,255,0.1) !important;
+                border-radius: 50px !important; /* Arredondado estilo app */
+                padding: 8px 15px !important;
+                border: 1px solid rgba(255,255,255,0.1) !important;
             }
 
-            /* 3. Conteúdo Principal (Remove a margem esquerda que empurrava o conteúdo) */
-            main.main-content { 
+            /* 6. Conteúdo Principal */
+            html body main.main-content { 
                 margin-left: 0 !important; 
                 padding: 15px !important; 
                 width: 100% !important; 
-                flex: none !important;
             }
 
-            /* 4. Grid de Cards (Um por linha) */
-            .dashboard-grid { 
-                grid-template-columns: 1fr !important; 
+            /* 7. Grid de Cards (Um embaixo do outro) */
+            html body .dashboard-grid { 
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 15px !important;
             }
         }
     </style>
@@ -122,7 +144,7 @@
                 <a href="admin_pedidos.html"><i class="ph ph-shopping-cart-simple"></i> Pedidos</a>
                 <a href="admin_afiliados.html"><i class="ph ph-users"></i> Afiliados & Financeiro</a>
                 <a href="admin_sugestoes.html"><i class="ph ph-lightbulb"></i> Sugestões</a>
-                <a href="#" id="logout-button" style="color:#e74c3c;"><i class="ph ph-sign-out"></i> Sair</a>
+                <a href="#" id="logout-button" onclick="logout()" style="color:#e74c3c;"><i class="ph ph-sign-out"></i> Sair</a>
             </nav>
         </aside>
 
@@ -186,5 +208,11 @@
     </div>
 
     <script src="admin.js"></script>
+    <script>
+        function logout() {
+            localStorage.removeItem('adminToken');
+            window.location.href = 'admin_login.html';
+        }
+    </script>
 </body>
 </html>

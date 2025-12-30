@@ -477,20 +477,36 @@ window.addEventListener('click', (e) => {
 // 👥 MÓDULO DE CLIENTES E ORÇAMENTOS
 // ============================================================
 
-// 1. Abrir Modal e Alternar PF/PJ
-// Função para limpar o modal quando for criar um NOVO (para não abrir sujo)
-function abrirModalCliente() {
-    document.getElementById('cli-id').value = ''; // Limpa ID
-    document.getElementById('cli-nome').value = '';
-    document.getElementById('cli-doc').value = '';
-    document.getElementById('cli-tel').value = '';
-    document.getElementById('cli-email').value = '';
-    document.getElementById('cli-endereco').value = '';
-    
-    const titulo = document.querySelector('#modal-novo-cliente h3');
-    if(titulo) titulo.innerText = "Novo Cliente"; // Volta o título original
 
-    document.getElementById('modal-novo-cliente').style.display = 'flex';
+// ============================================================
+// FUNÇÃO PARA ABRIR O MODAL DE NOVO CLIENTE (LIMPO)
+// ============================================================
+function abrirModalCliente() {
+    // 1. Limpa o ID oculto (Para garantir que não é uma edição)
+    const inputId = document.getElementById('cli-id');
+    if(inputId) inputId.value = ''; 
+
+    // 2. Limpa os campos visuais
+    if(document.getElementById('cli-nome')) document.getElementById('cli-nome').value = '';
+    if(document.getElementById('cli-doc')) document.getElementById('cli-doc').value = '';
+    if(document.getElementById('cli-tel')) document.getElementById('cli-tel').value = '';
+    if(document.getElementById('cli-email')) document.getElementById('cli-email').value = '';
+    if(document.getElementById('cli-endereco')) document.getElementById('cli-endereco').value = '';
+
+    // 3. Reseta o Título para "Cadastrar Cliente"
+    const titulo = document.querySelector('#modal-novo-cliente h3');
+    if(titulo) titulo.innerText = "Cadastrar Cliente";
+
+    // 4. Reseta para Pessoa Física
+    const radios = document.getElementsByName('tipoPessoa');
+    if(radios.length > 0) {
+        radios[0].checked = true;
+        alternarTipo('PF'); // Chama a função que muda o placeholder
+    }
+
+    // 5. Finalmente, mostra o modal
+    const modal = document.getElementById('modal-novo-cliente');
+    if(modal) modal.style.display = 'flex';
 }
 
 function alternarTipo(tipo) {

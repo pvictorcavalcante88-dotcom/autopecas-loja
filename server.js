@@ -226,13 +226,24 @@ app.get('/afiliado/dashboard', authenticateToken, async (req, res) => {
 // 2. ORÇAMENTOS (Salvar e Listar)
 app.post('/orcamentos', authenticateToken, async (req, res) => {
     try {
-        const { nome, itens, total } = req.body;
-        const afiliadoId = req.user.id; 
-        const novo = await prisma.orcamento.create({
-            data: { nome, itens: JSON.stringify(itens), total: parseFloat(total), afiliadoId }
+        // Agora recebemos também o 'clienteDoc' vindo do site
+        const { nome, itens, total, clienteDoc } = req.body; 
+        
+        await prisma.orcamento.create({
+            data: {
+                nome,
+                itens, // Geralmente é uma string JSON
+                total: parseFloat(total),
+                clienteDoc: clienteDoc || null, // <--- O SEGREDO ESTÁ AQUI
+                afiliadoId: req.user.id
+            }
         });
-        res.json({ mensagem: "Salvo!", id: novo.id });
-    } catch (e) { res.status(500).json({ erro: "Erro ao salvar." }); }
+        
+        res.json({ success: true });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ erro: "Erro ao salvar orçamento." });
+    }
 });
 
 app.get('/afiliado/orcamentos', authenticateToken, async (req, res) => {

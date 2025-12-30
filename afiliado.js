@@ -241,28 +241,38 @@ function preencherTabelaVendas(elementId, vendas) {
 async function carregarMeusOrcamentos() {
     const tbody = document.getElementById('lista-orcamentos-salvos');
     if(!tbody) return;
+
     try {
         const res = await fetch(`${API_URL}/afiliado/orcamentos`, {
             headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` }
         });
         const lista = await res.json();
+
         tbody.innerHTML = '';
+
         if (!lista || lista.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#7f8c8d;">Nenhum orçamento salvo.</td></tr>';
             return;
         }
+
         lista.forEach(orc => {
             const data = new Date(orc.createdAt).toLocaleDateString('pt-BR');
             const totalDisplay = orc.total > 0 ? parseFloat(orc.total).toLocaleString('pt-BR', {style:'currency', currency:'BRL'}) : "Sob Consulta";
             
+            // Verifica se tem documento salvo, se não, passa null
+            const docCliente = orc.clienteDoc ? `'${orc.clienteDoc}'` : 'null';
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td><strong>${orc.nome}</strong></td>
+                <td>
+                    <strong>${orc.nome}</strong><br>
+                    ${orc.clienteDoc ? `<small style="color:#2980b9;">Client: ${orc.clienteDoc}</small>` : ''}
+                </td>
                 <td>${data}</td>
                 <td style="color:#27ae60;">${totalDisplay}</td>
                 <td>
-                    <button onclick="restaurarOrcamento('${encodeURIComponent(orc.itens)}')" style="background:#3498db; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; margin-right:5px;" title="Carregar no Carrinho">
-                        <i class="ph ph-shopping-cart"></i>
+                    <button onclick="restaurarOrcamento('${encodeURIComponent(orc.itens)}', ${docCliente})" style="background:#3498db; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; margin-right:5px;" title="Carregar no Carrinho">
+                        <i class="ph ph-shopping-cart"></i> Abrir
                     </button>
                     <button onclick="excluirOrcamento(${orc.id})" style="background:#c0392b; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;" title="Excluir">
                         <i class="ph ph-trash"></i>
@@ -271,17 +281,38 @@ async function carregarMeusOrcamentos() {
             `;
             tbody.appendChild(tr);
         });
+
     } catch (e) { console.error(e); }
 }
 
-function restaurarOrcamento(itensEncoded) {
+// 🟢 FUNÇÃO DE RESTAURAR ATUALIZADA
+function restaurarOrcamento(itensEncoded, clienteDoc) {
     if(!confirm("Isso vai substituir o carrinho atual pelo deste orçamento. Continuar?")) return;
+    
     try {
         const itensString = decodeURIComponent(itensEncoded);
+        
+        // 1. Valida se o JSON está ok
         JSON.parse(itensString);
+        
+        // 2. Salva o carrinho
         localStorage.setItem('nossoCarrinho', itensString);
-        window.location.href = 'cart.html'; 
-    } catch(e) { alert("Erro ao carregar itens."); }
+
+        // 3. SE tiver um documento de cliente salvo, guarda ele para o Checkout usar
+        if (clienteDoc && clienteDoc !== 'null') {
+            localStorage.setItem('tempClienteDoc', clienteDoc);
+        } else {
+            localStorage.removeItem('tempClienteDoc');
+        }
+
+        // 4. Redireciona direto para o Checkout (para já preencher os dados)
+        // Se preferir ir para o carrinho antes, mude para 'cart.html'
+        window.location.href = 'checkout.html'; 
+
+    } catch(e) { 
+        console.error(e);
+        alert("Erro ao carregar itens."); 
+    }
 }
 
 async function excluirOrcamento(id) {

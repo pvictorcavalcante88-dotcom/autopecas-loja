@@ -162,6 +162,21 @@
             const token = localStorage.getItem('afiliadoToken');
             if(token) {
                 document.getElementById('area-busca-afiliado').style.display = 'block';
+
+                // 🟢 NOVO: Verifica se veio de uma restauração de orçamento
+        const docRestaurado = localStorage.getItem('tempClienteDoc');
+        if (docRestaurado) {
+            // Preenche o campo de busca
+            document.getElementById('doc-busca').value = docRestaurado;
+            
+            // Executa a busca automaticamente
+            setTimeout(() => {
+                buscarClienteAuto();
+                // Limpa para não ficar buscando toda vez que der F5
+                localStorage.removeItem('tempClienteDoc');
+            }, 500);
+            }
+
             }
         });
 

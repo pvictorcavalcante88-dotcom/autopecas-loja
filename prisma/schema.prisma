@@ -95,6 +95,8 @@ model Orcamento {
   nome      String   // Ex: "Orçamento Gol do João"
   itens     String   // Vamos salvar o JSON do carrinho aqui
   total     Float
+
+  clienteDoc  String?
   
   afiliadoId Int
   afiliado   Afiliado @relation(fields: [afiliadoId], references: [id])

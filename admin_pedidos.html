@@ -168,6 +168,7 @@
                 if(p.status === 'ENTREGUE') { corStatus = '#2980b9'; corBorda = '#2980b9'; }
                 if(p.status === 'CANCELADO') { corStatus = '#c0392b'; corBorda = '#c0392b'; }
                 if(p.status === 'PENDENTE') { corStatus = '#f39c12'; corBorda = '#f39c12'; }
+                if(p.status === 'DEVOLUCAO_PARCIAL') { corStatus = '#9b59b6'; corBorda = '#9b59b6'; }
 
                 // Tratamento de Itens (JSON ou String)
                 let listaItens = '';
@@ -215,6 +216,7 @@
                                 <option value="PENDENTE" ${p.status === 'PENDENTE' ? 'selected' : ''}>⏳ Pendente</option>
                                 <option value="APROVADO" ${p.status === 'APROVADO' ? 'selected' : ''}>✅ Aprovado</option>
                                 <option value="ENTREGUE" ${p.status === 'ENTREGUE' ? 'selected' : ''}>🚚 Entregue</option>
+                                <option value="DEVOLUCAO_PARCIAL" ${p.status === 'DEVOLUCAO_PARCIAL' ? 'selected' : ''}>↩️ Devolução Parcial</option>
                                 <option value="CANCELADO" ${p.status === 'CANCELADO' ? 'selected' : ''}>🚫 Cancelado</option>
                             </select>
                         </div>
@@ -245,59 +247,73 @@
             details.classList.toggle('open');
         }
 
-        async function mudarStatusPedido(id, novoStatus, elementoSelect) {
-            const statusAnterior = elementoSelect.getAttribute('data-prev') || 'PENDENTE';
+async function mudarStatusPedido(id, novoStatus, elementoSelect) {
+    const statusAnterior = elementoSelect.getAttribute('data-prev') || 'PENDENTE';
 
-            // SEGURANÇA: CANCELAMENTO
-            if (novoStatus === 'CANCELADO') {
-                const confirmacao = confirm(
-                    "⚠️ ATENÇÃO: CANCELAMENTO ⚠️\n\n" +
-                    "1. Produtos voltarão para o estoque.\n" +
-                    "2. Comissão será estornada.\n\n" +
-                    "Confirmar cancelamento?"
-                );
-                if (!confirmacao) {
-                    elementoSelect.value = statusAnterior;
-                    return; 
-                }
-            }
+    // 1. SEGURANÇA: DEVOLUÇÃO PARCIAL
+    if (novoStatus === 'DEVOLUCAO_PARCIAL') {
+        const nota = prompt(
+            "⚠️ REGISTRO DE DEVOLUÇÃO ⚠️\n\n" +
+            "Digite abaixo qual item foi devolvido e o valor que você estornou (apenas para seu controle visual):",
+            "Ex: Devolveu 1 Amortecedor. Estorno de R$ 150,00 via Pix."
+        );
 
-            // SEGURANÇA: APROVAÇÃO
-            if (novoStatus === 'APROVADO' && statusAnterior !== 'APROVADO') {
-                if(!confirm("Confirmar recebimento do pagamento? Isso baixa o estoque e gera comissão.")) {
-                    elementoSelect.value = statusAnterior;
-                    return;
-                }
-            }
-
-            atualizarCorSelect(elementoSelect, novoStatus);
-
-            try {
-                const token = localStorage.getItem('adminToken');
-                const res = await fetch(`${API_URL}/admin/orders/${id}/status`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ status: novoStatus })
-                });
-
-                if (res.ok) {
-                    elementoSelect.setAttribute('data-prev', novoStatus);
-                } else {
-                    throw new Error("Erro");
-                }
-            } catch (e) { 
-                alert("Erro ao salvar status. (Se for teste offline, ignore)");
-                // Em produção real, descomente abaixo para voltar o status visualmente
-                // elementoSelect.value = statusAnterior;
-                // atualizarCorSelect(elementoSelect, statusAnterior);
-            }
+        if (nota === null) {
+            // Se clicar em Cancelar no prompt, volta o status anterior
+            elementoSelect.value = statusAnterior;
+            return;
         }
+        // Dica: Futuramente você pode salvar essa 'nota' no banco de dados
+    }
+
+    // 2. SEGURANÇA: CANCELAMENTO TOTAL
+    if (novoStatus === 'CANCELADO') {
+        const confirmacao = confirm(
+            "⚠️ ATENÇÃO: CANCELAMENTO TOTAL ⚠️\n\n" +
+            "Confirmar cancelamento de TODO o pedido?"
+        );
+        if (!confirmacao) {
+            elementoSelect.value = statusAnterior;
+            return; 
+        }
+    }
+
+    // 3. SEGURANÇA: APROVAÇÃO
+    if (novoStatus === 'APROVADO' && statusAnterior !== 'APROVADO') {
+        if(!confirm("Confirmar recebimento do pagamento?")) {
+            elementoSelect.value = statusAnterior;
+            return;
+        }
+    }
+
+    // Atualiza a cor visualmente
+    atualizarCorSelect(elementoSelect, novoStatus);
+
+    try {
+        const token = localStorage.getItem('adminToken');
+        const res = await fetch(`${API_URL}/admin/orders/${id}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ status: novoStatus }) // Envia DEVOLUCAO_PARCIAL
+        });
+
+        if (res.ok) {
+            elementoSelect.setAttribute('data-prev', novoStatus);
+        } else {
+            throw new Error("Erro na API");
+        }
+    } catch (e) { 
+        alert("Erro ao salvar status (Backend pode não suportar ainda, verifique logs).");
+        console.error(e);
+    }
+}
 
         function atualizarCorSelect(elemento, status) {
             let cor = '#f39c12';
             if(status === 'APROVADO') cor = '#27ae60';
             else if(status === 'CANCELADO') cor = '#c0392b';
             else if(status === 'ENTREGUE') cor = '#2980b9';
+            else if(status === 'DEVOLUCAO_PARCIAL') cor = '#9b59b6';
 
             elemento.style.backgroundColor = cor;
             elemento.closest('.order-card').style.borderLeftColor = cor;

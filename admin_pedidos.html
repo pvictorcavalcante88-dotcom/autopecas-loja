@@ -106,6 +106,23 @@
             <input type="text" id="search-orders" placeholder="Buscar cliente ou ID..." style="padding:10px; border-radius:4px; border:1px solid #ddd; width:250px;">
         </header>
 
+        <div style="display:flex; gap:10px; align-items:flex-end; background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom: 20px;">
+    <div>
+        <label style="font-size:0.8rem; display:block; color:#666;">De:</label>
+        <input type="date" id="filtro-inicio" style="padding:8px; border:1px solid #ccc; border-radius:4px;">
+    </div>
+    <div>
+        <label style="font-size:0.8rem; display:block; color:#666;">Até:</label>
+        <input type="date" id="filtro-fim" style="padding:8px; border:1px solid #ccc; border-radius:4px;">
+    </div>
+    <button onclick="filtrarPedidosAdmin()" style="padding:8px 15px; background:#2c3e50; color:white; border:none; border-radius:4px; cursor:pointer;">
+        <i class="ph ph-funnel"></i> Filtrar
+    </button>
+    <button onclick="limparFiltroAdmin()" style="padding:8px 10px; background:#bdc3c7; color:white; border:none; border-radius:4px; cursor:pointer;" title="Limpar">
+        <i class="ph ph-x"></i>
+    </button>
+</div>
+
         <div id="order-list-container">
             <p style="padding:20px; text-align:center; color:#666;">Carregando pedidos...</p>
         </div>
@@ -294,6 +311,50 @@
             );
             renderizarPedidos(filtrados);
         });
+
+        // ============================================================
+        // 🟢 NOVAS FUNÇÕES DE FILTRO
+        // ============================================================
+        
+        // 1. Função auxiliar para corrigir fuso horário
+        function getDataLocal(dataString) {
+            const dataObj = new Date(dataString);
+            const ano = dataObj.getFullYear();
+            const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
+            const dia = String(dataObj.getDate()).padStart(2, '0');
+            return `${ano}-${mes}-${dia}`;
+        }
+
+        // 2. Função de Filtrar
+        function filtrarPedidosAdmin() {
+            const inicio = document.getElementById('filtro-inicio').value;
+            const fim = document.getElementById('filtro-fim').value;
+
+            if (!inicio || !fim) {
+                alert("Selecione as datas de inicio e fim.");
+                return;
+            }
+
+            // Usa o seu 'pedidosCache' que já está salvo na memória
+            if (pedidosCache.length > 0) {
+                const filtrados = pedidosCache.filter(p => {
+                    // Pega a data de criação do pedido
+                    const dataVenda = getDataLocal(p.createdAt); 
+                    // Compara string com string (Ex: "2023-12-30")
+                    return dataVenda >= inicio && dataVenda <= fim;
+                });
+                
+                renderizarPedidos(filtrados);
+            }
+        }
+
+        // 3. Função de Limpar
+        function limparFiltroAdmin() {
+            document.getElementById('filtro-inicio').value = '';
+            document.getElementById('filtro-fim').value = '';
+            // Restaura a lista completa original
+            renderizarPedidos(pedidosCache);
+        }
 
         function logout() { localStorage.removeItem('adminToken'); window.location.href = 'admin_login.html'; }
         

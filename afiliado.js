@@ -478,7 +478,18 @@ window.addEventListener('click', (e) => {
 // ============================================================
 
 // 1. Abrir Modal e Alternar PF/PJ
+// Função para limpar o modal quando for criar um NOVO (para não abrir sujo)
 function abrirModalCliente() {
+    document.getElementById('cli-id').value = ''; // Limpa ID
+    document.getElementById('cli-nome').value = '';
+    document.getElementById('cli-doc').value = '';
+    document.getElementById('cli-tel').value = '';
+    document.getElementById('cli-email').value = '';
+    document.getElementById('cli-endereco').value = '';
+    
+    const titulo = document.querySelector('#modal-novo-cliente h3');
+    if(titulo) titulo.innerText = "Novo Cliente"; // Volta o título original
+
     document.getElementById('modal-novo-cliente').style.display = 'flex';
 }
 
@@ -497,6 +508,9 @@ function alternarTipo(tipo) {
 
 // 2. Salvar Cliente no Banco
 async function salvarNovoCliente() {
+    // Pega o ID (se estiver vazio, é cadastro novo. Se tiver valor, é edição)
+    const idCliente = document.getElementById('cli-id') ? document.getElementById('cli-id').value : null;
+
     const dados = {
         tipo: document.querySelector('input[name="tipoPessoa"]:checked').value,
         nome: document.getElementById('cli-nome').value,
@@ -509,18 +523,27 @@ async function salvarNovoCliente() {
     if(!dados.nome || !dados.documento) return alert("Nome e Documento são obrigatórios.");
 
     try {
-        const res = await fetch(`${API_URL}/afiliado/cadastrar-cliente`, {
-            method: 'POST',
+        let url = `${API_URL}/afiliado/cadastrar-cliente`;
+        let method = 'POST';
+
+        // SE TIVER ID, MUDA PARA EDIÇÃO
+        if (idCliente) {
+            url = `${API_URL}/afiliado/clientes/${idCliente}`; // Ajuste a rota conforme seu Backend
+            method = 'PUT';
+        }
+
+        const res = await fetch(url, {
+            method: method,
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${AFILIADO_TOKEN}` },
             body: JSON.stringify(dados)
         });
 
         if(res.ok) {
-            alert("Cliente cadastrado!");
+            alert(idCliente ? "Cliente atualizado!" : "Cliente cadastrado!");
             document.getElementById('modal-novo-cliente').style.display = 'none';
-            carregarClientesCadastrados(); // Atualiza a lista
+            carregarClientesCadastrados(); // Atualiza a lista na tela
         } else {
-            alert("Erro ao cadastrar.");
+            alert("Erro ao salvar.");
         }
     } catch(e) { console.error(e); }
 }
@@ -538,7 +561,8 @@ async function carregarClientesCadastrados() {
         
         tbody.innerHTML = '';
         lista.forEach(c => {
-            // Botão "Gerar Orçamento" que chama a função de impressão
+            // AQUI MUDOU: Botão agora é "Editar" (Azul)
+            // Note que usamos 'prepararEdicao' em vez de 'gerarOrcamentoPDF'
             tbody.innerHTML += `
                 <tr>
                     <td><strong>${c.nome}</strong></td>
@@ -546,14 +570,45 @@ async function carregarClientesCadastrados() {
                     <td>${c.documento || '-'}</td>
                     <td>${c.telefone || '-'}</td>
                     <td>
-                        <button onclick='gerarOrcamentoPDF(${JSON.stringify(c)})' style="background:#e67e22; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;">
-                            <i class="ph ph-printer"></i> Orçamento
+                        <button onclick='prepararEdicao(${JSON.stringify(c)})' style="background:#3498db; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;">
+                            <i class="ph ph-pencil-simple"></i> Editar
                         </button>
                     </td>
                 </tr>
             `;
         });
     } catch(e) { console.error(e); }
+}
+
+// Função para abrir o modal preenchido
+function prepararEdicao(cliente) {
+    // 1. Preenche o ID oculto (Necessário criar esse input no HTML se não existir)
+    const inputId = document.getElementById('cli-id');
+    if(inputId) inputId.value = cliente.id; 
+
+    // 2. Preenche os campos visuais
+    document.getElementById('cli-nome').value = cliente.nome || '';
+    document.getElementById('cli-doc').value = cliente.documento || '';
+    document.getElementById('cli-tel').value = cliente.telefone || '';
+    document.getElementById('cli-email').value = cliente.email || '';
+    document.getElementById('cli-endereco').value = cliente.endereco || '';
+
+    // 3. Seleciona o Tipo (PF ou PJ)
+    const radios = document.getElementsByName('tipoPessoa');
+    if(cliente.tipo === 'PJ') {
+        radios[1].checked = true; // Index 1 deve ser o PJ
+        alternarTipo('PJ');
+    } else {
+        radios[0].checked = true; // Index 0 deve ser o PF
+        alternarTipo('PF');
+    }
+
+    // 4. Muda o título do modal (opcional, para ficar bonito)
+    const titulo = document.querySelector('#modal-novo-cliente h3');
+    if(titulo) titulo.innerText = "Editar Cliente";
+
+    // 5. Abre o modal
+    document.getElementById('modal-novo-cliente').style.display = 'flex';
 }
 
 // Chame essa função no seu "carregarDashboardCompleto" ou "mudarAba"

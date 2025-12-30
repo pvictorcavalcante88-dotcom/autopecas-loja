@@ -457,42 +457,73 @@ async function carregarPaginaCheckout() {
 }
 
 // --- FUNÇÃO "SILENCIOSA" PARA SALVAR ORÇAMENTO --- 
-async function salvarOrcamentoSilencioso(tipo) {
-    const afiliado = JSON.parse(localStorage.getItem('afiliadoLogado'));
-    if(!afiliado || !afiliado.token) return;
+async function salvarOrcamentoSilencioso(origem = 'MANUAL') {
+    console.log("1. Função salvar iniciada..."); // DEBUG
 
-    // Tenta pegar o nome do input "Nome" (se tiver preenchido)
-    // Se não tiver, gera um nome automático: "Orçamento WhatsApp - 29/11 10:30"
-    const inputNome = document.getElementById('email'); // Usando o campo email/nome do form
-    let nomeCliente = inputNome ? inputNome.value.trim() : "";
-    
-    const dataHora = new Date().toLocaleString('pt-BR', {day:'numeric', month:'numeric', hour:'2-digit', minute:'2-digit'});
-    
-    let nomeFinal = nomeCliente ? `${nomeCliente} (${tipo})` : `Orçamento ${tipo} - ${dataHora}`;
-
-    const carrinho = getCarrinho(); 
-    if(carrinho.length === 0) return;
-
-    // Feedback visual rápido (troca texto do botão)
-    const btnId = tipo === 'WhatsApp' ? 'btn-zap' : 'btn-pdf';
-    const btn = document.getElementById(btnId);
-    let textoOriginal = "";
-    if(btn) {
-        textoOriginal = btn.innerHTML;
-        btn.innerHTML = `<i class="ph ph-spinner"></i> Salvando...`;
+    const carrinho = localStorage.getItem('nossoCarrinho');
+    if (!carrinho) {
+        console.log("ERRO: Carrinho vazio ou não encontrado.");
+        return;
     }
 
+    // Tenta pegar o documento
+    let docCliente = null;
+    const inputDoc = document.getElementById('doc-busca');
+    if (inputDoc) {
+        docCliente = inputDoc.value;
+        console.log("2. Documento encontrado no input:", docCliente); // DEBUG
+    } else {
+        console.log("AVISO: Input 'doc-busca' não achado na tela. Salvando sem documento.");
+    }
+
+    // Calcula total
+    const itens = JSON.parse(carrinho);
+    const total = itens.reduce((acc, item) => acc + (item.preco * item.quantidade), 0);
+    
+    // Pega nome
+    const inputNome = document.getElementById('email'); 
+    const nomeCliente = inputNome && inputNome.value ? inputNome.value : "Cliente";
+    const nomeOrcamento = `Orç. ${nomeCliente} (${origem})`;
+
+    const dadosParaEnviar = {
+        nome: nomeOrcamento,
+        itens: carrinho,
+        total: total,
+        clienteDoc: docCliente // Verifica se isso está indo
+    };
+
+    console.log("3. Enviando estes dados para o servidor:", dadosParaEnviar); // DEBUG
+
     try {
-        await fetch(`${API_URL}/orcamentos`, {
+        const token = localStorage.getItem('afiliadoToken');
+        if(!token) {
+            alert("Erro: Você não está logado como afiliado.");
+            return;
+        }
+
+        const res = await fetch(`${API_URL}/afiliado/orcamentos`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${afiliado.token}` },
-            body: JSON.stringify({ nome: nomeFinal, itens: carrinho, total: 0 })
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(dadosParaEnviar)
         });
-        console.log("✅ Orçamento salvo automaticamente: " + nomeFinal);
-    } catch(e) { 
-        console.error("Erro ao salvar auto", e); 
-    } finally {
-        if(btn) btn.innerHTML = textoOriginal; // Restaura botão
+
+        console.log("4. Resposta do servidor (Status):", res.status); // DEBUG
+
+        if (res.ok) {
+            console.log("SUCESSO: Salvo no banco!");
+            if (origem === 'MANUAL') alert("✅ Orçamento salvo com sucesso!");
+        } else {
+            const erro = await res.json();
+            console.error("ERRO DO SERVIDOR:", erro);
+            alert("Erro ao salvar: " + JSON.stringify(erro));
+        }
+        
+    } catch (e) {
+        console.error("ERRO DE CONEXÃO/CÓDIGO:", e);
+        alert("Erro técnico. Veja o console (F12).");
     }
 }
 

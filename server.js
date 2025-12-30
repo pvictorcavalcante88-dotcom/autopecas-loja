@@ -223,26 +223,37 @@ app.get('/afiliado/dashboard', authenticateToken, async (req, res) => {
     }
 });
 
-// 2. ORÇAMENTOS (Salvar e Listar)
-app.post('/orcamentos', authenticateToken, async (req, res) => {
+// ============================================================
+// ROTA CORRIGIDA PARA SALVAR ORÇAMENTOS
+// ============================================================
+
+// 1. O nome da rota TEM que ser '/afiliado/orcamentos' para bater com o script.js
+app.post('/afiliado/orcamentos', authenticateToken, async (req, res) => {
     try {
-        // Agora recebemos também o 'clienteDoc' vindo do site
-        const { nome, itens, total, clienteDoc } = req.body; 
-        
-        await prisma.orcamento.create({
-            data: {
-                nome,
-                itens, // Geralmente é uma string JSON
-                total: parseFloat(total),
-                clienteDoc: clienteDoc || null, // <--- O SEGREDO ESTÁ AQUI
-                afiliadoId: req.user.id
+        // 2. Adicionei 'clienteDoc' aqui para receber o CPF vindo do site
+        const { nome, itens, total, clienteDoc } = req.body;
+        const afiliadoId = req.user.id; 
+
+        // Verificação de segurança para o JSON
+        // Se 'itens' já vier como texto do localStorage, usamos direto. Se vier como objeto, transformamos.
+        const itensString = typeof itens === 'string' ? itens : JSON.stringify(itens);
+
+        const novo = await prisma.orcamento.create({
+            data: { 
+                nome, 
+                itens: itensString, 
+                total: parseFloat(total), 
+                afiliadoId,
+                // 3. Adicionei o campo no banco de dados
+                clienteDoc: clienteDoc || null 
             }
         });
-        
-        res.json({ success: true });
-    } catch (e) {
-        console.error(e);
-        res.status(500).json({ erro: "Erro ao salvar orçamento." });
+
+        res.json({ mensagem: "Salvo!", id: novo.id });
+
+    } catch (e) { 
+        console.error("Erro no backend:", e); // Mostra o erro no terminal se houver
+        res.status(500).json({ erro: "Erro ao salvar." }); 
     }
 });
 

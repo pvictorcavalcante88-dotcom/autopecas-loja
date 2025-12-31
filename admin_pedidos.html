@@ -128,6 +128,38 @@
         </div>
     </main>
 
+    <div id="modal-devolucao" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:2000; justify-content:center; align-items:center;">
+    <div style="background:white; width:90%; max-width:600px; padding:20px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.3);">
+        <h3 style="margin-top:0; color:#c0392b;">↪️ Processar Devolução</h3>
+        <p style="font-size:0.9rem; color:#666;">Ajuste a quantidade dos itens abaixo para refletir o que o cliente <strong>FICOU</strong>. <br>Se ele devolveu tudo de um item, coloque 0.</p>
+        
+        <div style="max-height:300px; overflow-y:auto; border:1px solid #eee; margin-bottom:15px; border-radius:4px;">
+            <table style="width:100%; border-collapse:collapse;">
+                <thead style="background:#f8f9fa;">
+                    <tr>
+                        <th style="padding:10px; text-align:left;">Produto</th>
+                        <th style="padding:10px; text-align:center;">Preço Un.</th>
+                        <th style="padding:10px; text-align:center;">Qtd. Atual</th>
+                        <th style="padding:10px; text-align:center;">Nova Qtd.</th>
+                    </tr>
+                </thead>
+                <tbody id="lista-itens-devolucao">
+                    </tbody>
+            </table>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; background:#eee; padding:10px; border-radius:4px;">
+            <strong>Novo Total Estimado:</strong>
+            <span id="novo-total-display" style="font-size:1.2rem; color:#2c3e50; font-weight:bold;">R$ 0,00</span>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+            <button onclick="fecharModalDevolucao()" style="padding:10px 20px; background:#ddd; border:none; border-radius:4px; cursor:pointer;">Cancelar</button>
+            <button onclick="confirmarDevolucao()" style="padding:10px 20px; background:#c0392b; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Confirmar Devolução</button>
+        </div>
+    </div>
+</div>
+
     <script>
         const API_URL = ''; 
         let pedidosCache = []; 
@@ -308,6 +340,120 @@ async function mudarStatusPedido(id, novoStatus, elementoSelect) {
     }
 }
 
+// ============================================================
+// 2. FUNÇÕES DO MODAL DE DEVOLUÇÃO
+// ============================================================
+function abrirModalDevolucao(pedido, elementoSelect) {
+    pedidoEmEdicaoId = pedido.id;
+    const modal = document.getElementById('modal-devolucao');
+    const tbody = document.getElementById('lista-itens-devolucao');
+    tbody.innerHTML = '';
+
+    // Parse dos itens (garante que é array)
+    let lista = [];
+    try {
+        lista = typeof pedido.itens === 'string' ? JSON.parse(pedido.itens) : pedido.itens;
+    } catch(e) { lista = []; }
+    
+    // Salva clone para edição
+    itensEmEdicao = JSON.parse(JSON.stringify(lista));
+
+    // Renderiza a tabela
+    itensEmEdicao.forEach((item, index) => {
+        const preco = parseFloat(item.unitario || item.preco || 0);
+        
+        tbody.innerHTML += `
+            <tr style="border-bottom:1px solid #ddd;">
+                <td style="padding:10px;">${item.nome}</td>
+                <td style="text-align:center;">R$ ${preco.toFixed(2)}</td>
+                <td style="text-align:center;">${item.qtd}</td>
+                <td style="text-align:center;">
+                    <input type="number" min="0" max="${item.qtd}" value="${item.qtd}" 
+                        onchange="atualizarTotalModal(${index}, this.value)"
+                        style="width:60px; padding:5px; text-align:center; border:1px solid #ccc; border-radius:4px;">
+                </td>
+            </tr>
+        `;
+    });
+
+    atualizarCalculoTotal(); // Calcula o total inicial
+    modal.style.display = 'flex';
+}
+
+function atualizarTotalModal(index, novaQtd) {
+    // Atualiza o array temporário
+    itensEmEdicao[index].qtd = parseInt(novaQtd);
+    atualizarCalculoTotal();
+}
+
+function atualizarCalculoTotal() {
+    let total = 0;
+    itensEmEdicao.forEach(item => {
+        const preco = parseFloat(item.unitario || item.preco || 0);
+        const qtd = parseInt(item.qtd || 0);
+        total += (preco * qtd);
+    });
+    document.getElementById('novo-total-display').innerText = total.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+    return total;
+}
+
+function fecharModalDevolucao() {
+    document.getElementById('modal-devolucao').style.display = 'none';
+    pedidoEmEdicaoId = null;
+}
+
+// ============================================================
+// 3. SALVAR A DEVOLUÇÃO NO BACKEND
+// ============================================================
+async function confirmarDevolucao() {
+    if(!pedidoEmEdicaoId) return;
+
+    // Remove itens com qtd 0 (pois foram devolvidos totalmente)
+    const itensFinais = itensEmEdicao.filter(i => i.qtd > 0);
+    const novoTotal = atualizarCalculoTotal(); // Recalcula o total final
+
+    if(!confirm("Confirma a atualização do pedido? \nIsso recalculará a comissão baseada apenas nos itens restantes.")) return;
+
+    try {
+        const token = localStorage.getItem('adminToken');
+        
+        // ENVIA: Status Novo + Nova Lista de Itens + Novo Total
+        const payload = {
+            status: 'DEVOLUCAO_PARCIAL',
+            itens: JSON.stringify(itensFinais), // Lista atualizada!
+            novoTotal: novoTotal
+        };
+
+        const res = await fetch(`${API_URL}/admin/orders/${pedidoEmEdicaoId}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            alert("✅ Devolução processada com sucesso!");
+            fecharModalDevolucao();
+            carregarPedidos(); // Recarrega a tela para mostrar novos valores
+        } else {
+            alert("Erro ao salvar devolução.");
+        }
+
+    } catch (e) { console.error(e); }
+}
+
+// Função auxiliar para salvar status normal (sem modal)
+async function salvarStatusSimples(id, status, elementoSelect) {
+    try {
+        const token = localStorage.getItem('adminToken');
+        await fetch(`${API_URL}/admin/orders/${id}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ status: status })
+        });
+        elementoSelect.setAttribute('data-prev', status);
+    } catch(e) { console.error(e); }
+}
+
         function atualizarCorSelect(elemento, status) {
             let cor = '#f39c12';
             if(status === 'APROVADO') cor = '#27ae60';
@@ -372,7 +518,10 @@ async function mudarStatusPedido(id, novoStatus, elementoSelect) {
             renderizarPedidos(pedidosCache);
         }
 
+
+
         function logout() { localStorage.removeItem('adminToken'); window.location.href = 'admin_login.html'; }
+
         
         carregarPedidos();
     </script>

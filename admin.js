@@ -224,6 +224,8 @@ async function mudarStatusPedido(id, novoStatus) {
     }
 }
 
+
+
 // 2. CARREGAR LISTA GERAL (COM BOTÃO DE APROVAR)
         async function carregarTodosAfiliados() {
             const token = localStorage.getItem('adminToken');

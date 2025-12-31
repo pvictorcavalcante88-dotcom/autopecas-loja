@@ -531,7 +531,9 @@ app.get('/admin/pedidos', authenticateToken, async (req, res) => {
 app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        const { status } = req.body;
+        
+        // 🟢 Recebemos também 'itens' e 'novoTotal' caso venha do modal de devolução
+        const { status, itens, novoTotal } = req.body; 
 
         const pedidoAntigo = await prisma.pedido.findUnique({ 
             where: { id: id },
@@ -540,22 +542,29 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
 
         if (!pedidoAntigo) return res.status(404).json({ erro: "Pedido não encontrado" });
 
-        // 1. BAIXA DE ESTOQUE
+        // =================================================================================
+        // 1. BAIXA DE ESTOQUE (APROVADO)
+        // =================================================================================
         if (status === 'APROVADO' && pedidoAntigo.status !== 'APROVADO') {
             try {
-                const listaItens = JSON.parse(pedidoAntigo.itens);
+                const listaItens = typeof pedidoAntigo.itens === 'string' ? JSON.parse(pedidoAntigo.itens) : pedidoAntigo.itens;
                 if (Array.isArray(listaItens)) {
                     for (const item of listaItens) {
-                        await prisma.produto.update({
-                            where: { id: item.id },
-                            data: { estoque: { decrement: item.qtd } }
-                        });
+                        // Verifica se tem ID para evitar erro
+                        if(item.id) {
+                            await prisma.produto.update({
+                                where: { id: item.id },
+                                data: { estoque: { decrement: item.qtd } }
+                            });
+                        }
                     }
                 }
-            } catch (err) {}
+            } catch (err) { console.error("Erro estoque:", err); }
         }
 
-        // 2. LIBERAR COMISSÃO
+        // =================================================================================
+        // 2. LIBERAR COMISSÃO (APROVADO)
+        // =================================================================================
         if (status === 'APROVADO' && pedidoAntigo.status !== 'APROVADO') {
             if (pedidoAntigo.afiliadoId && pedidoAntigo.comissaoGerada > 0) {
                 await prisma.afiliado.update({
@@ -565,34 +574,88 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
             }
         }
 
-        // 3. ESTORNO
+        // =================================================================================
+        // 3. ESTORNO TOTAL (CANCELADO)
+        // =================================================================================
         if (status === 'CANCELADO' && pedidoAntigo.status === 'APROVADO') {
+            // Tira o dinheiro do afiliado
             if (pedidoAntigo.afiliadoId && pedidoAntigo.comissaoGerada > 0) {
                 await prisma.afiliado.update({
                     where: { id: pedidoAntigo.afiliadoId },
                     data: { saldo: { decrement: pedidoAntigo.comissaoGerada } }
                 });
             }
+            // Devolve estoque
             try {
-                const listaItens = JSON.parse(pedidoAntigo.itens);
+                const listaItens = typeof pedidoAntigo.itens === 'string' ? JSON.parse(pedidoAntigo.itens) : pedidoAntigo.itens;
                 if (Array.isArray(listaItens)) {
                     for (const item of listaItens) {
-                        await prisma.produto.update({
-                            where: { id: item.id },
-                            data: { estoque: { increment: item.qtd } }
-                        });
+                        if(item.id) {
+                            await prisma.produto.update({
+                                where: { id: item.id },
+                                data: { estoque: { increment: item.qtd } }
+                            });
+                        }
                     }
                 }
             } catch(e) {}
         }
 
+        // =================================================================================
+        // 🟢 4. DEVOLUÇÃO PARCIAL (NOVA LÓGICA)
+        // =================================================================================
+        let dadosAtualizacao = { status: status }; // Objeto dinâmico para o update final
+        
+        if (status === 'DEVOLUCAO_PARCIAL') {
+            // Verifica se o frontend mandou os dados necessários
+            if (novoTotal !== undefined && itens) {
+                
+                // A. Se o afiliado JÁ recebeu, fazemos o estorno proporcional
+                if (pedidoAntigo.afiliadoId && (pedidoAntigo.status === 'APROVADO' || pedidoAntigo.status === 'ENTREGUE')) {
+                    const valorAntigo = parseFloat(pedidoAntigo.valorTotal);
+                    const valorNovo = parseFloat(novoTotal);
+                    const diferenca = valorAntigo - valorNovo;
+                    
+                    if (diferenca > 0 && valorAntigo > 0) {
+                        // Calcula quanto % foi devolvido para tirar a mesma % da comissão
+                        const porcentagemDevolvida = diferenca / valorAntigo;
+                        const valorEstorno = pedidoAntigo.comissaoGerada * porcentagemDevolvida;
+
+                        // Atualiza Saldo do Afiliado
+                        await prisma.afiliado.update({
+                            where: { id: pedidoAntigo.afiliadoId },
+                            data: { saldo: { decrement: valorEstorno } }
+                        });
+
+                        // Atualiza a comissão que ficou no pedido para o novo valor correto
+                        const novaComissao = pedidoAntigo.comissaoGerada - valorEstorno;
+                        dadosAtualizacao.comissaoGerada = novaComissao;
+                    }
+                }
+
+                // B. Prepara os dados do pedido para salvar
+                // Salva a nova lista de itens (onde os devolvidos estão com qtd 0 ou menor)
+                // Se seu banco salva itens como String, usamos JSON.stringify
+                dadosAtualizacao.itens = typeof itens === 'object' ? JSON.stringify(itens) : itens;
+                dadosAtualizacao.valorTotal = parseFloat(novoTotal);
+            }
+        }
+
+        // =================================================================================
+        // UPDATE FINAL NO PEDIDO
+        // =================================================================================
+        // Aqui usamos 'dadosAtualizacao' porque na Devolução Parcial mudamos mais coisas além do status
         const pedidoAtualizado = await prisma.pedido.update({
             where: { id: id },
-            data: { status: status }
+            data: dadosAtualizacao
         });
+
         res.json(pedidoAtualizado);
 
-    } catch (e) { res.status(500).json({ erro: e.message }); }
+    } catch (e) { 
+        console.error(e);
+        res.status(500).json({ erro: e.message }); 
+    }
 });
 
 // ============================================================

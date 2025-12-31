@@ -374,41 +374,87 @@
         // ============================================================
         // 🟢 3. SALVAR A DEVOLUÇÃO NO BACKEND
         // ============================================================
-        async function confirmarDevolucao() {
-            if(!pedidoEmEdicaoId) return;
+       async function confirmarDevolucao() {
+    if(!pedidoEmEdicaoId) return;
 
-            // Remove itens com qtd 0 (pois foram devolvidos totalmente)
-            const itensFinais = itensEmEdicao.filter(i => i.qtd > 0);
-            const novoTotal = atualizarCalculoTotal(); // Recalcula o total final
+    // 1. Busca os dados originais
+    const pedidoOriginal = pedidosCache.find(p => p.id === pedidoEmEdicaoId);
+    let itensOriginais = [];
+    try {
+        itensOriginais = typeof pedidoOriginal.itens === 'string' ? JSON.parse(pedidoOriginal.itens) : pedidoOriginal.itens;
+    } catch(e) { itensOriginais = []; }
 
-            if(!confirm("Confirma a atualização do pedido? \nIsso recalculará a comissão baseada apenas nos itens restantes.")) return;
-
-            try {
-                const token = localStorage.getItem('adminToken');
-                
-                // ENVIA: Status Novo + Nova Lista de Itens + Novo Total
-                const payload = {
-                    status: 'DEVOLUCAO_PARCIAL',
-                    itens: JSON.stringify(itensFinais), // Lista atualizada!
-                    novoTotal: novoTotal
-                };
-
-                const res = await fetch(`${API_URL}/admin/orders/${pedidoEmEdicaoId}/status`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify(payload)
-                });
-
-                if (res.ok) {
-                    alert("✅ Devolução processada com sucesso!");
-                    fecharModalDevolucao();
-                    carregarPedidos(); // Recarrega a tela para mostrar novos valores
-                } else {
-                    alert("Erro ao salvar devolução.");
-                }
-
-            } catch (e) { console.error(e); }
+    // 2. Calcula Totais
+    const itensFinais = itensEmEdicao.filter(i => i.qtd > 0);
+    const novoTotal = atualizarCalculoTotal();
+    const valorAntigo = parseFloat(pedidoOriginal.valorTotal);
+    
+    // 3. CALCULA O QUE VOLTA PRO ESTOQUE
+    let relatorioEstoque = "";
+    itensOriginais.forEach(orig => {
+        const editado = itensEmEdicao.find(ed => ed.nome === orig.nome);
+        const qtdFinal = editado ? parseInt(editado.qtd) : 0;
+        const devolvido = parseInt(orig.qtd) - qtdFinal;
+        if (devolvido > 0) {
+            relatorioEstoque += `📦 ${devolvido}x ${orig.nome}\n`;
         }
+    });
+
+    // 4. 💰 CÁLCULO DO ESTORNO DE COMISSÃO (PROPORCIONAL)
+    let msgFinanceira = "";
+    if (pedidoOriginal.status === 'APROVADO' || pedidoOriginal.status === 'ENTREGUE') {
+        // Se a comissão já foi paga, calculamos quanto tem que retirar
+        if (pedidoOriginal.comissaoGerada > 0) {
+            // Regra de 3: Se o valor caiu 30%, a comissão cai 30%
+            const porcentagemQueda = 1 - (novoTotal / valorAntigo);
+            const valorEstorno = pedidoOriginal.comissaoGerada * porcentagemQueda;
+            
+            msgFinanceira = `\n💰 IMPACTO NO AFILIADO:\n` +
+                            `O pedido já gerou comissão. Com essa devolução:\n` +
+                            `🛑 O saldo dele será DEBITADO em: ${valorEstorno.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}`;
+        }
+    }
+
+    // 5. Monta a mensagem final
+    let msgConfirmacao = "Confirma a atualização do pedido?\n";
+    if (relatorioEstoque) {
+        msgConfirmacao += "\n⚠️ ESTOQUE FÍSICO:\n" + relatorioEstoque;
+    }
+    if (msgFinanceira) {
+        msgConfirmacao += msgFinanceira;
+    }
+
+    if(!confirm(msgConfirmacao)) return;
+
+    // 6. Envia para o Backend
+    try {
+        const token = localStorage.getItem('adminToken');
+        
+        const payload = {
+            status: 'DEVOLUCAO_PARCIAL',
+            itens: JSON.stringify(itensFinais),
+            novoTotal: novoTotal
+        };
+
+        const res = await fetch(`${API_URL}/admin/orders/${pedidoEmEdicaoId}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            let avisos = "✅ Pedido atualizado com sucesso!";
+            if(relatorioEstoque) avisos += "\n\nLembre-se de repor o estoque manualmente.";
+            alert(avisos);
+            
+            fecharModalDevolucao();
+            carregarPedidos(); 
+        } else {
+            alert("Erro ao salvar devolução.");
+        }
+
+    } catch (e) { console.error(e); }
+}
 
         // Função auxiliar para salvar status normal (sem modal)
         async function salvarStatusSimples(id, status, elementoSelect) {

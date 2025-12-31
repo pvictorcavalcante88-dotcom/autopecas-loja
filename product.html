@@ -143,6 +143,9 @@
                 <div class="detail-installments">em até 12x no cartão</div>
             </div>
 
+            <p id="prod-estoque" style="font-weight: bold; margin-top: 15px; font-size: 0.95rem; color: #7f8c8d;">Verificando estoque...</p>
+            <div id="affiliate-area" class="affiliate-profit-box" style="display:none;">
+
             <div id="affiliate-area" class="affiliate-profit-box" style="display:none;">
                 <h4 style="margin-bottom:10px; color:#2c3e50;"><i class="ph ph-currency-circle-dollar"></i> Painel do Parceiro</h4>
                 <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
@@ -293,6 +296,35 @@
                 
                 document.getElementById('prod-desc').innerHTML = desc || "Sem descrição técnica.";
 
+                const elEstoque = document.getElementById('prod-estoque');
+const btnComprar = document.querySelector('.btn-buy-now');
+const inputQtd = document.getElementById('qtd');
+
+// Garante que estoque é número
+const estoqueAtual = parseInt(PRODUTO_ATUAL.estoque || 0);
+
+if (estoqueAtual <= 0) {
+    // SEM ESTOQUE
+    elEstoque.innerHTML = '<span style="color:#c0392b"><i class="ph ph-x-circle"></i> Produto Esgotado</span>';
+    if(btnComprar) {
+        btnComprar.disabled = true;
+        btnComprar.style.background = "#bdc3c7";
+        btnComprar.style.cursor = "not-allowed";
+        btnComprar.innerHTML = "Indisponível";
+    }
+    if(inputQtd) inputQtd.disabled = true;
+
+} else if (estoqueAtual < 5) {
+    // POUCO ESTOQUE
+    elEstoque.innerHTML = `<span style="color:#e67e22"><i class="ph ph-warning"></i> Restam apenas ${estoqueAtual} unidades!</span>`;
+    if(inputQtd) inputQtd.max = estoqueAtual;
+
+} else {
+    // ESTOQUE NORMAL
+    elEstoque.innerHTML = `<span style="color:#27ae60"><i class="ph ph-check-circle"></i> Disponível (${estoqueAtual} em estoque)</span>`;
+    if(inputQtd) inputQtd.max = estoqueAtual;
+}
+
                 // RELACIONADOS
                 const boxRelacionados = document.getElementById('related-section');
                 const gridRelacionados = document.getElementById('related-grid');
@@ -389,53 +421,68 @@
         }
 
         function adicionarAoCarrinhoAtual() {
-            if(!PRODUTO_ATUAL) return;
+    if(!PRODUTO_ATUAL) return;
 
-            const urlParams = new URLSearchParams(window.location.search);
-            const termoBusca = urlParams.get('q') || urlParams.get('search') || ''; 
+    const estoqueMax = parseInt(PRODUTO_ATUAL.estoque || 0);
+    const qtdQueroAdicionar = parseInt(document.getElementById('qtd').value);
+    
+    // 1. Pega o carrinho atual
+    let carrinho = JSON.parse(localStorage.getItem('nossoCarrinho') || '[]');
+    const index = carrinho.findIndex(i => i.id == PRODUTO_ATUAL.id);
+    
+    // 2. Verifica quanto JÁ TEM no carrinho
+    let qtdJaNoCarrinho = 0;
+    if (index > -1) {
+        qtdJaNoCarrinho = carrinho[index].quantidade;
+    }
 
-            const qtd = parseInt(document.getElementById('qtd').value);
-            let carrinho = JSON.parse(localStorage.getItem('nossoCarrinho') || '[]');
-            
-            const index = carrinho.findIndex(i => i.id == PRODUTO_ATUAL.id);
-            
-            const dadosExtras = {
-                tituloOriginal: PRODUTO_ATUAL.titulo,
-                referencia: PRODUTO_ATUAL.referencia || '',
-                listaCarros: PRODUTO_ATUAL.carros || '',
-                termoPesquisa: termoBusca
-            };
+    // 3. 🟢 VALIDAÇÃO DE ESTOQUE ANTES DE ADICIONAR
+    if ((qtdJaNoCarrinho + qtdQueroAdicionar) > estoqueMax) {
+        alert(`⚠️ ESTOQUE INSUFICIENTE!\n\nVocê já tem ${qtdJaNoCarrinho} no carrinho e quer adicionar +${qtdQueroAdicionar}.\nSó temos ${estoqueMax} unidades no total.`);
+        return; // Para tudo e não adiciona
+    }
 
-            if (index > -1) {
-                carrinho[index].quantidade += qtd;
-                carrinho[index].customMargin = MARGEM_ATUAL;
-                carrinho[index].termoPesquisa = termoBusca; 
-            } else {
-                carrinho.push({ 
-                    id: PRODUTO_ATUAL.id, 
-                    quantidade: qtd, 
-                    customMargin: MARGEM_ATUAL,
-                    preco: PRODUTO_ATUAL.preco_novo, 
-                    imagem: PRODUTO_ATUAL.imagem,
-                    ...dadosExtras 
-                });
-            }
-            
-            localStorage.setItem('nossoCarrinho', JSON.stringify(carrinho));
-            
-            if(typeof atualizarIconeCarrinho === 'function') atualizarIconeCarrinho();
-            
-            const btn = document.querySelector('.btn-buy-now');
-            const textoOriginal = btn.innerHTML;
-            
-            btn.innerHTML = '<i class="ph ph-check"></i> Adicionado!';
-            btn.style.background = '#27ae60';
-            
-            setTimeout(() => {
-                btn.innerHTML = textoOriginal; 
-                btn.style.background = ''; 
-            }, 2000);
-        }
+    const urlParams = new URLSearchParams(window.location.search);
+    const termoBusca = urlParams.get('q') || urlParams.get('search') || ''; 
+
+    const dadosExtras = {
+        tituloOriginal: PRODUTO_ATUAL.titulo,
+        referencia: PRODUTO_ATUAL.referencia || '',
+        listaCarros: PRODUTO_ATUAL.carros || '',
+        termoPesquisa: termoBusca
+    };
+
+    if (index > -1) {
+        carrinho[index].quantidade += qtdQueroAdicionar;
+        carrinho[index].customMargin = MARGEM_ATUAL;
+        carrinho[index].termoPesquisa = termoBusca; 
+    } else {
+        carrinho.push({ 
+            id: PRODUTO_ATUAL.id, 
+            quantidade: qtdQueroAdicionar, 
+            customMargin: MARGEM_ATUAL,
+            preco: PRODUTO_ATUAL.preco_novo, 
+            imagem: PRODUTO_ATUAL.imagem,
+            estoqueMax: estoqueMax, // Opcional: salva o maximo no carrinho pra validar lá também
+            ...dadosExtras 
+        });
+    }
+    
+    localStorage.setItem('nossoCarrinho', JSON.stringify(carrinho));
+    
+    if(typeof atualizarIconeCarrinho === 'function') atualizarIconeCarrinho();
+    
+    const btn = document.querySelector('.btn-buy-now');
+    const textoOriginal = btn.innerHTML;
+    
+    btn.innerHTML = '<i class="ph ph-check"></i> Adicionado!';
+    btn.style.background = '#27ae60';
+    
+    setTimeout(() => {
+        btn.innerHTML = textoOriginal; 
+        btn.style.background = ''; 
+    }, 2000);
+}
 
         // --- 4. SUGESTÕES ---
         function abrirModalSugestao() {

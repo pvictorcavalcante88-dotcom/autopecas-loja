@@ -160,9 +160,13 @@
     </div>
 </div>
 
-    <script>
+<script>
         const API_URL = ''; 
         let pedidosCache = []; 
+        
+        // 🟢 NOVAS VARIÁVEIS GLOBAIS (Necessárias para o modal funcionar)
+        let pedidoEmEdicaoId = null;
+        let itensEmEdicao = [];
 
         async function carregarPedidos() {
             const token = localStorage.getItem('adminToken');
@@ -174,7 +178,6 @@
                 pedidosCache = pedidos;
                 renderizarPedidos(pedidos);
             } catch (error) {
-                // Simulação caso esteja offline ou sem backend
                 console.log("Erro ao buscar ou offline:", error);
                 document.getElementById('order-list-container').innerHTML = '<p style="text-align:center; padding:20px;">Sem conexão com servidor (Simulação).</p>';
             }
@@ -192,8 +195,7 @@
                 const total = parseFloat(p.valorTotal).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
                 const data = new Date(p.createdAt).toLocaleDateString('pt-BR');
                 
-                // Define cores
-                let corStatus = '#95a5a6'; // Cinza
+                let corStatus = '#95a5a6';
                 let corBorda = '#bdc3c7';
                 
                 if(p.status === 'APROVADO') { corStatus = '#27ae60'; corBorda = '#27ae60'; }
@@ -202,19 +204,14 @@
                 if(p.status === 'PENDENTE') { corStatus = '#f39c12'; corBorda = '#f39c12'; }
                 if(p.status === 'DEVOLUCAO_PARCIAL') { corStatus = '#9b59b6'; corBorda = '#9b59b6'; }
 
-                // Tratamento de Itens (JSON ou String)
                 let listaItens = '';
                 try {
                     let itensObj = [];
-                    // Se for string JSON
                     if (typeof p.itens === 'string' && p.itens.startsWith('[')) {
                         itensObj = JSON.parse(p.itens);
-                    } 
-                    // Se já for objeto (alguns backends mandam direto)
-                    else if (typeof p.itens === 'object') {
+                    } else if (typeof p.itens === 'object') {
                         itensObj = p.itens;
-                    }
-                    else {
+                    } else {
                          itensObj = [{ nome: p.itens, qtd: 1, unitario: p.valorTotal }];
                     }
 
@@ -279,180 +276,152 @@
             details.classList.toggle('open');
         }
 
-async function mudarStatusPedido(id, novoStatus, elementoSelect) {
-    const statusAnterior = elementoSelect.getAttribute('data-prev') || 'PENDENTE';
+        // ============================================================
+        // 🟢 1. FUNÇÃO PRINCIPAL DE MUDANÇA DE STATUS (CORRIGIDA)
+        // ============================================================
+        async function mudarStatusPedido(id, novoStatus, elementoSelect) {
+            const statusAnterior = elementoSelect.getAttribute('data-prev') || 'PENDENTE';
 
-    // 1. SEGURANÇA: DEVOLUÇÃO PARCIAL
-    if (novoStatus === 'DEVOLUCAO_PARCIAL') {
-        const nota = prompt(
-            "⚠️ REGISTRO DE DEVOLUÇÃO ⚠️\n\n" +
-            "Digite abaixo qual item foi devolvido e o valor que você estornou (apenas para seu controle visual):",
-            "Ex: Devolveu 1 Amortecedor. Estorno de R$ 150,00 via Pix."
-        );
+            // SE FOR DEVOLUÇÃO, ABRE O MODAL E PARA O PROCESSO AQUI
+            if (novoStatus === 'DEVOLUCAO_PARCIAL') {
+                // Busca o pedido completo no cache para pegar os itens
+                const pedido = pedidosCache.find(p => p.id === id);
+                if(!pedido) return alert("Erro ao localizar pedido.");
 
-        if (nota === null) {
-            // Se clicar em Cancelar no prompt, volta o status anterior
-            elementoSelect.value = statusAnterior;
-            return;
-        }
-        // Dica: Futuramente você pode salvar essa 'nota' no banco de dados
-    }
+                abrirModalDevolucao(pedido, elementoSelect);
+                // Reseta o select visualmente até confirmar no modal
+                elementoSelect.value = statusAnterior; 
+                return; 
+            }
 
-    // 2. SEGURANÇA: CANCELAMENTO TOTAL
-    if (novoStatus === 'CANCELADO') {
-        const confirmacao = confirm(
-            "⚠️ ATENÇÃO: CANCELAMENTO TOTAL ⚠️\n\n" +
-            "Confirmar cancelamento de TODO o pedido?"
-        );
-        if (!confirmacao) {
-            elementoSelect.value = statusAnterior;
-            return; 
-        }
-    }
+            // LÓGICA PADRÃO PARA OUTROS STATUS
+            if (novoStatus === 'CANCELADO') {
+                if (!confirm("⚠️ Confirmar cancelamento TOTAL?")) {
+                    elementoSelect.value = statusAnterior; return; 
+                }
+            }
+            if (novoStatus === 'APROVADO' && statusAnterior !== 'APROVADO') {
+                if(!confirm("Confirmar pagamento recebido?")) {
+                    elementoSelect.value = statusAnterior; return;
+                }
+            }
 
-    // 3. SEGURANÇA: APROVAÇÃO
-    if (novoStatus === 'APROVADO' && statusAnterior !== 'APROVADO') {
-        if(!confirm("Confirmar recebimento do pagamento?")) {
-            elementoSelect.value = statusAnterior;
-            return;
-        }
-    }
-
-    // Atualiza a cor visualmente
-    atualizarCorSelect(elementoSelect, novoStatus);
-
-    try {
-        const token = localStorage.getItem('adminToken');
-        const res = await fetch(`${API_URL}/admin/orders/${id}/status`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ status: novoStatus }) // Envia DEVOLUCAO_PARCIAL
-        });
-
-        if (res.ok) {
-            elementoSelect.setAttribute('data-prev', novoStatus);
-        } else {
-            throw new Error("Erro na API");
-        }
-    } catch (e) { 
-        alert("Erro ao salvar status (Backend pode não suportar ainda, verifique logs).");
-        console.error(e);
-    }
-}
-
-// ============================================================
-// 2. FUNÇÕES DO MODAL DE DEVOLUÇÃO
-// ============================================================
-function abrirModalDevolucao(pedido, elementoSelect) {
-    pedidoEmEdicaoId = pedido.id;
-    const modal = document.getElementById('modal-devolucao');
-    const tbody = document.getElementById('lista-itens-devolucao');
-    tbody.innerHTML = '';
-
-    // Parse dos itens (garante que é array)
-    let lista = [];
-    try {
-        lista = typeof pedido.itens === 'string' ? JSON.parse(pedido.itens) : pedido.itens;
-    } catch(e) { lista = []; }
-    
-    // Salva clone para edição
-    itensEmEdicao = JSON.parse(JSON.stringify(lista));
-
-    // Renderiza a tabela
-    itensEmEdicao.forEach((item, index) => {
-        const preco = parseFloat(item.unitario || item.preco || 0);
-        
-        tbody.innerHTML += `
-            <tr style="border-bottom:1px solid #ddd;">
-                <td style="padding:10px;">${item.nome}</td>
-                <td style="text-align:center;">R$ ${preco.toFixed(2)}</td>
-                <td style="text-align:center;">${item.qtd}</td>
-                <td style="text-align:center;">
-                    <input type="number" min="0" max="${item.qtd}" value="${item.qtd}" 
-                        onchange="atualizarTotalModal(${index}, this.value)"
-                        style="width:60px; padding:5px; text-align:center; border:1px solid #ccc; border-radius:4px;">
-                </td>
-            </tr>
-        `;
-    });
-
-    atualizarCalculoTotal(); // Calcula o total inicial
-    modal.style.display = 'flex';
-}
-
-function atualizarTotalModal(index, novaQtd) {
-    // Atualiza o array temporário
-    itensEmEdicao[index].qtd = parseInt(novaQtd);
-    atualizarCalculoTotal();
-}
-
-function atualizarCalculoTotal() {
-    let total = 0;
-    itensEmEdicao.forEach(item => {
-        const preco = parseFloat(item.unitario || item.preco || 0);
-        const qtd = parseInt(item.qtd || 0);
-        total += (preco * qtd);
-    });
-    document.getElementById('novo-total-display').innerText = total.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
-    return total;
-}
-
-function fecharModalDevolucao() {
-    document.getElementById('modal-devolucao').style.display = 'none';
-    pedidoEmEdicaoId = null;
-}
-
-// ============================================================
-// 3. SALVAR A DEVOLUÇÃO NO BACKEND
-// ============================================================
-async function confirmarDevolucao() {
-    if(!pedidoEmEdicaoId) return;
-
-    // Remove itens com qtd 0 (pois foram devolvidos totalmente)
-    const itensFinais = itensEmEdicao.filter(i => i.qtd > 0);
-    const novoTotal = atualizarCalculoTotal(); // Recalcula o total final
-
-    if(!confirm("Confirma a atualização do pedido? \nIsso recalculará a comissão baseada apenas nos itens restantes.")) return;
-
-    try {
-        const token = localStorage.getItem('adminToken');
-        
-        // ENVIA: Status Novo + Nova Lista de Itens + Novo Total
-        const payload = {
-            status: 'DEVOLUCAO_PARCIAL',
-            itens: JSON.stringify(itensFinais), // Lista atualizada!
-            novoTotal: novoTotal
-        };
-
-        const res = await fetch(`${API_URL}/admin/orders/${pedidoEmEdicaoId}/status`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify(payload)
-        });
-
-        if (res.ok) {
-            alert("✅ Devolução processada com sucesso!");
-            fecharModalDevolucao();
-            carregarPedidos(); // Recarrega a tela para mostrar novos valores
-        } else {
-            alert("Erro ao salvar devolução.");
+            atualizarCorSelect(elementoSelect, novoStatus);
+            salvarStatusSimples(id, novoStatus, elementoSelect);
         }
 
-    } catch (e) { console.error(e); }
-}
+        // ============================================================
+        // 🟢 2. FUNÇÕES DO MODAL DE DEVOLUÇÃO
+        // ============================================================
+        function abrirModalDevolucao(pedido, elementoSelect) {
+            pedidoEmEdicaoId = pedido.id;
+            const modal = document.getElementById('modal-devolucao');
+            const tbody = document.getElementById('lista-itens-devolucao');
+            tbody.innerHTML = '';
 
-// Função auxiliar para salvar status normal (sem modal)
-async function salvarStatusSimples(id, status, elementoSelect) {
-    try {
-        const token = localStorage.getItem('adminToken');
-        await fetch(`${API_URL}/admin/orders/${id}/status`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ status: status })
-        });
-        elementoSelect.setAttribute('data-prev', status);
-    } catch(e) { console.error(e); }
-}
+            // Parse dos itens (garante que é array)
+            let lista = [];
+            try {
+                lista = typeof pedido.itens === 'string' ? JSON.parse(pedido.itens) : pedido.itens;
+            } catch(e) { lista = []; }
+            
+            // Salva clone para edição
+            itensEmEdicao = JSON.parse(JSON.stringify(lista));
+
+            // Renderiza a tabela
+            itensEmEdicao.forEach((item, index) => {
+                const preco = parseFloat(item.unitario || item.preco || 0);
+                
+                tbody.innerHTML += `
+                    <tr style="border-bottom:1px solid #ddd;">
+                        <td style="padding:10px;">${item.nome}</td>
+                        <td style="text-align:center;">R$ ${preco.toFixed(2)}</td>
+                        <td style="text-align:center;">${item.qtd}</td>
+                        <td style="text-align:center;">
+                            <input type="number" min="0" max="${item.qtd}" value="${item.qtd}" 
+                                onchange="atualizarTotalModal(${index}, this.value)"
+                                style="width:60px; padding:5px; text-align:center; border:1px solid #ccc; border-radius:4px;">
+                        </td>
+                    </tr>
+                `;
+            });
+
+            atualizarCalculoTotal(); // Calcula o total inicial
+            modal.style.display = 'flex';
+        }
+
+        function atualizarTotalModal(index, novaQtd) {
+            itensEmEdicao[index].qtd = parseInt(novaQtd);
+            atualizarCalculoTotal();
+        }
+
+        function atualizarCalculoTotal() {
+            let total = 0;
+            itensEmEdicao.forEach(item => {
+                const preco = parseFloat(item.unitario || item.preco || 0);
+                const qtd = parseInt(item.qtd || 0);
+                total += (preco * qtd);
+            });
+            document.getElementById('novo-total-display').innerText = total.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+            return total;
+        }
+
+        function fecharModalDevolucao() {
+            document.getElementById('modal-devolucao').style.display = 'none';
+            pedidoEmEdicaoId = null;
+        }
+
+        // ============================================================
+        // 🟢 3. SALVAR A DEVOLUÇÃO NO BACKEND
+        // ============================================================
+        async function confirmarDevolucao() {
+            if(!pedidoEmEdicaoId) return;
+
+            // Remove itens com qtd 0 (pois foram devolvidos totalmente)
+            const itensFinais = itensEmEdicao.filter(i => i.qtd > 0);
+            const novoTotal = atualizarCalculoTotal(); // Recalcula o total final
+
+            if(!confirm("Confirma a atualização do pedido? \nIsso recalculará a comissão baseada apenas nos itens restantes.")) return;
+
+            try {
+                const token = localStorage.getItem('adminToken');
+                
+                // ENVIA: Status Novo + Nova Lista de Itens + Novo Total
+                const payload = {
+                    status: 'DEVOLUCAO_PARCIAL',
+                    itens: JSON.stringify(itensFinais), // Lista atualizada!
+                    novoTotal: novoTotal
+                };
+
+                const res = await fetch(`${API_URL}/admin/orders/${pedidoEmEdicaoId}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    alert("✅ Devolução processada com sucesso!");
+                    fecharModalDevolucao();
+                    carregarPedidos(); // Recarrega a tela para mostrar novos valores
+                } else {
+                    alert("Erro ao salvar devolução.");
+                }
+
+            } catch (e) { console.error(e); }
+        }
+
+        // Função auxiliar para salvar status normal (sem modal)
+        async function salvarStatusSimples(id, status, elementoSelect) {
+            try {
+                const token = localStorage.getItem('adminToken');
+                await fetch(`${API_URL}/admin/orders/${id}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ status: status })
+                });
+                elementoSelect.setAttribute('data-prev', status);
+            } catch(e) { console.error(e); }
+        }
 
         function atualizarCorSelect(elemento, status) {
             let cor = '#f39c12';
@@ -475,10 +444,8 @@ async function salvarStatusSimples(id, status, elementoSelect) {
         });
 
         // ============================================================
-        // 🟢 NOVAS FUNÇÕES DE FILTRO
+        // FILTROS DE DATA
         // ============================================================
-        
-        // 1. Função auxiliar para corrigir fuso horário
         function getDataLocal(dataString) {
             const dataObj = new Date(dataString);
             const ano = dataObj.getFullYear();
@@ -487,7 +454,6 @@ async function salvarStatusSimples(id, status, elementoSelect) {
             return `${ano}-${mes}-${dia}`;
         }
 
-        // 2. Função de Filtrar
         function filtrarPedidosAdmin() {
             const inicio = document.getElementById('filtro-inicio').value;
             const fim = document.getElementById('filtro-fim').value;
@@ -497,31 +463,22 @@ async function salvarStatusSimples(id, status, elementoSelect) {
                 return;
             }
 
-            // Usa o seu 'pedidosCache' que já está salvo na memória
             if (pedidosCache.length > 0) {
                 const filtrados = pedidosCache.filter(p => {
-                    // Pega a data de criação do pedido
                     const dataVenda = getDataLocal(p.createdAt); 
-                    // Compara string com string (Ex: "2023-12-30")
                     return dataVenda >= inicio && dataVenda <= fim;
                 });
-                
                 renderizarPedidos(filtrados);
             }
         }
 
-        // 3. Função de Limpar
         function limparFiltroAdmin() {
             document.getElementById('filtro-inicio').value = '';
             document.getElementById('filtro-fim').value = '';
-            // Restaura a lista completa original
             renderizarPedidos(pedidosCache);
         }
 
-
-
         function logout() { localStorage.removeItem('adminToken'); window.location.href = 'admin_login.html'; }
-
         
         carregarPedidos();
     </script>

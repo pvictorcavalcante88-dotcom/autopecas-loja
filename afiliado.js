@@ -92,7 +92,7 @@ async function carregarDashboardCompleto() {
 
         const elQtd = document.getElementById('qtd-vendas');
         if(elQtd && dados.vendas) {
-            const aprovadas = dados.vendas.filter(v => v.status === 'APROVADO' || v.status === 'ENTREGUE').length;
+            const aprovadas = dados.vendas.filter(v => v.status === 'APROVADO' || v.status === 'ENTREGUE' || v.status === 'DEVOLUCAO_PARCIAL').length;
             elQtd.innerText = aprovadas;
         }
 
@@ -178,8 +178,9 @@ function calcularVendasPorPeriodo() {
 
     if (window.TODAS_VENDAS) {
         window.TODAS_VENDAS.forEach(v => {
-            if (v.status === 'APROVADO' || v.status === 'ENTREGUE') {
-                // CORREÇÃO AQUI TAMBÉM:
+            // CORREÇÃO: Adicionamos 'DEVOLUCAO_PARCIAL' aqui
+            if (v.status === 'APROVADO' || v.status === 'ENTREGUE' || v.status === 'DEVOLUCAO_PARCIAL') {
+                
                 const dataObj = new Date(v.createdAt);
                 const ano = dataObj.getFullYear();
                 const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
@@ -187,6 +188,7 @@ function calcularVendasPorPeriodo() {
                 const dataVendaStr = `${ano}-${mes}-${dia}`;
 
                 if (dataVendaStr >= inicioStr && dataVendaStr <= fimStr) {
+                    // O backend já mandou o 'valorTotal' atualizado (reduzido), então é só somar
                     totalPeriodo += parseFloat(v.valorTotal || 0);
                 }
             }
@@ -221,6 +223,7 @@ function preencherTabelaVendas(elementId, vendas) {
         if(v.status === 'PENDENTE') statusStyle = "background:#fff3cd; color:#856404;";
         if(v.status === 'CANCELADO') statusStyle = "background:#f8d7da; color:#721c24;";
         if(v.status === 'PAGO') statusStyle = "background:#cce5ff; color:#004085;";
+        if(v.status === 'DEVOLUCAO_PARCIAL') statusStyle = "background:#e1bee7; color:#4a148c;";
 
         const tr = document.createElement('tr');
         tr.innerHTML = `

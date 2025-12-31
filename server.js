@@ -541,7 +541,7 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
         if (!pedidoAntigo) return res.status(404).json({ erro: "Pedido não encontrado" });
 
         // =================================================================================
-        // 1. BAIXA DE ESTOQUE (APROVADO)
+        // 1. BAIXA DE ESTOQUE (QUANDO APROVA)
         // =================================================================================
         if (status === 'APROVADO' && pedidoAntigo.status !== 'APROVADO') {
             try {
@@ -560,7 +560,7 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
         }
 
         // =================================================================================
-        // 2. LIBERAR COMISSÃO (APROVADO)
+        // 2. LIBERAR COMISSÃO (QUANDO APROVA)
         // =================================================================================
         if (status === 'APROVADO' && pedidoAntigo.status !== 'APROVADO') {
             if (pedidoAntigo.afiliadoId && pedidoAntigo.comissaoGerada > 0) {
@@ -572,20 +572,17 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
         }
 
         // =================================================================================
-        // 3. ESTORNO TOTAL (CANCELADO) - CORREÇÃO AQUI 👇
+        // 3. ESTORNO TOTAL (QUANDO CANCELA PEDIDO JÁ APROVADO/DEVOLVIDO)
         // =================================================================================
-        // Aceita cancelamento vindo de APROVADO, ENTREGUE ou DEVOLUCAO_PARCIAL
         if (status === 'CANCELADO' && (pedidoAntigo.status === 'APROVADO' || pedidoAntigo.status === 'ENTREGUE' || pedidoAntigo.status === 'DEVOLUCAO_PARCIAL')) {
-            
-            // 3.1 Tira o dinheiro (comissão restante) do afiliado
+            // Tira o dinheiro do afiliado
             if (pedidoAntigo.afiliadoId && pedidoAntigo.comissaoGerada > 0) {
                 await prisma.afiliado.update({
                     where: { id: pedidoAntigo.afiliadoId },
                     data: { saldo: { decrement: pedidoAntigo.comissaoGerada } }
                 });
             }
-
-            // 3.2 Devolve estoque (Itens restantes)
+            // Devolve TUDO ao estoque
             try {
                 const listaItens = typeof pedidoAntigo.itens === 'string' ? JSON.parse(pedidoAntigo.itens) : pedidoAntigo.itens;
                 if (Array.isArray(listaItens)) {
@@ -593,7 +590,7 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
                         if(item.id) {
                             await prisma.produto.update({
                                 where: { id: item.id },
-                                data: { estoque: { increment: item.qtd } } // Soma de volta o que sobrou
+                                data: { estoque: { increment: item.qtd } }
                             });
                         }
                     }
@@ -602,21 +599,21 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
         }
 
         // =================================================================================
-        // 4. DEVOLUÇÃO PARCIAL (LÓGICA ANTERIOR)
+        // 4. DEVOLUÇÃO PARCIAL (FINANCEIRO + ESTOQUE AUTOMÁTICO)
         // =================================================================================
         let dadosAtualizacao = { status: status }; 
         
         if (status === 'DEVOLUCAO_PARCIAL') {
             if (novoTotal !== undefined && itens) {
                 
-                // Se o afiliado JÁ recebeu (inclusive se já era Devolução Parcial e mudou de novo), ajusta
+                // A. ESTORNO FINANCEIRO DO AFILIADO (PROPORCIONAL)
                 if (pedidoAntigo.afiliadoId && (pedidoAntigo.status === 'APROVADO' || pedidoAntigo.status === 'ENTREGUE' || pedidoAntigo.status === 'DEVOLUCAO_PARCIAL')) {
                     const valorAntigo = parseFloat(pedidoAntigo.valorTotal);
                     const valorNovo = parseFloat(novoTotal);
-                    const diferenca = valorAntigo - valorNovo;
+                    const diferencaValor = valorAntigo - valorNovo;
                     
-                    if (diferenca > 0 && valorAntigo > 0) {
-                        const porcentagemDevolvida = diferenca / valorAntigo;
+                    if (diferencaValor > 0 && valorAntigo > 0) {
+                        const porcentagemDevolvida = diferencaValor / valorAntigo;
                         const valorEstorno = pedidoAntigo.comissaoGerada * porcentagemDevolvida;
 
                         await prisma.afiliado.update({
@@ -629,6 +626,35 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
                     }
                 }
 
+                // 🟢 B. ESTORNO AUTOMÁTICO DE ESTOQUE (PRODUTOS) 🟢
+                try {
+                    const listaAntiga = typeof pedidoAntigo.itens === 'string' ? JSON.parse(pedidoAntigo.itens) : pedidoAntigo.itens;
+                    const listaNova = typeof itens === 'string' ? JSON.parse(itens) : itens;
+
+                    // Percorre a lista original para ver o que sumiu ou diminuiu
+                    for (const itemAntigo of listaAntiga) {
+                        // Procura esse mesmo item na lista nova (pelo ID ou Nome se ID falhar)
+                        // Se o item não existir na lista nova, assumimos qtd = 0 (foi totalmente devolvido)
+                        const itemNovo = listaNova.find(i => (i.id && i.id === itemAntigo.id) || i.nome === itemAntigo.nome) || { qtd: 0 };
+                        
+                        // Calcula a diferença
+                        const qtdAntiga = parseInt(itemAntigo.qtd);
+                        const qtdNova = parseInt(itemNovo.qtd);
+                        const qtdDevolvida = qtdAntiga - qtdNova;
+
+                        // Se devolveu algo (diferença positiva), devolve pro estoque
+                        if (qtdDevolvida > 0 && itemAntigo.id) {
+                            await prisma.produto.update({
+                                where: { id: itemAntigo.id },
+                                data: { estoque: { increment: qtdDevolvida } }
+                            });
+                        }
+                    }
+                } catch (erroEstoque) {
+                    console.error("Erro ao devolver estoque parcial:", erroEstoque);
+                }
+
+                // C. PREPARA DADOS PARA SALVAR NO PEDIDO
                 dadosAtualizacao.itens = typeof itens === 'object' ? JSON.stringify(itens) : itens;
                 dadosAtualizacao.valorTotal = parseFloat(novoTotal);
             }

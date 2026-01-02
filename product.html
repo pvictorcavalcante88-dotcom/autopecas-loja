@@ -292,7 +292,27 @@
                 let desc = "";
                 if(PRODUTO_ATUAL.referencia) desc += `<strong>Ref:</strong> ${PRODUTO_ATUAL.referencia}<br>`;
                 if(PRODUTO_ATUAL.fabricante) desc += `<strong>Marca:</strong> ${PRODUTO_ATUAL.fabricante}<br>`;
-                if(PRODUTO_ATUAL.carros) desc += `<strong>Aplicação:</strong> ${PRODUTO_ATUAL.carros}<br>`;
+                if(PRODUTO_ATUAL.carros) {
+                    const textoApp = PRODUTO_ATUAL.carros;
+                    const limite = 60; // Quantidade de letras antes de cortar
+
+                    if (textoApp.length > limite) {
+                        // Corta o texto e prepara o "Ver Mais"
+                        const parteVisivel = textoApp.substring(0, limite);
+                        const parteOculta = textoApp.substring(limite);
+                        
+                        desc += `
+                            <strong>Aplicação:</strong> 
+                            <span>${parteVisivel}</span><span id="app-oculta" style="display:none;">${parteOculta}</span>
+                            <span onclick="toggleAplicacao()" id="btn-app-toggle" style="color:#3498db; cursor:pointer; font-weight:bold; font-size:0.9em;">
+                                ... ver mais
+                            </span><br>
+                        `;
+                    } else {
+                        // Se for pequeno, mostra normal
+                        desc += `<strong>Aplicação:</strong> ${textoApp}<br>`;
+                    }
+                }
                 if(PRODUTO_ATUAL.motor) desc += `<strong>Motor:</strong> ${PRODUTO_ATUAL.motor}`;
                 
                 document.getElementById('prod-desc').innerHTML = desc || "Sem descrição técnica.";

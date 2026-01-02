@@ -556,6 +556,24 @@ if (estoqueAtual <= 0) {
                 btn.disabled = false;
             }
         }
+
+        // Função para abrir/fechar a lista de carros
+        window.toggleAplicacao = function() {
+            const spanOculto = document.getElementById('app-oculta');
+            const btn = document.getElementById('btn-app-toggle');
+            
+            if (!spanOculto || !btn) return;
+
+            if (spanOculto.style.display === 'none') {
+                spanOculto.style.display = 'inline'; // Mostra tudo
+                btn.innerHTML = ' (ver menos)'; // Muda o texto do botão
+                btn.style.color = '#7f8c8d'; // Deixa cinza discreto
+            } else {
+                spanOculto.style.display = 'none'; // Esconde de novo
+                btn.innerHTML = ' ... ver mais';
+                btn.style.color = '#3498db'; // Volta a ser azul
+            }
+        }
     </script>
 </body>
 </html>

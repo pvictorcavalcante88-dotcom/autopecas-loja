@@ -1,7 +1,6 @@
-// services/asaasService.js
 const axios = require('axios');
 
-// No .env: ASAAS_API_KEY=sua_chave_aqui e ASAAS_URL=https://sandbox.asaas.com/api/v3 (para testes)
+// No .env: ASAAS_API_KEY e ASAAS_URL
 const ASAAS_URL = process.env.ASAAS_URL || 'https://sandbox.asaas.com/api/v3';
 const ASAAS_KEY = process.env.ASAAS_API_KEY;
 
@@ -12,30 +11,43 @@ const api = axios.create({
 
 async function criarClienteAsaas(cliente) {
     try {
-        // 1. Tenta achar o cliente pelo CPF/CNPJ para não duplicar
-        const busca = await api.get(`/customers?cpfCnpj=${cliente.documento}`);
+        // 1. Limpeza de dados (O PULO DO GATO 😺)
+        // Remove tudo que não for número do CPF e Telefone
+        const cpfLimpo = cliente.documento.replace(/\D/g, '');
+        const telefoneLimpo = cliente.telefone.replace(/\D/g, '');
+
+        // 2. Tenta achar o cliente pelo CPF/CNPJ para não duplicar
+        const busca = await api.get(`/customers?cpfCnpj=${cpfLimpo}`);
         if (busca.data.data && busca.data.data.length > 0) {
             return busca.data.data[0].id;
         }
 
-        // 2. Se não achar, cria um novo
+        // 3. Se não achar, cria um novo
         const novo = await api.post('/customers', {
             name: cliente.nome,
-            cpfCnpj: cliente.documento,
+            cpfCnpj: cpfLimpo,                 // Envia limpo
             email: cliente.email,
-            mobilePhone: cliente.telefone,
-            notificationDisabled: false // Asaas envia email/sms automático (opcional)
+            mobilePhone: telefoneLimpo,        // Envia limpo (sem parênteses)
+            notificationDisabled: false 
         });
         return novo.data.id;
+
     } catch (error) {
-        console.error("Erro criar cliente Asaas:", error.response?.data || error.message);
-        throw new Error("Falha ao cadastrar cliente no pagamento.");
+        // AQUI ESTÁ A MELHORIA NO LOG DE ERRO:
+        const erroDetalhe = error.response?.data?.errors 
+            ? JSON.stringify(error.response.data.errors) 
+            : error.message;
+            
+        console.error("❌ ERRO ASAAS (CRIAR CLIENTE):", erroDetalhe);
+        
+        // Joga o erro detalhado para o frontend ver
+        throw new Error(`Asaas recusou o cadastro: ${erroDetalhe}`);
     }
 }
 
 async function criarCobrancaPix(cliente, valorTotal, descricao, walletIdAfiliado = null, comissaoAfiliado = 0) {
     try {
-        // 1. Garante que o cliente existe no Asaas
+        // 1. Garante que o cliente existe (ou cria)
         const customerId = await criarClienteAsaas(cliente);
 
         // 2. Monta o objeto de cobrança
@@ -47,13 +59,11 @@ async function criarCobrancaPix(cliente, valorTotal, descricao, walletIdAfiliado
             description: descricao,
         };
 
-        // 🟢 3. LÓGICA DE SPLIT (SE TIVER AFILIADO)
-        // Se passarmos o walletId (chave da carteira do afiliado no Asaas), ele divide
+        // 3. Lógica de Split
         if (walletIdAfiliado && comissaoAfiliado > 0) {
             payload.split = [{
                 walletId: walletIdAfiliado,
-                fixedValue: comissaoAfiliado, // Valor em R$ que vai pro afiliado
-                // Ou use 'percentualValue' se preferir %
+                fixedValue: comissaoAfiliado, 
             }];
         }
 
@@ -61,19 +71,24 @@ async function criarCobrancaPix(cliente, valorTotal, descricao, walletIdAfiliado
         const response = await api.post('/payments', payload);
         const idCobranca = response.data.id;
 
-        // 5. Pega o QRCode e o Código Copia e Cola
+        // 5. Pega o QRCode
         const qrResponse = await api.get(`/payments/${idCobranca}/pixQrCode`);
         
         return {
             id: idCobranca,
-            encodedImage: qrResponse.data.encodedImage, // Imagem base64 do QR
-            payload: qrResponse.data.payload, // Código Copia e Cola
+            encodedImage: qrResponse.data.encodedImage,
+            payload: qrResponse.data.payload,
             expirationDate: qrResponse.data.expirationDate
         };
 
     } catch (error) {
-        console.error("Erro Cobrança Pix:", error.response?.data || error.message);
-        throw error;
+        // Melhoria no Log aqui também
+        const erroDetalhe = error.response?.data?.errors 
+            ? JSON.stringify(error.response.data.errors) 
+            : error.message;
+
+        console.error("❌ ERRO ASAAS (COBRANÇA):", erroDetalhe);
+        throw new Error(`Erro ao gerar Pix: ${erroDetalhe}`);
     }
 }
 

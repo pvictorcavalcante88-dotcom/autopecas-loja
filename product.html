@@ -141,12 +141,12 @@
                 <div class="detail-old-price" id="prod-old-price"></div>
                 <div class="detail-price" id="prod-price">R$ ...</div>
                 <div class="detail-installments">em até 12x no cartão</div>
+            
             </div>
 
-            <p id="prod-estoque" style="font-weight: bold; margin-top: 15px; font-size: 0.95rem; color: #7f8c8d;">Verificando estoque...</p>
             <div id="affiliate-area" class="affiliate-profit-box" style="display:none;">
-
-            <div id="affiliate-area" class="affiliate-profit-box" style="display:none;">
+                <p id="prod-estoque" style="font-weight: bold; margin-top: 15px; font-size: 0.95rem; color: #7f8c8d;">Verificando estoque...</p>
+                <div id="affiliate-area" class="affiliate-profit-box" style="display:none;">
                 <h4 style="margin-bottom:10px; color:#2c3e50;"><i class="ph ph-currency-circle-dollar"></i> Painel do Parceiro</h4>
                 <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
                     <label>Sua Margem:</label>
@@ -420,7 +420,7 @@ if (estoqueAtual <= 0) {
             atualizarPrecoTela();
         }
 
-        function adicionarAoCarrinhoAtual() {
+       function adicionarAoCarrinhoAtual() {
     if(!PRODUTO_ATUAL) return;
 
     const estoqueMax = parseInt(PRODUTO_ATUAL.estoque || 0);

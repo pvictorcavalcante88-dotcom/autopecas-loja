@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
@@ -5,6 +6,8 @@ const jwt = require('jsonwebtoken');
 const path = require('path'); 
 const multer = require('multer');
 const fs = require('fs');
+
+const { criarCobrancaPix } = require('./services/asaasService');
 
 const prisma = new PrismaClient();
 const app = express();
@@ -918,6 +921,70 @@ app.get('/admin/saques-pendentes', authenticateToken, async (req, res) => {
         });
         res.json(saques);
     } catch (e) { res.status(500).json({ erro: "Erro" }); }
+});
+
+// ROTA DE CHECKOUT (GERAR PIX)
+app.post('/api/checkout/pix', async (req, res) => {
+    try {
+        const { itens, cliente, afiliadoId } = req.body;
+
+        // 1. VALIDAÇÃO DE SEGURANÇA (Recalcular preço real)
+        let valorTotalReal = 0;
+        let descricaoPedido = "Pedido AutoPeças: ";
+
+        for (const item of itens) {
+            // Busca o produto no SEU banco de dados
+            const prodBanco = await prisma.produto.findUnique({ where: { id: item.id } });
+            
+            if (!prodBanco) return res.status(400).json({ erro: `Produto ID ${item.id} indisponível.` });
+            
+            // Verifica estoque antes de cobrar
+            if (prodBanco.estoque < item.quantidade) {
+                return res.status(400).json({ erro: `Estoque insuficiente para ${prodBanco.titulo}.` });
+            }
+
+            // Soma usando o preço do banco (segurança)
+            valorTotalReal += (prodBanco.preco_novo * item.quantidade);
+            descricaoPedido += `${item.quantidade}x ${prodBanco.titulo}, `;
+        }
+
+        // 2. VERIFICA AFILIADO (Para o Split)
+        let walletAfiliado = null;
+        let comissao = 0;
+
+        if (afiliadoId) {
+            const afiliado = await prisma.afiliado.findUnique({ where: { id: afiliadoId } });
+            // Aqui você precisaria ter salvo o 'walletId' do Asaas do afiliado no cadastro dele
+            // Por enquanto, vamos deixar null ou simular
+            // walletAfiliado = afiliado.asaasWalletId; 
+            
+            // Calcula a comissão (Ex: 10% ou baseado na margem personalizada)
+            // comissao = valorTotalReal * 0.10; 
+        }
+
+        // 3. CHAMA O ASAAS
+        const dadosPix = await criarCobrancaPix(
+            cliente, 
+            valorTotalReal, 
+            descricaoPedido,
+            walletAfiliado, 
+            comissao
+        );
+
+        // 4. (OPCIONAL) CRIAR O PEDIDO NO BANCO COMO "PENDENTE" AGORA
+        // Você pode criar o pedido aqui com status 'AGUARDANDO_PAGAMENTO'
+        // e salvar o ID do Asaas (dadosPix.id) nele para dar baixa depois via Webhook.
+
+        res.json({
+            sucesso: true,
+            pix: dadosPix,
+            total: valorTotalReal
+        });
+
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ erro: "Erro ao gerar pagamento." });
+    }
 });
 
 const PORT = process.env.PORT || 3000;

@@ -443,9 +443,14 @@ async function carregarPaginaCheckout() {
     } else {
         // --- VISÃO DO CLIENTE (Pagar) ---
         const btnPagar = document.createElement('button');
+        btnPagar.id = "btn-finalizar-pix"; // Damos um ID para manipular o texto depois
         btnPagar.className = "btn-place-order"; 
-        btnPagar.innerHTML = `✅ Finalizar Pedido`;
-        btnPagar.onclick = () => finalizarPedido(itensParaProcessar); 
+        btnPagar.style.background = "#27ae60"; // Verde Asaas
+        btnPagar.innerHTML = `<i class="ph ph-qr-code"></i> Gerar PIX e Pagar`;
+        
+        // AQUI ESTÁ O PULO DO GATO: Chama a função nova
+        btnPagar.onclick = () => finalizarCompraAsaas(); 
+        
         container.appendChild(btnPagar);
     }
     
@@ -481,7 +486,7 @@ async function salvarOrcamentoSilencioso(origem = 'MANUAL') {
     const total = itens.reduce((acc, item) => acc + (item.preco * item.quantidade), 0);
     
     // Pega nome
-    const inputNome = document.getElementById('email'); 
+    const inputNome = document.getElementById('nome_cliente'); 
     const nomeCliente = inputNome && inputNome.value ? inputNome.value : "Cliente";
     const nomeOrcamento = `Orç. ${nomeCliente} (${origem})`;
 
@@ -563,7 +568,7 @@ async function gerarPDFCustom() {
 
     // --- 🟢 CAPTURA OS DADOS DO CLIENTE DO FORMULÁRIO HTML ---
     // Note que estou usando os IDs que definimos no checkout.html
-    const cliNome = document.getElementById('email').value || "Cliente Não Identificado"; // O ID do nome é 'email' no seu HTML
+    const cliNome = document.getElementById('nome_cliente').value || "Cliente Não Identificado"; // O ID do nome é 'email' no seu HTML
     const cliEndereco = document.getElementById('rua').value || "";
     const cliTelefone = document.getElementById('input-telefone') ? document.getElementById('input-telefone').value : "";
     const cliEmail = document.getElementById('input-email-contato') ? document.getElementById('input-email-contato').value : "";
@@ -879,3 +884,98 @@ async function buscarProdutosPromocao() {
 async function carregarMargemDoCodigo(c) { try { const res = await fetch(`${API_URL}/afiliado/check/${c}`); if(res.ok) { const d = await res.json(); if(d.margem) FATOR_GLOBAL = 1 + (d.margem/100); } } catch(e) {} }
 function ativarModoParceiro(afiliado) { const btnLogin = document.getElementById('btn-login-header'); if (btnLogin) { btnLogin.innerHTML = `<i class="ph ph-sign-out"></i><span>Sair</span>`; btnLogin.href = "#"; btnLogin.style.color = "#e67e22"; btnLogin.onclick = (e) => { e.preventDefault(); if(confirm(`Sair da conta de parceiro?`)) { localStorage.removeItem('afiliadoLogado'); localStorage.removeItem('minhaMargem'); window.location.reload(); } }; } const barraAntiga = document.getElementById('barra-parceiro'); if (barraAntiga) barraAntiga.remove(); const barra = document.createElement('div'); barra.id = "barra-parceiro"; barra.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 45px; background: linear-gradient(90deg, #1a252f 0%, #2c3e50 100%); color: white; z-index: 999999; display: flex; justify-content: space-between; align-items: center; padding: 0 5%; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-family: sans-serif; box-sizing: border-box;`; barra.innerHTML = `<div style="display:flex; align-items:center; gap: 10px;"><div style="background:rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px; display:flex; align-items:center; gap:6px;"><span style="font-size: 1.1rem;">🦊</span><span style="font-size: 0.9rem; color: #ecf0f1;">Olá, <strong>${afiliado.nome}</strong></span></div><span style="font-size: 0.75rem; background:#27ae60; padding:2px 6px; border-radius:4px; font-weight:bold;">PARCEIRO ATIVO</span></div><a href="afiliado_dashboard.html" style="text-decoration: none; color: white; background: rgba(255,255,255,0.15); padding: 6px 15px; border-radius: 30px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,0.1);"><i class="ph ph-gauge"></i><span>Meu Painel</span></a>`; document.body.prepend(barra); document.body.style.paddingTop = "45px"; }
 let slideIndex = 0; let slideInterval; function iniciarSlider() { const slides = document.querySelectorAll('.slide'); if(slides.length > 0) { mostrarSlide(slideIndex); slideInterval = setInterval(() => mudarSlide(1), 5000); } } function mudarSlide(n) { slideIndex += n; mostrarSlide(slideIndex); clearInterval(slideInterval); slideInterval = setInterval(() => mudarSlide(1), 5000); } function mostrarSlide(n) { const slides = document.querySelectorAll('.slide'); if (slides.length === 0) return; if (n >= slides.length) slideIndex = 0; if (n < 0) slideIndex = slides.length - 1; slides.forEach(slide => slide.classList.remove('active')); slides[slideIndex].classList.add('active'); } window.mudarSlide = mudarSlide; window.iniciarSlider = iniciarSlider;
+
+// 🟢 FUNÇÃO DE FINALIZAR COM ASAAS
+async function finalizarCompraAsaas() {
+    // 1. Pega os dados do formulário (AJUSTE OS IDS CONFORME SEU HTML)
+    // No seu HTML atual, o campo NOME tem id="nome_cliente", verifique isso!
+    const nome = document.getElementById('nome_cliente').value; 
+    const emailContato = document.getElementById('input-email-contato').value;
+    const telefone = document.getElementById('input-telefone').value;
+    const endereco = document.getElementById('rua').value;
+    
+    // O CPF é obrigatório para o Asaas.
+    // Se você não tem um campo fixo de CPF no form principal, use o da busca (doc-busca) ou crie um.
+    // Vou tentar pegar do campo de busca ou pedir num prompt se tiver vazio.
+    let doc = document.getElementById('doc-busca') ? document.getElementById('doc-busca').value : '';
+    
+    if (!nome || !endereco || !telefone) {
+        return alert("Por favor, preencha Nome, Endereço e Telefone.");
+    }
+
+    // Validação simples de CPF se estiver vazio
+    if (!doc) {
+        doc = prompt("Para gerar o PIX, precisamos do seu CPF/CNPJ (Apenas números):");
+        if(!doc) return;
+    }
+
+    // 2. Prepara o botão
+    const btn = document.getElementById('btn-finalizar-pix');
+    if(btn) {
+        btn.innerHTML = "Processando...";
+        btn.disabled = true;
+    }
+
+    // 3. Pega o carrinho
+    const carrinho = JSON.parse(localStorage.getItem('nossoCarrinho') || '[]');
+    if(carrinho.length === 0) return alert("Carrinho vazio!");
+
+    try {
+        // 4. Prepara Payload
+        const payload = {
+            cliente: { 
+                nome: nome, 
+                documento: doc.replace(/\D/g,''), // Remove pontos
+                email: emailContato || 'cliente@sememail.com', 
+                telefone: telefone, 
+                endereco: endereco 
+            },
+            itens: carrinho.map(i => ({ id: i.id, quantidade: i.quantidade })),
+            afiliadoId: null
+        };
+
+        // Verifica se tem afiliado logado
+        const afLogado = localStorage.getItem('afiliadoLogado');
+        if(afLogado) {
+            const dadosAf = JSON.parse(afLogado);
+            payload.afiliadoId = dadosAf.id;
+        }
+
+        // 5. Envia para o Backend
+        // Ajuste a URL se necessário
+        const API_URL = ''; 
+        const res = await fetch(`${API_URL}/api/checkout/pix`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+            // SUCESSO! Abre o modal
+            mostrarModalPix(data.pix);
+            localStorage.removeItem('nossoCarrinho'); // Limpa carrinho
+        } else {
+            alert("Erro: " + (data.erro || "Falha no pagamento."));
+            if(btn) { btn.disabled = false; btn.innerHTML = "Tentar Novamente"; }
+        }
+
+    } catch (e) {
+        console.error(e);
+        alert("Erro de conexão.");
+        if(btn) { btn.disabled = false; btn.innerHTML = "Tentar Novamente"; }
+    }
+}
+
+// Funções auxiliares do Modal
+function mostrarModalPix(pixData) {
+    document.getElementById('pix-img').src = `data:image/png;base64,${pixData.encodedImage}`;
+    document.getElementById('pix-cola').innerText = pixData.payload;
+    document.getElementById('modal-pix').style.display = 'flex';
+}
+
+function copiarCodigo() {
+    const codigo = document.getElementById('pix-cola').innerText;
+    navigator.clipboard.writeText(codigo).then(() => alert("Copiado!"));
+}

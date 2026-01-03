@@ -886,18 +886,21 @@ function ativarModoParceiro(afiliado) { const btnLogin = document.getElementById
 let slideIndex = 0; let slideInterval; function iniciarSlider() { const slides = document.querySelectorAll('.slide'); if(slides.length > 0) { mostrarSlide(slideIndex); slideInterval = setInterval(() => mudarSlide(1), 5000); } } function mudarSlide(n) { slideIndex += n; mostrarSlide(slideIndex); clearInterval(slideInterval); slideInterval = setInterval(() => mudarSlide(1), 5000); } function mostrarSlide(n) { const slides = document.querySelectorAll('.slide'); if (slides.length === 0) return; if (n >= slides.length) slideIndex = 0; if (n < 0) slideIndex = slides.length - 1; slides.forEach(slide => slide.classList.remove('active')); slides[slideIndex].classList.add('active'); } window.mudarSlide = mudarSlide; window.iniciarSlider = iniciarSlider;
 
 function calcularTotalVisual(carrinho) {
-        let total = 0;
-        // Percorre para somar visualmente (o backend recalcula o real por segurança)
-        carrinho.forEach(item => {
-            let preco = parseFloat(item.preco);
-            // Se tiver margem customizada salva no item, aplica (apenas visual)
-            if(item.customMargin) {
-                preco = preco * (1 + (item.customMargin / 100));
-            }
-            total += (preco * item.quantidade);
-        });
-        document.getElementById('cart-total').innerText = total.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
-    }
+    let total = 0;
+    carrinho.forEach(item => {
+        let precoBase = parseFloat(item.preco); // Preço salvo no carrinho
+        let margem = item.customMargin || 0;
+        
+        // Aplica margem
+        let precoComMargem = precoBase * (1 + (margem / 100));
+        
+        total += (precoComMargem * item.quantidade);
+    });
+    
+    // Atualiza o HTML
+    const elTotal = document.getElementById('cart-total');
+    if(elTotal) elTotal.innerText = total.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+}
 
 // 🟢 FUNÇÃO DE FINALIZAR COM ASAAS
 async function finalizarCompraAsaas() {
@@ -932,9 +935,19 @@ async function finalizarCompraAsaas() {
 
     // 3. Pega o carrinho
     const carrinho = JSON.parse(localStorage.getItem('nossoCarrinho') || '[]');
-    if(carrinho.length === 0) return alert("Carrinho vazio!");
+    if (carrinho.length > 0) {
+    calcularTotalVisual(carrinho);
+}
 
     try {
+
+        // 🟢 ATUALIZAÇÃO AQUI: Mandar a 'customMargin' junto
+            const itensParaEnviar = carrinho.map(i => ({ 
+                id: i.id, 
+                quantidade: i.quantidade,
+                customMargin: i.customMargin || 0 // Manda a margem (ou 0 se não tiver)
+            }));
+
         // 4. Prepara Payload
         const payload = {
             cliente: { 
@@ -944,7 +957,8 @@ async function finalizarCompraAsaas() {
                 telefone: telefone, 
                 endereco: endereco 
             },
-            itens: carrinho.map(i => ({ id: i.id, quantidade: i.quantidade })),
+            itens: itensParaEnviar,
+           // itens: carrinho.map(i => ({ id: i.id, quantidade: i.quantidade })),
             afiliadoId: null
         };
 

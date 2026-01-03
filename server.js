@@ -943,9 +943,20 @@ app.post('/api/checkout/pix', async (req, res) => {
                 return res.status(400).json({ erro: `Estoque insuficiente para ${prodBanco.titulo}.` });
             }
 
+            // 🟢 LÓGICA DA MARGEM (AQUI ESTÁ A CORREÇÃO)
+            let precoFinalUnitario = prodBanco.preco_novo;
+            
+            // Se o item veio com margem customizada do frontend, aplica ela
+            if (item.customMargin && item.customMargin > 0) {
+                // Exemplo: Preço 100 + Margem 20% = 120
+                precoFinalUnitario = prodBanco.preco_novo * (1 + (item.customMargin / 100));
+            }
+
             // Soma usando o preço do banco (segurança)
-            valorTotalReal += (prodBanco.preco_novo * item.quantidade);
+            valorTotalReal += (precoFinalUnitario * item.quantidade);
             descricaoPedido += `${item.quantidade}x ${prodBanco.titulo}, `;
+            //valorTotalReal += (prodBanco.preco_novo * item.quantidade);
+            //descricaoPedido += `${item.quantidade}x ${prodBanco.titulo}, `;
         }
 
         // 2. VERIFICA AFILIADO (Para o Split)

@@ -987,6 +987,57 @@ app.post('/api/checkout/pix', async (req, res) => {
     }
 });
 
+// ==============================================================
+// 🤖 WEBHOOK ASAAS (RECEBE CONFIRMAÇÃO DE PAGAMENTO)
+// ==============================================================
+app.post('/api/webhook/asaas', async (req, res) => {
+    try {
+        // 1. SEGURANÇA: Verifica se é o Asaas mesmo
+        // O Asaas manda o token que definimos no header 'asaas-access-token'
+        const tokenRecebido = req.headers['asaas-access-token'];
+        if (tokenRecebido !== process.env.ASAAS_WEBHOOK_TOKEN) {
+            console.log("⛔ Tentativa de Webhook inválida (Token errado)");
+            return res.status(401).json({ error: 'Acesso negado' });
+        }
+
+        const { event, payment } = req.body;
+        
+        console.log(`🔔 Webhook recebido: ${event} para cobrança ${payment.id}`);
+
+        // 2. FILTRA O EVENTO: Só queremos saber se PAGOU
+        if (event === 'PAYMENT_RECEIVED' || event === 'PAYMENT_CONFIRMED') {
+            
+            // 3. ATUALIZA O PEDIDO NO BANCO
+            // Procura o pedido que tem esse ID do Asaas (payment.id)
+            // IMPORTANTE: Seu banco precisa ter um campo 'asaasId' ou similar na tabela Pedido
+            
+            /* EXEMPLO (Ajuste conforme seu Prisma):
+               
+               const pedidoAtualizado = await prisma.pedido.update({
+                   where: { asaasId: payment.id }, 
+                   data: { 
+                       status: 'APROVADO',
+                       dataPagamento: new Date()
+                   }
+               });
+               
+               console.log("✅ Pedido Aprovado automaticamente:", pedidoAtualizado.id);
+            */
+
+             // SE VOCÊ AINDA NÃO TEM TABELA DE PEDIDOS:
+             console.log(`✅ SUCESSO! O Cliente pagou o PIX ${payment.id}. Valor: ${payment.value}`);
+             // Aqui você pode disparar um email, notificação, etc.
+        }
+
+        // 3. Responde pro Asaas que entendemos (senão ele fica mandando de novo)
+        res.status(200).json({ received: true });
+
+    } catch (error) {
+        console.error("Erro no Webhook:", error);
+        res.status(500).json({ error: 'Erro interno' });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);

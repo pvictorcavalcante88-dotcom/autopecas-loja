@@ -960,13 +960,18 @@ async function finalizarCompraAsaas() {
                 endereco: endereco 
             },
             itens: itensParaEnviar,
-            afiliadoId: null
+            afiliadoId: null,
+            afiliadoCodigo: null
         };
 
         const afLogado = localStorage.getItem('afiliadoLogado');
+        const refCode = localStorage.getItem('afiliadoCodigo');
         if(afLogado) {
             const dadosAf = JSON.parse(afLogado);
             payload.afiliadoId = dadosAf.id;
+        }else if (refCode) {
+            // Se for um cliente vindo pelo link
+            payload.afiliadoCodigo = refCode; // <--- ENVIA O CÓDIGO
         }
 
         // ENVIA

@@ -1,86 +1,67 @@
 const axios = require('axios');
-
 const ASAAS_URL = process.env.ASAAS_URL || 'https://sandbox.asaas.com/api/v3';
 const ASAAS_KEY = process.env.ASAAS_API_KEY;
 
-const api = axios.create({
-    baseURL: ASAAS_URL,
-    headers: { 'access_token': ASAAS_KEY }
-});
+const api = axios.create({ baseURL: ASAAS_URL, headers: { 'access_token': ASAAS_KEY } });
 
-// ... (criarClienteAsaas continua IGUAL, não precisa mudar) ...
 async function criarClienteAsaas(cliente) {
+    // ... (MANTENHA SUA FUNÇÃO DE CLIENTE IGUAL ANTES) ...
+    // Vou resumir aqui para não ficar gigante, use a que você já tem
     try {
         const cpfLimpo = cliente.documento.replace(/\D/g, '');
-        const telefoneLimpo = cliente.telefone.replace(/\D/g, '');
-
         const busca = await api.get(`/customers?cpfCnpj=${cpfLimpo}`);
-        if (busca.data.data && busca.data.data.length > 0) {
-            return busca.data.data[0].id;
-        }
-
+        if (busca.data.data?.length > 0) return busca.data.data[0].id;
         const novo = await api.post('/customers', {
-            name: cliente.nome,
-            cpfCnpj: cpfLimpo,
-            email: cliente.email,
-            mobilePhone: telefoneLimpo,
-            notificationDisabled: false 
+            name: cliente.nome, cpfCnpj: cpfLimpo, email: cliente.email, 
+            mobilePhone: cliente.telefone.replace(/\D/g, ''), notificationDisabled: false 
         });
         return novo.data.id;
-    } catch (error) {
-        console.error("❌ ERRO CLIENTE:", error.message);
-        throw error;
-    }
+    } catch (e) { throw e; }
 }
 
-// 🟢 NOVA FUNÇÃO MAIS INTELIGENTE
 async function criarCobrancaPix(cliente, valorTotal, descricao, walletIdAfiliado = null, comissaoAfiliado = 0) {
     try {
         const customerId = await criarClienteAsaas(cliente);
-        
-        // MUDANÇA 1: Não travamos mais em 'PIX' se quisermos flexibilidade.
-        // Mas para ter o QR CODE imediato no modal, o Asaas EXIGE que seja 'PIX'.
-        // O Truque: Vamos manter PIX, mas vamos retornar o link mesmo assim.
-        
+
         let payload = {
             customer: customerId,
-            billingType: 'PIX', // Mantém PIX para o QR Code funcionar na hora
+            billingType: 'UNDEFINED', // 🟢 MUDANÇA: 'UNDEFINED' libera Cartão e Boleto no link!
             value: valorTotal,
             dueDate: new Date().toISOString().split('T')[0],
             description: descricao,
         };
 
         if (walletIdAfiliado && comissaoAfiliado > 0) {
-            payload.split = [{
-                walletId: walletIdAfiliado,
-                fixedValue: comissaoAfiliado, 
-            }];
+            payload.split = [{ walletId: walletIdAfiliado, fixedValue: comissaoAfiliado }];
         }
 
-        console.log("🚀 Criando cobrança no Asaas...");
+        // 1. Cria a Cobrança Genérica
         const response = await api.post('/payments', payload);
         const idCobranca = response.data.id;
-        const linkFatura = response.data.invoiceUrl; // Captura o Link
+        const linkFatura = response.data.invoiceUrl; // ESSE LINK AGORA ACEITA CARTÃO!
 
-        console.log("✅ Cobrança Criada! ID:", idCobranca);
-
-        // Pega o QRCode
-        const qrResponse = await api.get(`/payments/${idCobranca}/pixQrCode`);
+        // 2. Tenta pegar o QR Code do Pix (Pode falhar se for Undefined, mas tentamos)
+        let pixData = { encodedImage: '', payload: '', expirationDate: '' };
+        
+        try {
+            // Tenta forçar a leitura do QR Code mesmo sendo Undefined
+            const qrResponse = await api.get(`/payments/${idCobranca}/pixQrCode`);
+            pixData = qrResponse.data;
+        } catch (err) {
+            console.log("⚠️ Pix não gerado automaticamente (Normal para cobrança Híbrida)");
+            // Se falhar, mandamos uma imagem de "Use o Link" ou deixamos vazio
+        }
         
         return {
             id: idCobranca,
-            encodedImage: qrResponse.data.encodedImage,
-            payload: qrResponse.data.payload,
-            expirationDate: qrResponse.data.expirationDate,
-            invoiceUrl: linkFatura // <--- O LINK ESTÁ AQUI
+            encodedImage: pixData.encodedImage, // Pode vir vazio
+            payload: pixData.payload,           // Pode vir vazio
+            invoiceUrl: linkFatura              // 🟢 ESSE É O IMPORTANTE AGORA
         };
 
     } catch (error) {
-        const erroDetalhe = error.response?.data?.errors 
-            ? JSON.stringify(error.response.data.errors) 
-            : error.message;
-        console.error("❌ ERRO ASAAS:", erroDetalhe);
-        throw new Error(`Erro Asaas: ${erroDetalhe}`);
+        console.error("Erro Asaas:", error.response?.data || error.message);
+        throw new Error("Erro no pagamento.");
     }
 }
 

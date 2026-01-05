@@ -1005,15 +1005,32 @@ async function finalizarCompraAsaas() {
 
 // Funções auxiliares do Modal
 function mostrarModalPix(pixData, linkPagamento) {
-    // Pix
-    document.getElementById('pix-img').src = `data:image/png;base64,${pixData.encodedImage}`;
-    document.getElementById('pix-cola').innerText = pixData.payload;
-    
-    // Link de Cartão
+    const imgPix = document.getElementById('pix-img');
+    const txtCola = document.getElementById('pix-cola');
     const btnLink = document.getElementById('btn-link-pagamento');
+    const titulo = document.querySelector('#modal-pix h3');
+
+    // Se tiver imagem do Pix, mostra. Se não, esconde.
+    if (pixData && pixData.encodedImage) {
+        imgPix.src = `data:image/png;base64,${pixData.encodedImage}`;
+        imgPix.style.display = 'block';
+        txtCola.innerText = pixData.payload;
+        txtCola.style.display = 'block';
+        titulo.innerText = "✅ Pedido Gerado!";
+    } else {
+        // Se não gerou Pix direto (cobrança híbrida), esconde o QR e foca no link
+        imgPix.style.display = 'none';
+        txtCola.style.display = 'none';
+        titulo.innerText = "✅ Finalize o Pagamento";
+    }
+    
+    // Link de Cartão (Obrigatório aparecer agora)
     if (linkPagamento && btnLink) {
         btnLink.href = linkPagamento;
-        btnLink.style.display = 'block'; // Mostra o botão
+        btnLink.style.display = 'block'; 
+        btnLink.innerText = "💳 Pagar com Cartão / Pix / Boleto"; // Texto mais claro
+    } else {
+        console.error("ERRO: Link de pagamento não recebido!");
     }
     
     document.getElementById('modal-pix').style.display = 'flex';

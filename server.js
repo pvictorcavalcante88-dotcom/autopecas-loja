@@ -1046,50 +1046,78 @@ app.post('/api/checkout/pix', async (req, res) => {
 // ==============================================================
 // 🤖 WEBHOOK ASAAS (RECEBE CONFIRMAÇÃO DE PAGAMENTO)
 // ==============================================================
+// ==============================================================
+// 🤖 WEBHOOK ASAAS (ATUALIZAÇÃO AUTOMÁTICA)
+// ==============================================================
 app.post('/api/webhook/asaas', async (req, res) => {
     try {
-        // 1. SEGURANÇA: Verifica se é o Asaas mesmo
-        // O Asaas manda o token que definimos no header 'asaas-access-token'
+        // 1. SEGURANÇA
         const tokenRecebido = req.headers['asaas-access-token'];
         if (tokenRecebido !== process.env.ASAAS_WEBHOOK_TOKEN) {
-            console.log("⛔ Tentativa de Webhook inválida (Token errado)");
-            return res.status(401).json({ error: 'Acesso negado' });
+            return res.status(401).json({ error: 'Token inválido' });
         }
 
         const { event, payment } = req.body;
-        
-        console.log(`🔔 Webhook recebido: ${event} para cobrança ${payment.id}`);
+        console.log(`🔔 Webhook: ${event} | ID: ${payment.id}`);
 
-        // 2. FILTRA O EVENTO: Só queremos saber se PAGOU
-        if (event === 'PAYMENT_RECEIVED' || event === 'PAYMENT_CONFIRMED') {
+        // 2. VERIFICA SE O PAGAMENTO FOI CONFIRMADO
+        if (event === 'PAYMENT_CONFIRMED' || event === 'PAYMENT_RECEIVED') {
             
-            // 3. ATUALIZA O PEDIDO NO BANCO
-            // Procura o pedido que tem esse ID do Asaas (payment.id)
-            // IMPORTANTE: Seu banco precisa ter um campo 'asaasId' ou similar na tabela Pedido
-            
-            /* EXEMPLO (Ajuste conforme seu Prisma):
-               
-               const pedidoAtualizado = await prisma.pedido.update({
-                   where: { asaasId: payment.id }, 
-                   data: { 
-                       status: 'APROVADO',
-                       dataPagamento: new Date()
-                   }
-               });
-               
-               console.log("✅ Pedido Aprovado automaticamente:", pedidoAtualizado.id);
-            */
+            // Busca o pedido pelo ID do Asaas (salvo na hora do checkout)
+            const pedido = await prisma.pedido.findFirst({
+                where: { asaasId: payment.id }
+            });
 
-             // SE VOCÊ AINDA NÃO TEM TABELA DE PEDIDOS:
-             console.log(`✅ SUCESSO! O Cliente pagou o PIX ${payment.id}. Valor: ${payment.value}`);
-             // Aqui você pode disparar um email, notificação, etc.
+            if (!pedido) {
+                console.log("⚠️ Pedido não encontrado para este pagamento.");
+                return res.json({ received: true });
+            }
+
+            // Evita processar duas vezes se já estiver aprovado
+            if (pedido.status === 'APROVADO' || pedido.status === 'PAGO') {
+                return res.json({ received: true });
+            }
+
+            // =================================================
+            // 3. ATUALIZAÇÕES NO BANCO DE DADOS
+            // =================================================
+            
+            // A. Atualiza Status do Pedido
+            await prisma.pedido.update({
+                where: { id: pedido.id },
+                data: { status: 'APROVADO' }
+            });
+
+            // B. Libera Comissão do Afiliado (se tiver)
+            if (pedido.afiliadoId && pedido.comissaoGerada > 0) {
+                await prisma.afiliado.update({
+                    where: { id: pedido.afiliadoId },
+                    data: { saldo: { increment: pedido.comissaoGerada } }
+                });
+                console.log(`💰 Comissão liberada: R$ ${pedido.comissaoGerada}`);
+            }
+
+            // C. Baixa no Estoque
+            try {
+                const listaItens = JSON.parse(pedido.itens);
+                for (const item of listaItens) {
+                    await prisma.produto.update({
+                        where: { id: item.id },
+                        data: { estoque: { decrement: item.qtd } }
+                    });
+                }
+                console.log("📦 Estoque atualizado!");
+            } catch (err) {
+                console.error("Erro ao baixar estoque:", err);
+            }
+
+            console.log(`✅ PEDIDO #${pedido.id} APROVADO COM SUCESSO!`);
         }
 
-        // 3. Responde pro Asaas que entendemos (senão ele fica mandando de novo)
-        res.status(200).json({ received: true });
+        res.json({ received: true });
 
     } catch (error) {
-        console.error("Erro no Webhook:", error);
+        console.error("Erro Fatal no Webhook:", error);
         res.status(500).json({ error: 'Erro interno' });
     }
 });

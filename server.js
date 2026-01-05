@@ -1063,9 +1063,14 @@ app.post('/api/webhook/asaas', async (req, res) => {
         // 2. VERIFICA SE O PAGAMENTO FOI CONFIRMADO
         if (event === 'PAYMENT_CONFIRMED' || event === 'PAYMENT_RECEIVED') {
             
-            // Busca o pedido pelo ID do Asaas (salvo na hora do checkout)
+            // 🟢 ATUALIZAÇÃO: Busca pelo ID do Pagamento OU pelo ID do Link
             const pedido = await prisma.pedido.findFirst({
-                where: { asaasId: payment.id }
+                where: { 
+                    OR: [
+                        { asaasId: payment.id },          // Se foi cobrança direta
+                        { asaasId: payment.paymentLink }  // Se foi Link de Pagamento
+                    ]
+                }
             });
 
             if (!pedido) {

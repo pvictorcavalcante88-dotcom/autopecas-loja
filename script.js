@@ -1009,28 +1009,27 @@ function mostrarModalPix(pixData, linkPagamento) {
     const txtCola = document.getElementById('pix-cola');
     const btnLink = document.getElementById('btn-link-pagamento');
     const titulo = document.querySelector('#modal-pix h3');
+    const desc = document.querySelector('#modal-pix p');
 
-    // Se tiver imagem do Pix, mostra. Se não, esconde.
-    if (pixData && pixData.encodedImage) {
-        imgPix.src = `data:image/png;base64,${pixData.encodedImage}`;
-        imgPix.style.display = 'block';
-        txtCola.innerText = pixData.payload;
-        txtCola.style.display = 'block';
-        titulo.innerText = "✅ Pedido Gerado!";
-    } else {
-        // Se não gerou Pix direto (cobrança híbrida), esconde o QR e foca no link
-        imgPix.style.display = 'none';
-        txtCola.style.display = 'none';
-        titulo.innerText = "✅ Finalize o Pagamento";
+    // Esconde elementos de Pix direto (já que usamos Link agora)
+    if (imgPix) imgPix.style.display = 'none';
+    if (txtCola) txtCola.style.display = 'none';
+    if (document.querySelector('button[onclick="copiarCodigo()"]')) {
+        document.querySelector('button[onclick="copiarCodigo()"]').style.display = 'none';
     }
+
+    // Atualiza Textos
+    if (titulo) titulo.innerText = "🚀 Quase lá!";
+    if (desc) desc.innerText = "Clique no botão abaixo para escolher entre PIX ou CARTÃO (até 12x) e finalizar seu pagamento com segurança.";
     
-    // Link de Cartão (Obrigatório aparecer agora)
+    // Botão Principal
     if (linkPagamento && btnLink) {
         btnLink.href = linkPagamento;
         btnLink.style.display = 'block'; 
-        btnLink.innerText = "💳 Pagar com Cartão / Pix / Boleto"; // Texto mais claro
-    } else {
-        console.error("ERRO: Link de pagamento não recebido!");
+        btnLink.style.background = '#27ae60'; // Verde destaque
+        btnLink.style.fontSize = '1.1rem';
+        btnLink.style.padding = '15px';
+        btnLink.innerHTML = `<i class="ph ph-credit-card"></i> IR PARA PAGAMENTO (PIX / CARTÃO)`;
     }
     
     document.getElementById('modal-pix').style.display = 'flex';

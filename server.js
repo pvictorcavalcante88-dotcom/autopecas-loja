@@ -924,77 +924,85 @@ app.get('/admin/saques-pendentes', authenticateToken, async (req, res) => {
 });
 
 // ROTA DE CHECKOUT (GERAR PIX)
+// ROTA DE CHECKOUT (PIX + LINK)
 app.post('/api/checkout/pix', async (req, res) => {
     try {
         const { itens, cliente, afiliadoId } = req.body;
 
-        // 1. VALIDAÇÃO DE SEGURANÇA (Recalcular preço real)
+        // 1. VALIDAÇÃO E CÁLCULO (Igual antes)
         let valorTotalReal = 0;
         let descricaoPedido = "Pedido AutoPeças: ";
+        
+        // Array para salvar no banco (snapshot dos itens)
+        let itensParaBanco = [];
 
         for (const item of itens) {
-            // Busca o produto no SEU banco de dados
             const prodBanco = await prisma.produto.findUnique({ where: { id: item.id } });
-            
             if (!prodBanco) return res.status(400).json({ erro: `Produto ID ${item.id} indisponível.` });
-            
-            // Verifica estoque antes de cobrar
-            if (prodBanco.estoque < item.quantidade) {
-                return res.status(400).json({ erro: `Estoque insuficiente para ${prodBanco.titulo}.` });
-            }
+            if (prodBanco.estoque < item.quantidade) return res.status(400).json({ erro: `Estoque insuficiente para ${prodBanco.titulo}.` });
 
-            // 🟢 LÓGICA DA MARGEM (AQUI ESTÁ A CORREÇÃO)
+            // Cálculo da Margem
             let precoFinalUnitario = prodBanco.preco_novo;
-            
-            // Se o item veio com margem customizada do frontend, aplica ela
             if (item.customMargin && item.customMargin > 0) {
-                // Exemplo: Preço 100 + Margem 20% = 120
                 precoFinalUnitario = prodBanco.preco_novo * (1 + (item.customMargin / 100));
             }
 
-            // Soma usando o preço do banco (segurança)
             valorTotalReal += (precoFinalUnitario * item.quantidade);
             descricaoPedido += `${item.quantidade}x ${prodBanco.titulo}, `;
-            //valorTotalReal += (prodBanco.preco_novo * item.quantidade);
-            //descricaoPedido += `${item.quantidade}x ${prodBanco.titulo}, `;
+
+            itensParaBanco.push({
+                id: prodBanco.id,
+                nome: prodBanco.titulo,
+                qtd: item.quantidade,
+                unitario: precoFinalUnitario,
+                total: precoFinalUnitario * item.quantidade,
+                imagem: prodBanco.imagem
+            });
         }
 
-        // 2. VERIFICA AFILIADO (Para o Split)
-        let walletAfiliado = null;
-        let comissao = 0;
-
-        if (afiliadoId) {
-            const afiliado = await prisma.afiliado.findUnique({ where: { id: afiliadoId } });
-            // Aqui você precisaria ter salvo o 'walletId' do Asaas do afiliado no cadastro dele
-            // Por enquanto, vamos deixar null ou simular
-            // walletAfiliado = afiliado.asaasWalletId; 
-            
-            // Calcula a comissão (Ex: 10% ou baseado na margem personalizada)
-            // comissao = valorTotalReal * 0.10; 
-        }
-
-        // 3. CHAMA O ASAAS
+        // 2. CHAMA O ASAAS
+        // Atenção: Se quiser permitir Cartão no link, precisamos que a cobrança seja Híbrida ou criar link de pagamento
+        // Por padrão o Pix gera InvoiceUrl também.
         const dadosPix = await criarCobrancaPix(
             cliente, 
             valorTotalReal, 
             descricaoPedido,
-            walletAfiliado, 
-            comissao
+            null, // walletIdAfiliado (implementar depois se tiver split real)
+            0     // comissao (implementar depois)
         );
 
-        // 4. (OPCIONAL) CRIAR O PEDIDO NO BANCO COMO "PENDENTE" AGORA
-        // Você pode criar o pedido aqui com status 'AGUARDANDO_PAGAMENTO'
-        // e salvar o ID do Asaas (dadosPix.id) nele para dar baixa depois via Webhook.
+        // 🟢 3. SALVAR NO BANCO DE DADOS (CRUCIAL PARA O DASHBOARD)
+        const novoPedido = await prisma.pedido.create({
+            data: {
+                clienteNome: cliente.nome,
+                clienteDoc: cliente.documento, // Salva o CPF
+                clienteEmail: cliente.email,
+                clienteTelefone: cliente.telefone,
+                clienteEndereco: cliente.endereco,
+                
+                valorTotal: valorTotalReal,
+                itens: JSON.stringify(itensParaBanco), // Salva os itens como JSON
+                status: 'AGUARDANDO_PAGAMENTO',
+                
+                asaasId: dadosPix.id, // ID do Asaas para o Webhook achar depois!
+                
+                afiliadoId: afiliadoId ? parseInt(afiliadoId) : null // Liga ao afiliado se tiver
+            }
+        });
 
+        console.log("✅ Pedido Salvo no Banco! ID:", novoPedido.id);
+
+        // 4. RETORNA TUDO PARA O FRONTEND
         res.json({
             sucesso: true,
-            pix: dadosPix,
-            total: valorTotalReal
+            pedidoId: novoPedido.id,
+            pix: dadosPix, // Aqui dentro tem o encodedImage (QR)
+            linkPagamento: dadosPix.invoiceUrl // 🟢 O Asaas retorna o link da fatura aqui!
         });
 
     } catch (e) {
         console.error(e);
-        res.status(500).json({ erro: "Erro ao gerar pagamento." });
+        res.status(500).json({ erro: "Erro ao processar pedido." });
     }
 });
 

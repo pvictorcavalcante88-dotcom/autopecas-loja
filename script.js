@@ -904,74 +904,66 @@ function calcularTotalVisual(carrinho) {
 
 // 🟢 FUNÇÃO DE FINALIZAR COM ASAAS
 async function finalizarCompraAsaas() {
-    // 1. Pega os dados do formulário (AJUSTE OS IDS CONFORME SEU HTML)
-    // No seu HTML atual, o campo NOME tem id="nome_cliente", verifique isso!
+    // 1. PEGAR DADOS (CORRIGIDO PARA NÃO USAR PROMPT)
     const nome = document.getElementById('nome_cliente').value; 
     const emailContato = document.getElementById('input-email-contato').value;
     const telefone = document.getElementById('input-telefone').value;
     const endereco = document.getElementById('rua').value;
     
-    // O CPF é obrigatório para o Asaas.
-    // Se você não tem um campo fixo de CPF no form principal, use o da busca (doc-busca) ou crie um.
-    // Vou tentar pegar do campo de busca ou pedir num prompt se tiver vazio.
-    let doc = document.getElementById('doc-busca') ? document.getElementById('doc-busca').value : '';
+    // 🟢 TENTA PEGAR O CPF DO CAMPO DE BUSCA PRIMEIRO
+    let doc = document.getElementById('doc-busca').value;
     
+    // Validações
     if (!nome || !endereco || !telefone) {
         return alert("Por favor, preencha Nome, Endereço e Telefone.");
     }
 
-    // Validação simples de CPF se estiver vazio
     if (!doc) {
-        doc = prompt("Para gerar o PIX, precisamos do seu CPF/CNPJ (Apenas números):");
+        // Só pede no prompt se o campo estiver vazio mesmo
+        doc = prompt("CPF obrigatório para nota fiscal. Digite apenas números:");
         if(!doc) return;
+        // Preenche o input para o usuário ver
+        document.getElementById('doc-busca').value = doc;
     }
 
-    // 2. Prepara o botão
+    // Limpa o CPF para enviar só números
+    const cpfLimpo = doc.replace(/\D/g,'');
+    if (cpfLimpo.length < 11) return alert("CPF inválido.");
+
+    // ... (Lógica do botão "Processando" continua igual) ...
     const btn = document.getElementById('btn-finalizar-pix');
-    if(btn) {
-        btn.innerHTML = "Processando...";
-        btn.disabled = true;
-    }
+    if(btn) { btn.innerHTML = "Processando..."; btn.disabled = true; }
 
-    // 3. Pega o carrinho
     const carrinho = JSON.parse(localStorage.getItem('nossoCarrinho') || '[]');
-    if (carrinho.length > 0) {
-    calcularTotalVisual(carrinho);
-}
 
     try {
+        // Mapeia itens com margem
+        const itensParaEnviar = carrinho.map(i => ({ 
+            id: i.id, 
+            quantidade: i.quantidade,
+            customMargin: i.customMargin || 0 
+        }));
 
-        // 🟢 ATUALIZAÇÃO AQUI: Mandar a 'customMargin' junto
-            const itensParaEnviar = carrinho.map(i => ({ 
-                id: i.id, 
-                quantidade: i.quantidade,
-                customMargin: i.customMargin || 0 // Manda a margem (ou 0 se não tiver)
-            }));
-
-        // 4. Prepara Payload
         const payload = {
             cliente: { 
                 nome: nome, 
-                documento: doc.replace(/\D/g,''), // Remove pontos
+                documento: cpfLimpo, 
                 email: emailContato || 'cliente@sememail.com', 
                 telefone: telefone, 
                 endereco: endereco 
             },
             itens: itensParaEnviar,
-           // itens: carrinho.map(i => ({ id: i.id, quantidade: i.quantidade })),
             afiliadoId: null
         };
 
-        // Verifica se tem afiliado logado
         const afLogado = localStorage.getItem('afiliadoLogado');
         if(afLogado) {
             const dadosAf = JSON.parse(afLogado);
             payload.afiliadoId = dadosAf.id;
         }
 
-        // 5. Envia para o Backend
-        // Ajuste a URL se necessário
-        const API_URL = ''; 
+        // ENVIA
+        const API_URL = 'https://autopecas-loja.onrender.com'; // Sua URL
         const res = await fetch(`${API_URL}/api/checkout/pix`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -981,14 +973,17 @@ async function finalizarCompraAsaas() {
         const data = await res.json();
 
         if (res.ok) {
-            // SUCESSO! Abre o modal
-            mostrarModalPix(data.pix);
-            localStorage.removeItem('nossoCarrinho'); // Limpa carrinho
+            // SUCESSO!
+            // Mostra o QR Code
+            mostrarModalPix(data.pix, data.linkPagamento); // 🟢 Passa o link também
+            
+            // Limpa carrinho
+            localStorage.removeItem('nossoCarrinho');
+            document.getElementById('container-botoes-dinamicos').innerHTML = '<p style="color:#27ae60; text-align:center;">Pedido Realizado!</p>';
         } else {
-            alert("Erro: " + (data.erro || "Falha no pagamento."));
+            alert("Erro: " + (data.erro || "Falha ao processar."));
             if(btn) { btn.disabled = false; btn.innerHTML = "Tentar Novamente"; }
         }
-
     } catch (e) {
         console.error(e);
         alert("Erro de conexão.");
@@ -997,9 +992,18 @@ async function finalizarCompraAsaas() {
 }
 
 // Funções auxiliares do Modal
-function mostrarModalPix(pixData) {
+function mostrarModalPix(pixData, linkPagamento) {
+    // Pix
     document.getElementById('pix-img').src = `data:image/png;base64,${pixData.encodedImage}`;
     document.getElementById('pix-cola').innerText = pixData.payload;
+    
+    // Link de Cartão
+    const btnLink = document.getElementById('btn-link-pagamento');
+    if (linkPagamento && btnLink) {
+        btnLink.href = linkPagamento;
+        btnLink.style.display = 'block'; // Mostra o botão
+    }
+    
     document.getElementById('modal-pix').style.display = 'flex';
 }
 

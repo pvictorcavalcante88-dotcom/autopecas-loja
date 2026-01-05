@@ -49,6 +49,7 @@ async function criarCobrancaPix(cliente, valorTotal, descricao, walletIdAfiliado
     try {
         // 1. Garante que o cliente existe (ou cria)
         const customerId = await criarClienteAsaas(cliente);
+        
 
         // 2. Monta o objeto de cobrança
         let payload = {
@@ -78,7 +79,8 @@ async function criarCobrancaPix(cliente, valorTotal, descricao, walletIdAfiliado
             id: idCobranca,
             encodedImage: qrResponse.data.encodedImage,
             payload: qrResponse.data.payload,
-            expirationDate: qrResponse.data.expirationDate
+            expirationDate: qrResponse.data.expirationDate,
+            invoiceUrl: response.data.invoiceUrl
         };
 
     } catch (error) {

@@ -75,6 +75,7 @@ model Pedido {
   clienteEmail    String
   clienteEndereco String
   clienteTelefone String?
+  clienteDoc      String?
   valorTotal      Float
   itens           String
 
@@ -86,6 +87,7 @@ model Pedido {
   notificado_afiliado Boolean @default(false)
   status          String   @default("PENDENTE")
 
+  asaasId         String?
 
   createdAt       DateTime @default(now())
 }

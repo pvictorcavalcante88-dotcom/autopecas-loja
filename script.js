@@ -483,7 +483,13 @@ async function salvarOrcamentoSilencioso(origem = 'MANUAL') {
 
     // Calcula total
     const itens = JSON.parse(carrinho);
-    const total = itens.reduce((acc, item) => acc + (item.preco * item.quantidade), 0);
+    const total = itens.reduce((acc, item) => {
+        let precoBase = parseFloat(item.preco || item.preco_novo);
+        let margem = item.customMargin || 0;
+        // Aplica a margem para salvar o valor correto
+        let precoFinal = precoBase * (1 + (margem / 100));
+        return acc + (precoFinal * item.quantidade);
+    }, 0);
     
     // Pega nome
     const inputNome = document.getElementById('nome_cliente'); 
@@ -911,7 +917,8 @@ async function finalizarCompraAsaas() {
     const endereco = document.getElementById('rua').value;
     
     // 🟢 TENTA PEGAR O CPF DO CAMPO DE BUSCA PRIMEIRO
-    let doc = document.getElementById('doc-busca').value;
+    let doc = document.getElementById('input-doc-cliente').value;
+    if (!doc) doc = document.getElementById('doc-busca').value;
     
     // Validações
     if (!nome || !endereco || !telefone) {

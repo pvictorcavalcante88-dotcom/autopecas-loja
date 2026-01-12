@@ -24,40 +24,45 @@ async function criarClienteAsaas(cliente) {
 }
 
 // 🟢 NOVA FUNÇÃO: GERA LINK COM PARCELAMENTO
+// services/asaasService.js
+
+// ... (imports e criarClienteAsaas continuam iguais) ...
+
 async function criarCobrancaPix(cliente, valorTotal, descricao, walletIdAfiliado = null, comissaoAfiliado = 0) {
     try {
-        // Nota: Para Links de Pagamento, criar o cliente antes é opcional, 
-        // mas ajuda a manter o cadastro organizado.
-        
-        // 1. Configurações do Link
+        // 1. Configurações do Link para o Cliente ESCOLHER
         let payload = {
             billingType: 'UNDEFINED', // Aceita Pix, Cartão e Boleto
-            chargeType: 'INSTALLMENT',   // Cria uma cobrança nova para cada cliente
+            chargeType: 'DETACHED',   // <--- ISSO É IMPORTANTE! Cria cobrança avulsa
             name: descricao.substring(0, 255),
             description: descricao,
-            endDate: null,            // Não expira o link principal (mas a cobrança sim)
             value: valorTotal,
-            dueDateLimitDays: 1,      // Vencimento: 1 dia após clicar
-            installmentCount: 2,       // Força 2 parcelas
-            installmentValue: valorTotal / 2, // Valor de cada parcela
-            maxInstallmentCount: 10   // <--- LIBERA ATÉ 10x NO CARTÃO
+            dueDateLimitDays: 1,      // Vencimento do link
+            
+            // 🟢 O SEGREDO ESTÁ AQUI:
+            // NÃO enviamos 'installmentCount' (isso travaria o número)
+            // Enviamos APENAS o 'maxInstallmentCount' (o limite)
+            maxInstallmentCount: 12   
         };
 
-        // 2. Cria o Link
-        console.log("🚀 Gerando Link de Pagamento...");
+        // Lógica de Split (se tiver)
+        if (walletIdAfiliado && comissaoAfiliado > 0) {
+            payload.split = [{
+                walletId: walletIdAfiliado,
+                fixedValue: comissaoAfiliado, 
+            }];
+        }
+
+        console.log("🚀 Gerando Link Flexível...");
         const response = await api.post('/paymentLinks', payload);
         
-        const linkId = response.data.id;  // ID do Link (ex: 123456)
-        const linkUrl = response.data.url; // URL para o cliente pagar
+        console.log("✅ Link Gerado:", response.data.url);
 
-        console.log("✅ Link Gerado:", linkUrl);
-
-        // Retornamos num formato que seu site já entende
         return {
-            id: linkId,          // Guardamos o ID do Link agora!
-            encodedImage: null,  // Link não gera QR Code direto (sem imagem)
-            payload: null,       // Sem copia e cola direto
-            invoiceUrl: linkUrl  // O link mágico
+            id: response.data.id,
+            encodedImage: null, 
+            payload: null,
+            invoiceUrl: response.data.url 
         };
 
     } catch (error) {
@@ -68,5 +73,6 @@ async function criarCobrancaPix(cliente, valorTotal, descricao, walletIdAfiliado
         throw new Error(`Erro Asaas: ${erroDetalhe}`);
     }
 }
+
 
 module.exports = { criarCobrancaPix };

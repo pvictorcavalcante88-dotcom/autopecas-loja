@@ -7,6 +7,17 @@ const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
 
+// ==============================================================
+// 📊 CONFIGURAÇÃO DE TAXAS E IMPOSTOS
+// ==============================================================
+const CONFIG_FINANCEIRA = {
+    impostoGoverno: 0.06,      // 6% (Ex: Simples Nacional)
+    taxaAsaasPix: 0.99,        // R$ 0,99 fixo por Pix recebido
+    taxaAsaasCartaoPct: 0.0299,// 2.99% sobre a venda (Cartão)
+    taxaAsaasCartaoFixo: 0.49, // R$ 0,49 fixo por transação
+    taxaAntecipacao: 0.10      // 10% (Caso queira descontar antecipação do lucro)
+};
+
 const { criarCobrancaPix } = require('./services/asaasService');
 
 const prisma = new PrismaClient();
@@ -928,86 +939,153 @@ app.get('/admin/saques-pendentes', authenticateToken, async (req, res) => {
 // ============================================================
 app.post('/api/checkout/pix', async (req, res) => {
     try {
-        // 1. Recebe 'afiliadoCodigo' também
-        const { itens, cliente, afiliadoId, afiliadoCodigo } = req.body;
+        const { itens, cliente, afiliadoId, afiliadoCodigo, metodoPagamento } = req.body;
 
-        // =================================================================
-        // 🕵️‍♂️ LÓGICA DE DETETIVE DE AFILIADO
-        // =================================================================
+        // 1. Identificar Afiliado
         let idFinalAfiliado = null;
+        let walletIdAfiliado = null;
 
-        // Caso 1: O próprio afiliado está comprando (Logado)
         if (afiliadoId) {
             idFinalAfiliado = parseInt(afiliadoId);
-        } 
-        // Caso 2: Cliente comprando com Link de Referência (Tem código, mas não ID)
-        else if (afiliadoCodigo) {
-            const afiliadoEncontrado = await prisma.afiliado.findUnique({
-                where: { codigo: afiliadoCodigo }
-            });
-            if (afiliadoEncontrado) {
-                idFinalAfiliado = afiliadoEncontrado.id;
-                console.log(`🔗 Venda vinculada ao afiliado: ${afiliadoEncontrado.nome} (via código)`);
+        } else if (afiliadoCodigo) {
+            const af = await prisma.afiliado.findUnique({ where: { codigo: afiliadoCodigo } });
+            if (af) {
+                idFinalAfiliado = af.id;
+                walletIdAfiliado = af.walletId;
             }
         }
-        // =================================================================
 
-        let valorTotalReal = 0;
-        let descricaoPedido = "Pedido AutoPeças: ";
+        // 2. Preparar Variáveis Financeiras
+        let valorTotalVenda = 0;      // O que o cliente paga (Preço Final)
+        let custoTotalProdutos = 0;   // Quanto você pagou na distribuidora
+        let lucroBrutoLoja = 0;       // Sua margem bruta (sem descontar taxas)
+        let lucroBrutoAfiliado = 0;   // A margem bruta dele (sem descontar taxas)
+        
         let itensParaBanco = [];
 
+        // 3. Loop dos Produtos (Calculando item a item)
         for (const item of itens) {
             const prodBanco = await prisma.produto.findUnique({ where: { id: item.id } });
-            if (!prodBanco) return res.status(400).json({ erro: `Produto ID ${item.id} indisponível.` });
+            if (!prodBanco) continue;
+
+            // A. Preços Base
+            const custoPeca = prodBanco.preco;           // Custo Distribuidora (Ex: 100)
+            const precoLoja = prodBanco.preco_novo;      // Seu Preço Base (Ex: 130)
             
-            // Cálculo da Margem
-            let precoFinalUnitario = prodBanco.preco_novo;
+            // B. Preço Venda Final (com margem do afiliado)
+            let precoVendaUnitario = precoLoja;
+            
+            // Se tiver margem do afiliado (Ex: +15%)
             if (item.customMargin && item.customMargin > 0) {
-                precoFinalUnitario = prodBanco.preco_novo * (1 + (item.customMargin / 100));
+                precoVendaUnitario = precoLoja * (1 + (item.customMargin / 100));
+            }
+            
+            // Se for Cartão, aplicamos aquele acréscimo de segurança (Ex: +15%)
+            if (metodoPagamento === 'CARTAO') {
+                precoVendaUnitario = precoVendaUnitario * 1.15; 
             }
 
-            valorTotalReal += (precoFinalUnitario * item.quantidade);
-            descricaoPedido += `${item.quantidade}x ${prodBanco.titulo}, `;
+            // C. Totais do Item
+            const qtd = item.quantidade;
+            const totalItemVenda = precoVendaUnitario * qtd;
+            const totalItemCusto = custoPeca * qtd;
+            const totalItemLojaBase = precoLoja * qtd;
+
+            // D. Separando os Lucros BRUTOS
+            // Lucro Loja = (Preço Loja - Custo Peca) + (Diferença do Cartão se houver)
+            // Nota: Se aumentou 15% pro cartão, esse extra teoricamente é pra pagar taxa, 
+            // mas entra no bolo total pra ser dividido.
+            
+            // Margem do Afiliado neste item (Bruta)
+            const margemAfiliadoNesteItem = totalItemVenda - (totalItemLojaBase * (metodoPagamento === 'CARTAO' ? 1.15 : 1)); 
+            // *Nota sobre a linha acima: Se teve acréscimo de cartão, a base do afiliado sobe junto 
+            // ou consideramos que a margem dele é sobre o preço BASE?
+            // Vamos simplificar: Margem Afiliado = Preço Final - Preço Que a Loja Venderia
+            
+            let lucroItemAfiliado = totalItemVenda - totalItemLojaBase;
+            if (metodoPagamento === 'CARTAO') {
+                // Se aumentou o preço só por causa do cartão, esse aumento NÃO É lucro do afiliado, é taxa.
+                // Então recalculamos a margem dele baseada no preço SEM a taxa do cartão.
+                const precoVendaSemTaxaCartao = precoLoja * (1 + (item.customMargin / 100));
+                lucroItemAfiliado = (precoVendaSemTaxaCartao - precoLoja) * qtd;
+            }
+
+            let lucroItemLoja = totalItemLojaBase - totalItemCusto;
+
+            // Acumuladores
+            valorTotalVenda += totalItemVenda;
+            custoTotalProdutos += totalItemCusto;
+            lucroBrutoAfiliado += lucroItemAfiliado;
+            lucroBrutoLoja += lucroItemLoja;
 
             itensParaBanco.push({
-                id: prodBanco.id,
-                nome: prodBanco.titulo,
-                qtd: item.quantidade,
-                unitario: precoFinalUnitario,
-                total: precoFinalUnitario * item.quantidade,
-                imagem: prodBanco.imagem
+                id: prodBanco.id, nome: prodBanco.titulo, qtd: qtd,
+                unitario: precoVendaUnitario, total: totalItemVenda, imagem: prodBanco.imagem
             });
         }
 
-        // 2. CHAMA O ASAAS (Cria a cobrança e o Link)
-        // Se quiser dividir o dinheiro na hora (Split), passamos a walletId aqui
-        let walletIdSplit = null;
-        let valorComissao = 0;
+        // 4. CÁLCULO DO RATEIO DAS TAXAS ⚖️
+        
+        // A. Calcular Custo Total das Taxas (Asaas + Governo)
+        let custoTaxasTotal = 0;
+        
+        // Asaas
+        if (metodoPagamento === 'CARTAO') {
+            custoTaxasTotal += (valorTotalVenda * CONFIG_FINANCEIRA.taxaAsaasCartaoPct) + CONFIG_FINANCEIRA.taxaAsaasCartaoFixo;
+        } else {
+            custoTaxasTotal += CONFIG_FINANCEIRA.taxaAsaasPix;
+        }
+        
+        // Governo (Imposto sobre Nota Fiscal Cheia)
+        custoTaxasTotal += (valorTotalVenda * CONFIG_FINANCEIRA.impostoGoverno);
 
-        // Se tiver afiliado, calculamos a comissão para o Split (Opcional por enquanto)
-        if (idFinalAfiliado) {
-             // Lógica futura de split real no Asaas vai aqui
+        // B. Calcular a Proporção (Quem ganha mais, paga mais)
+        const lucroBrutoTotalOperacao = lucroBrutoLoja + lucroBrutoAfiliado;
+        
+        let comissaoLiquidaAfiliado = 0;
+
+        if (lucroBrutoTotalOperacao > 0 && lucroBrutoAfiliado > 0) {
+            // Qual a fatia do afiliado no bolo do lucro? (Ex: 0.40 ou 40%)
+            const pesoAfiliado = lucroBrutoAfiliado / lucroBrutoTotalOperacao;
+            
+            // Ele paga essa % das taxas
+            const parteTaxaAfiliado = custoTaxasTotal * pesoAfiliado;
+            
+            // Comissão Final = Lucro Bruto Dele - Parte da Taxa Dele
+            comissaoLiquidaAfiliado = lucroBrutoAfiliado - parteTaxaAfiliado;
         }
 
-        const dadosPix = await criarCobrancaPix(
+        // Proteção para não dar negativo
+        if (comissaoLiquidaAfiliado < 0) comissaoLiquidaAfiliado = 0;
+
+        // DEBUG NO CONSOLE (Pra você conferir se está batendo)
+        console.log(`
+        =========================================
+        💰 FECHAMENTO DO PEDIDO (RATEIO JUSTO)
+        =========================================
+        + Venda Total:      R$ ${valorTotalVenda.toFixed(2)}
+        - Custo Produtos:   R$ ${custoTotalProdutos.toFixed(2)}
+        - Taxas Totais:     R$ ${custoTaxasTotal.toFixed(2)} (Gov + Asaas)
+        -----------------------------------------
+        = Lucro Bruto Loja: R$ ${lucroBrutoLoja.toFixed(2)}
+        = Lucro Bruto Afi.: R$ ${lucroBrutoAfiliado.toFixed(2)}
+        -----------------------------------------
+        ⚖️ DIVISÃO DE CUSTOS:
+        Afiliado contribui com R$ ${(custoTaxasTotal * (lucroBrutoAfiliado/lucroBrutoTotalOperacao) || 0).toFixed(2)} das taxas.
+        -----------------------------------------
+        ✅ COMISSÃO LÍQUIDA: R$ ${comissaoLiquidaAfiliado.toFixed(2)}
+        =========================================
+        `);
+
+        // 5. Gera o Link e Salva no Banco
+        const dadosPix = await asaasService.criarCobrancaPix(
             cliente, 
-            valorTotalReal, 
-            descricaoPedido
+            valorTotalVenda, 
+            `Pedido AutoPeças (${metodoPagamento})`,
+            walletIdAfiliado,
+            comissaoLiquidaAfiliado
         );
 
-        // 3. CALCULA A COMISSÃO INTERNA (PARA O DASHBOARD)
-        // A diferença entre o preço final e o preço de custo (preco_novo)
-        let comissaoTotalGerada = 0;
-        if (idFinalAfiliado) {
-             for (const item of itens) {
-                 const prod = await prisma.produto.findUnique({ where: { id: item.id } });
-                 const precoVenda = prod.preco_novo * (1 + ((item.customMargin || 0) / 100));
-                 const lucroUnidade = precoVenda - prod.preco_novo;
-                 comissaoTotalGerada += (lucroUnidade * item.quantidade);
-             }
-        }
-
-        // 🟢 4. SALVAR NO BANCO DE DADOS
         const novoPedido = await prisma.pedido.create({
             data: {
                 clienteNome: cliente.nome,
@@ -1015,20 +1093,14 @@ app.post('/api/checkout/pix', async (req, res) => {
                 clienteEmail: cliente.email,
                 clienteTelefone: cliente.telefone,
                 clienteEndereco: cliente.endereco,
-                
-                valorTotal: valorTotalReal,
+                valorTotal: valorTotalVenda,
                 itens: JSON.stringify(itensParaBanco),
                 status: 'AGUARDANDO_PAGAMENTO',
-                
                 asaasId: dadosPix.id, 
-                
-                // AQUI ESTÁ A MÁGICA: Salva o ID que encontramos
                 afiliadoId: idFinalAfiliado, 
-                comissaoGerada: comissaoTotalGerada
+                comissaoGerada: comissaoLiquidaAfiliado // Salva JÁ DESCONTADO
             }
         });
-
-        console.log("✅ Pedido Salvo! ID:", novoPedido.id, "| Afiliado:", idFinalAfiliado ? "SIM" : "NÃO");
 
         res.json({
             sucesso: true,
@@ -1038,7 +1110,7 @@ app.post('/api/checkout/pix', async (req, res) => {
         });
 
     } catch (e) {
-        console.error(e);
+        console.error("Erro checkout:", e);
         res.status(500).json({ erro: "Erro ao processar pedido." });
     }
 });

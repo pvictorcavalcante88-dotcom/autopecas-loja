@@ -6,20 +6,18 @@ const API_URL = ''; // Deixe vazio se estiver no mesmo domínio
 document.addEventListener("DOMContentLoaded", () => {
     verificarLogin();
     
-    // CONFIGURAÇÃO DAS DATAS PADRÃO (Primeiro dia do mês -> Hoje)
+    // CONFIGURAÇÃO DAS DATAS PADRÃO
     const hoje = new Date();
     const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
     
     const hojeStr = hoje.toISOString().split('T')[0];
     const primeiroDiaStr = primeiroDia.toISOString().split('T')[0];
 
-    // 1. Datas do Widget de Lucro (Topo)
     const elInicio = document.getElementById('data-inicio');
     const elFim = document.getElementById('data-fim');
     if(elInicio) elInicio.value = primeiroDiaStr;
     if(elFim) elFim.value = hojeStr;
 
-    // 2. Datas do Filtro da Tabela (Histórico Completo)
     const filtroInicio = document.getElementById('filtro-inicio');
     const filtroFim = document.getElementById('filtro-fim');
     if(filtroInicio) filtroInicio.value = primeiroDiaStr;
@@ -27,10 +25,9 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 let AFILIADO_TOKEN = null;
-window.TODAS_VENDAS = []; // 🟢 VARIÁVEL GLOBAL IMPORTANTÍSSIMA
+window.TODAS_VENDAS = []; 
 
 function verificarLogin() {
-    // Tenta pegar o login
     const dadosAntigos = localStorage.getItem('afiliadoLogado');
     const tokenSimples = localStorage.getItem('afiliadoToken');
 
@@ -40,25 +37,21 @@ function verificarLogin() {
     } else if (tokenSimples) {
         AFILIADO_TOKEN = tokenSimples;
     } else {
-        // Se não tiver token, manda pro login
-        // (Remova o alert se quiser que redirecione silenciosamente)
-        // alert("Sessão expirada. Faça login novamente.");
         window.location.href = 'index.html'; 
         return;
     }
 
-    // Configura Botão Sair
-    const btnSair = document.getElementById('logout-btn') || document.querySelector('.btn-sair');
+    const btnSair = document.getElementById('logout-btn');
     if(btnSair) {
         btnSair.onclick = (e) => {
             e.preventDefault();
             localStorage.removeItem('afiliadoLogado');
             localStorage.removeItem('afiliadoToken');
+            localStorage.removeItem('minhaMargem');
             window.location.href = 'index.html';
         }
     }
 
-    // CARREGA TUDO
     carregarDashboardCompleto();
     carregarMeusOrcamentos();
     carregarMeusClientes();
@@ -68,7 +61,7 @@ function verificarLogin() {
 }
 
 // ============================================================
-// 1. CARREGAR DADOS DO DASHBOARD E VENDAS
+// 1. CARREGAR DADOS DO DASHBOARD
 // ============================================================
 async function carregarDashboardCompleto() {
     try {
@@ -80,10 +73,8 @@ async function carregarDashboardCompleto() {
 
         const dados = await res.json();
 
-        // 🟢 1. GUARDA AS VENDAS NA VARIÁVEL GLOBAL
         window.TODAS_VENDAS = dados.vendas || [];
         
-        // 2. Preenche Topo (Nome e Saldo)
         const elNome = document.getElementById('nome-afiliado');
         if(elNome) elNome.innerText = `Olá, ${dados.nome}!`;
 
@@ -92,7 +83,7 @@ async function carregarDashboardCompleto() {
 
         const elQtd = document.getElementById('qtd-vendas');
         if(elQtd && dados.vendas) {
-            const aprovadas = dados.vendas.filter(v => v.status === 'APROVADO' || v.status === 'ENTREGUE' || v.status === 'DEVOLUCAO_PARCIAL').length;
+            const aprovadas = dados.vendas.filter(v => ['APROVADO','ENTREGUE','DEVOLUCAO_PARCIAL'].includes(v.status)).length;
             elQtd.innerText = aprovadas;
         }
 
@@ -101,16 +92,14 @@ async function carregarDashboardCompleto() {
             elLink.value = `${window.location.origin}/index.html?ref=${dados.codigo}`;
         }
 
-        // 3. ATUALIZA DADOS BANCÁRIOS NA TELA DE PERFIL
         if(document.getElementById('input-pix')) document.getElementById('input-pix').value = dados.chavePix || '';
         if(document.getElementById('input-banco')) document.getElementById('input-banco').value = dados.banco || '';
         if(document.getElementById('input-agencia')) document.getElementById('input-agencia').value = dados.agencia || '';
         if(document.getElementById('input-conta')) document.getElementById('input-conta').value = dados.conta || '';
 
-        // 4. PREENCHE AS TABELAS INICIAIS
-        calcularVendasPorPeriodo(); // Widget do topo
-        preencherTabelaVendas('lista-ultimas-vendas', dados.vendas.slice(0, 5)); // 5 últimas
-        preencherTabelaVendas('lista-todas-vendas', dados.vendas); // Tabela completa
+        calcularVendasPorPeriodo(); 
+        preencherTabelaVendas('lista-ultimas-vendas', dados.vendas.slice(0, 5)); 
+        preencherTabelaVendas('lista-todas-vendas', dados.vendas); 
 
     } catch (error) {
         console.error("Erro Fatal:", error);
@@ -118,8 +107,46 @@ async function carregarDashboardCompleto() {
 }
 
 // ============================================================
-// 🟢 FUNÇÃO DE FILTRO CORRIGIDA (SEM ERRO DE FUSO HORÁRIO)
+// 🟢 CÁLCULO DO WIDGET (ATUALIZADO COM LUCRO)
 // ============================================================
+function calcularVendasPorPeriodo() {
+    const elInicio = document.getElementById('data-inicio');
+    const elFim = document.getElementById('data-fim');
+    const elTotalVendas = document.getElementById('total-periodo-valor');
+    const elTotalLucro = document.getElementById('total-periodo-lucro'); // Novo elemento
+    
+    if(!elInicio || !elFim) return;
+
+    const inicioStr = elInicio.value; 
+    const fimStr = elFim.value;
+
+    if (!inicioStr || !fimStr) return;
+
+    let totalVendaPeriodo = 0;
+    let totalLucroPeriodo = 0;
+
+    if (window.TODAS_VENDAS) {
+        window.TODAS_VENDAS.forEach(v => {
+            if (['APROVADO','ENTREGUE','DEVOLUCAO_PARCIAL'].includes(v.status)) {
+                
+                const dataObj = new Date(v.createdAt);
+                const ano = dataObj.getFullYear();
+                const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
+                const dia = String(dataObj.getDate()).padStart(2, '0');
+                const dataVendaStr = `${ano}-${mes}-${dia}`;
+
+                if (dataVendaStr >= inicioStr && dataVendaStr <= fimStr) {
+                    totalVendaPeriodo += parseFloat(v.valorTotal || 0);
+                    totalLucroPeriodo += parseFloat(v.comissaoGerada || 0); // Soma o lucro líquido
+                }
+            }
+        });
+    }
+
+    if(elTotalVendas) elTotalVendas.innerText = totalVendaPeriodo.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+    if(elTotalLucro) elTotalLucro.innerText = totalLucroPeriodo.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+}
+
 function filtrarHistoricoVendas() {
     const inicioVal = document.getElementById('filtro-inicio').value;
     const fimVal = document.getElementById('filtro-fim').value;
@@ -131,19 +158,11 @@ function filtrarHistoricoVendas() {
 
     if (window.TODAS_VENDAS.length > 0) {
         const filtradas = window.TODAS_VENDAS.filter(v => {
-            // 1. Cria a data da venda
             const dataObj = new Date(v.createdAt);
-            
-            // 2. Extrai ANO, MÊS e DIA locais (do seu computador/celular)
             const ano = dataObj.getFullYear();
-            // getMonth vai de 0 a 11, por isso +1. padStart garante o zero à esquerda (09, 05...)
             const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
             const dia = String(dataObj.getDate()).padStart(2, '0');
-            
-            // 3. Monta a string "YYYY-MM-DD" local
             const dataVendaStr = `${ano}-${mes}-${dia}`;
-
-            // 4. Compara texto com texto (Ex: "2025-12-27" >= "2025-12-27")
             return dataVendaStr >= inicioVal && dataVendaStr <= fimVal;
         });
 
@@ -160,46 +179,7 @@ function limparFiltroVendas() {
 }
 
 // ============================================================
-// 🟢 CÁLCULO DO WIDGET (TOPO) - CORRIGIDO
-// ============================================================
-function calcularVendasPorPeriodo() {
-    const elInicio = document.getElementById('data-inicio');
-    const elFim = document.getElementById('data-fim');
-    const elTotal = document.getElementById('total-periodo-valor');
-    
-    if(!elInicio || !elFim || !elTotal) return;
-
-    const inicioStr = elInicio.value; 
-    const fimStr = elFim.value;
-
-    if (!inicioStr || !fimStr) return;
-
-    let totalPeriodo = 0;
-
-    if (window.TODAS_VENDAS) {
-        window.TODAS_VENDAS.forEach(v => {
-            // CORREÇÃO: Adicionamos 'DEVOLUCAO_PARCIAL' aqui
-            if (v.status === 'APROVADO' || v.status === 'ENTREGUE' || v.status === 'DEVOLUCAO_PARCIAL') {
-                
-                const dataObj = new Date(v.createdAt);
-                const ano = dataObj.getFullYear();
-                const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
-                const dia = String(dataObj.getDate()).padStart(2, '0');
-                const dataVendaStr = `${ano}-${mes}-${dia}`;
-
-                if (dataVendaStr >= inicioStr && dataVendaStr <= fimStr) {
-                    // O backend já mandou o 'valorTotal' atualizado (reduzido), então é só somar
-                    totalPeriodo += parseFloat(v.valorTotal || 0);
-                }
-            }
-        });
-    }
-
-    elTotal.innerText = totalPeriodo.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
-}
-
-// ============================================================
-// RENDERIZAÇÃO DE TABELAS (GENÉRICA)
+// RENDERIZAÇÃO DE TABELAS (COM INDICADOR DE LÍQUIDO)
 // ============================================================
 function preencherTabelaVendas(elementId, vendas) {
     const tbody = document.getElementById(elementId);
@@ -230,7 +210,12 @@ function preencherTabelaVendas(elementId, vendas) {
             <td>${data}</td>
             <td>${v.clienteNome || 'Cliente'}</td>
             <td>${valor}</td>
-            <td><span style="color:#27ae60; font-weight:bold;">+ ${comissao}</span></td>
+            <td>
+                <div style="display:flex; flex-direction:column;">
+                    <span style="color:#27ae60; font-weight:bold;">+ ${comissao}</span>
+                    <span style="font-size:0.7rem; color:#95a5a6;">Líquido</span>
+                </div>
+            </td>
             <td><span style="padding:4px 8px; border-radius:4px; font-size:0.8rem; font-weight:bold; ${statusStyle}">${v.status || 'PENDENTE'}</span></td>
         `;
         tbody.appendChild(tr);
@@ -238,43 +223,36 @@ function preencherTabelaVendas(elementId, vendas) {
 }
 
 // ============================================================
-// ORÇAMENTOS, CLIENTES, PERFIL E SAQUES (MANTIDOS IGUAIS)
+// OUTRAS FUNÇÕES (MANTIDAS IGUAIS)
 // ============================================================
 
 async function carregarMeusOrcamentos() {
     const tbody = document.getElementById('lista-orcamentos-salvos');
     if(!tbody) return;
-
     try {
         const res = await fetch(`${API_URL}/afiliado/orcamentos`, {
             headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` }
         });
         const lista = await res.json();
-
         tbody.innerHTML = '';
-
         if (!lista || lista.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#7f8c8d;">Nenhum orçamento salvo.</td></tr>';
             return;
         }
-
         lista.forEach(orc => {
             const data = new Date(orc.createdAt).toLocaleDateString('pt-BR');
             const totalDisplay = orc.total > 0 ? parseFloat(orc.total).toLocaleString('pt-BR', {style:'currency', currency:'BRL'}) : "Sob Consulta";
-            
-            // Verifica se tem documento salvo, se não, passa null
             const docCliente = orc.clienteDoc ? `'${orc.clienteDoc}'` : 'null';
-
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>
                     <strong>${orc.nome}</strong><br>
-                    ${orc.clienteDoc ? `<small style="color:#2980b9;">Client: ${orc.clienteDoc}</small>` : ''}
+                    ${orc.clienteDoc ? `<small style="color:#2980b9;">Doc: ${orc.clienteDoc}</small>` : ''}
                 </td>
                 <td>${data}</td>
                 <td style="color:#27ae60;">${totalDisplay}</td>
                 <td>
-                    <button onclick="restaurarOrcamento('${encodeURIComponent(orc.itens)}', ${docCliente})" style="background:#3498db; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; margin-right:5px;" title="Carregar no Carrinho">
+                    <button onclick="restaurarOrcamento('${encodeURIComponent(orc.itens)}', ${docCliente})" style="background:#3498db; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; margin-right:5px;" title="Carregar">
                         <i class="ph ph-shopping-cart"></i> Abrir
                     </button>
                     <button onclick="excluirOrcamento(${orc.id})" style="background:#c0392b; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;" title="Excluir">
@@ -284,38 +262,22 @@ async function carregarMeusOrcamentos() {
             `;
             tbody.appendChild(tr);
         });
-
     } catch (e) { console.error(e); }
 }
 
-// 🟢 FUNÇÃO DE RESTAURAR ATUALIZADA
 function restaurarOrcamento(itensEncoded, clienteDoc) {
     if(!confirm("Isso vai substituir o carrinho atual pelo deste orçamento. Continuar?")) return;
-    
     try {
         const itensString = decodeURIComponent(itensEncoded);
-        
-        // 1. Valida se o JSON está ok
         JSON.parse(itensString);
-        
-        // 2. Salva o carrinho
         localStorage.setItem('nossoCarrinho', itensString);
-
-        // 3. SE tiver um documento de cliente salvo, guarda ele para o Checkout usar
         if (clienteDoc && clienteDoc !== 'null') {
             localStorage.setItem('tempClienteDoc', clienteDoc);
         } else {
             localStorage.removeItem('tempClienteDoc');
         }
-
-        // 4. Redireciona direto para o Checkout (para já preencher os dados)
-        // Se preferir ir para o carrinho antes, mude para 'cart.html'
         window.location.href = 'checkout.html'; 
-
-    } catch(e) { 
-        console.error(e);
-        alert("Erro ao carregar itens."); 
-    }
+    } catch(e) { console.error(e); alert("Erro ao carregar itens."); }
 }
 
 async function excluirOrcamento(id) {
@@ -332,9 +294,7 @@ async function carregarMeusClientes() {
     const tbody = document.getElementById('lista-clientes');
     if(!tbody) return;
     try {
-        const res = await fetch(`${API_URL}/afiliado/meus-clientes`, {
-            headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` }
-        });
+        const res = await fetch(`${API_URL}/afiliado/meus-clientes`, { headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` } });
         const clientes = await res.json();
         tbody.innerHTML = '';
         if (!clientes || clientes.length === 0) {
@@ -348,11 +308,6 @@ async function carregarMeusClientes() {
                 <td>${c.email}<br>${c.telefone ? `<small>📞 ${c.telefone}</small>` : ''}</td>
                 <td>${parseFloat(c.totalGasto).toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</td>
                 <td>${new Date(c.ultimaCompra).toLocaleDateString('pt-BR')}</td>
-                <td>
-                    <a href="https://wa.me/?text=Olá ${c.nome}, tudo bem?" target="_blank" style="color:#27ae60; text-decoration:none; font-weight:bold;">
-                        <i class="ph ph-whatsapp-logo"></i>
-                    </a>
-                </td>
             `;
             tbody.appendChild(tr);
         });
@@ -374,16 +329,14 @@ async function carregarMeusSaques() {
             const dataSol = new Date(s.dataSolicitacao).toLocaleDateString('pt-BR');
             const dataPag = s.dataPagamento ? new Date(s.dataPagamento).toLocaleDateString('pt-BR') : '-';
             const valor = parseFloat(s.valor).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
-            
             let statusBadge = `<span style="background:#fff3cd; color:#856404; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.7rem;">PENDENTE ⏳</span>`;
             if(s.status === 'PAGO') statusBadge = `<span style="background:#d4edda; color:#155724; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.7rem;">PAGO ✅</span>`;
-
+            
             let btnComprovante = '-';
             if (s.comprovante) {
                 const link = s.comprovante.replace(/\\/g, '/');
-                btnComprovante = `<a href="${API_URL}/${link}" target="_blank" style="background:#3498db; color:white; padding:4px 8px; border-radius:4px; text-decoration:none; font-size:0.8rem;"><i class="ph ph-file-text"></i> Ver</a>`;
+                btnComprovante = `<a href="${API_URL}/${link}" target="_blank" style="background:#3498db; color:white; padding:4px 8px; border-radius:4px; text-decoration:none; font-size:0.8rem;">Ver</a>`;
             }
-
             const tr = document.createElement('tr');
             tr.innerHTML = `<td>${dataSol}</td><td><strong>${valor}</strong></td><td>${dataPag}</td><td>${statusBadge}</td><td>${btnComprovante}</td>`;
             tbody.appendChild(tr);
@@ -437,7 +390,7 @@ function mudarAba(abaId) {
     if(nav) nav.classList.add('active');
 }
 
-// SISTEMA DE NOTIFICAÇÕES (IGUAL)
+// NOTIFICAÇÕES
 function iniciarNotificacoes() { verificarNotificacoes(); setInterval(verificarNotificacoes, 15000); }
 async function verificarNotificacoes() {
     if(!AFILIADO_TOKEN) return;
@@ -476,38 +429,19 @@ window.addEventListener('click', (e) => {
     if (c && d && !c.contains(e.target)) d.style.display = 'none';
 });
 
-// ============================================================
-// 👥 MÓDULO DE CLIENTES E ORÇAMENTOS
-// ============================================================
-
-
-// ============================================================
-// FUNÇÃO PARA ABRIR O MODAL DE NOVO CLIENTE (LIMPO)
-// ============================================================
+// CLIENTES (Funções do Modal e Cadastro)
 function abrirModalCliente() {
-    // 1. Limpa o ID oculto (Para garantir que não é uma edição)
     const inputId = document.getElementById('cli-id');
     if(inputId) inputId.value = ''; 
-
-    // 2. Limpa os campos visuais
     if(document.getElementById('cli-nome')) document.getElementById('cli-nome').value = '';
     if(document.getElementById('cli-doc')) document.getElementById('cli-doc').value = '';
     if(document.getElementById('cli-tel')) document.getElementById('cli-tel').value = '';
     if(document.getElementById('cli-email')) document.getElementById('cli-email').value = '';
     if(document.getElementById('cli-endereco')) document.getElementById('cli-endereco').value = '';
-
-    // 3. Reseta o Título para "Cadastrar Cliente"
     const titulo = document.querySelector('#modal-novo-cliente h3');
     if(titulo) titulo.innerText = "Cadastrar Cliente";
-
-    // 4. Reseta para Pessoa Física
     const radios = document.getElementsByName('tipoPessoa');
-    if(radios.length > 0) {
-        radios[0].checked = true;
-        alternarTipo('PF'); // Chama a função que muda o placeholder
-    }
-
-    // 5. Finalmente, mostra o modal
+    if(radios.length > 0) { radios[0].checked = true; alternarTipo('PF'); }
     const modal = document.getElementById('modal-novo-cliente');
     if(modal) modal.style.display = 'flex';
 }
@@ -515,21 +449,12 @@ function abrirModalCliente() {
 function alternarTipo(tipo) {
     const docInput = document.getElementById('cli-doc');
     const nomeInput = document.getElementById('cli-nome');
-    
-    if(tipo === 'PJ') {
-        docInput.placeholder = "CNPJ";
-        nomeInput.placeholder = "Razão Social";
-    } else {
-        docInput.placeholder = "CPF";
-        nomeInput.placeholder = "Nome Completo";
-    }
+    if(tipo === 'PJ') { docInput.placeholder = "CNPJ"; nomeInput.placeholder = "Razão Social"; } 
+    else { docInput.placeholder = "CPF"; nomeInput.placeholder = "Nome Completo"; }
 }
 
-// 2. Salvar Cliente no Banco
 async function salvarNovoCliente() {
-    // Pega o ID (se estiver vazio, é cadastro novo. Se tiver valor, é edição)
     const idCliente = document.getElementById('cli-id') ? document.getElementById('cli-id').value : null;
-
     const dados = {
         tipo: document.querySelector('input[name="tipoPessoa"]:checked').value,
         nome: document.getElementById('cli-nome').value,
@@ -538,199 +463,51 @@ async function salvarNovoCliente() {
         email: document.getElementById('cli-email').value,
         endereco: document.getElementById('cli-endereco').value
     };
-
     if(!dados.nome || !dados.documento) return alert("Nome e Documento são obrigatórios.");
-
     try {
         let url = `${API_URL}/afiliado/cadastrar-cliente`;
         let method = 'POST';
-
-        // SE TIVER ID, MUDA PARA EDIÇÃO
         if (idCliente) {
-            url = `${API_URL}/afiliado/clientes/${idCliente}`; // Ajuste a rota conforme seu Backend
+            url = `${API_URL}/afiliado/clientes/${idCliente}`;
             method = 'PUT';
         }
-
         const res = await fetch(url, {
-            method: method,
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${AFILIADO_TOKEN}` },
-            body: JSON.stringify(dados)
+            method: method, headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${AFILIADO_TOKEN}` }, body: JSON.stringify(dados)
         });
-
         if(res.ok) {
             alert(idCliente ? "Cliente atualizado!" : "Cliente cadastrado!");
             document.getElementById('modal-novo-cliente').style.display = 'none';
-            carregarClientesCadastrados(); // Atualiza a lista na tela
-        } else {
-            alert("Erro ao salvar.");
-        }
+            carregarClientesCadastrados(); 
+        } else { alert("Erro ao salvar."); }
     } catch(e) { console.error(e); }
 }
 
-// 3. Listar Clientes na Tabela
 async function carregarClientesCadastrados() {
     const tbody = document.getElementById('lista-clientes-cadastrados');
     if(!tbody) return;
-
     try {
-        const res = await fetch(`${API_URL}/afiliado/meus-clientes-cadastrados`, {
-            headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` }
-        });
+        const res = await fetch(`${API_URL}/afiliado/meus-clientes-cadastrados`, { headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` } });
         const lista = await res.json();
-        
         tbody.innerHTML = '';
         lista.forEach(c => {
-            // AQUI MUDOU: Botão agora é "Editar" (Azul)
-            // Note que usamos 'prepararEdicao' em vez de 'gerarOrcamentoPDF'
-            tbody.innerHTML += `
-                <tr>
-                    <td><strong>${c.nome}</strong></td>
-                    <td>${c.tipo}</td>
-                    <td>${c.documento || '-'}</td>
-                    <td>${c.telefone || '-'}</td>
-                    <td>
-                        <button onclick='prepararEdicao(${JSON.stringify(c)})' style="background:#3498db; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;">
-                            <i class="ph ph-pencil-simple"></i> Editar
-                        </button>
-                    </td>
-                </tr>
-            `;
+            tbody.innerHTML += `<tr><td><strong>${c.nome}</strong></td><td>${c.tipo}</td><td>${c.documento || '-'}</td><td>${c.telefone || '-'}</td>
+                <td><button onclick='prepararEdicao(${JSON.stringify(c)})' style="background:#3498db; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; font-size:0.8rem;"><i class="ph ph-pencil-simple"></i> Editar</button></td></tr>`;
         });
     } catch(e) { console.error(e); }
 }
 
-// Função para abrir o modal preenchido
 function prepararEdicao(cliente) {
-    // 1. Preenche o ID oculto (Necessário criar esse input no HTML se não existir)
     const inputId = document.getElementById('cli-id');
     if(inputId) inputId.value = cliente.id; 
-
-    // 2. Preenche os campos visuais
     document.getElementById('cli-nome').value = cliente.nome || '';
     document.getElementById('cli-doc').value = cliente.documento || '';
     document.getElementById('cli-tel').value = cliente.telefone || '';
     document.getElementById('cli-email').value = cliente.email || '';
     document.getElementById('cli-endereco').value = cliente.endereco || '';
-
-    // 3. Seleciona o Tipo (PF ou PJ)
     const radios = document.getElementsByName('tipoPessoa');
-    if(cliente.tipo === 'PJ') {
-        radios[1].checked = true; // Index 1 deve ser o PJ
-        alternarTipo('PJ');
-    } else {
-        radios[0].checked = true; // Index 0 deve ser o PF
-        alternarTipo('PF');
-    }
-
-    // 4. Muda o título do modal (opcional, para ficar bonito)
+    if(cliente.tipo === 'PJ') { radios[1].checked = true; alternarTipo('PJ'); } 
+    else { radios[0].checked = true; alternarTipo('PF'); }
     const titulo = document.querySelector('#modal-novo-cliente h3');
     if(titulo) titulo.innerText = "Editar Cliente";
-
-    // 5. Abre o modal
     document.getElementById('modal-novo-cliente').style.display = 'flex';
-}
-
-// Chame essa função no seu "carregarDashboardCompleto" ou "mudarAba"
-// Ex: carregarClientesCadastrados();
-
-// ============================================================
-// 🖨️ GERADOR DE ORÇAMENTO (PDF / IMPRESSÃO)
-// ============================================================
-function gerarOrcamentoPDF(cliente) {
-    // 1. Pega os itens do Carrinho do LocalStorage
-    const carrinhoStr = localStorage.getItem('nossoCarrinho');
-    let itens = [];
-    if(carrinhoStr) itens = JSON.parse(carrinhoStr);
-
-    if(itens.length === 0) return alert("Seu carrinho está vazio! Adicione produtos primeiro para gerar um orçamento.");
-
-    // 2. Calcula Totais
-    let totalGeral = 0;
-    let linhasItens = itens.map(item => {
-        const totalItem = item.preco * item.quantidade;
-        totalGeral += totalItem;
-        return `
-            <tr style="border-bottom: 1px solid #eee;">
-                <td style="padding: 8px;">${item.tituloOriginal}</td>
-                <td style="padding: 8px; text-align: center;">${item.quantidade}</td>
-                <td style="padding: 8px; text-align: right;">R$ ${parseFloat(item.preco).toFixed(2)}</td>
-                <td style="padding: 8px; text-align: right;">R$ ${totalItem.toFixed(2)}</td>
-            </tr>
-        `;
-    }).join('');
-
-    // 3. Monta o HTML da Janela de Impressão
-    // Aqui colocamos o Cabeçalho da Empresa e os Dados do Cliente
-    const conteudoHTML = `
-        <html>
-        <head>
-            <title>Orçamento - ${cliente.nome}</title>
-            <style>
-                body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
-                .header { display: flex; justify-content: space-between; margin-bottom: 40px; border-bottom: 2px solid #333; padding-bottom: 20px; }
-                .empresa-info { width: 48%; }
-                .cliente-info { width: 48%; text-align: right; }
-                h1 { margin: 0; color: #2c3e50; font-size: 24px; }
-                h2 { font-size: 16px; margin-bottom: 5px; color: #555; }
-                .table-orcamento { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                .table-orcamento th { background: #f4f6f8; padding: 10px; text-align: left; border-bottom: 2px solid #ddd; }
-                .total-box { margin-top: 30px; text-align: right; font-size: 20px; font-weight: bold; }
-                .footer { margin-top: 50px; font-size: 12px; color: #777; text-align: center; border-top: 1px solid #eee; padding-top: 10px; }
-            </style>
-        </head>
-        <body>
-            
-            <div class="header">
-                <div class="empresa-info">
-                    <h1>AutoPeças Veloz</h1>
-                    <p>CNPJ: 00.000.000/0001-00</p>
-                    <p>Rua das Peças, 123 - Centro</p>
-                    <p>Tel: (11) 9999-9999</p>
-                    <p>Email: contato@autopecasveloz.com.br</p>
-                </div>
-                <div class="cliente-info">
-                    <h2 style="color:#e67e22;">ORÇAMENTO PARA:</h2>
-                    <p><strong>${cliente.nome}</strong></p>
-                    <p>${cliente.tipo} - ${cliente.documento || ''}</p>
-                    <p>${cliente.telefone || ''}</p>
-                    <p>${cliente.endereco || ''}</p>
-                    <br>
-                    <p>Data: ${new Date().toLocaleDateString('pt-BR')}</p>
-                </div>
-            </div>
-
-            <table class="table-orcamento">
-                <thead>
-                    <tr>
-                        <th>Produto / Descrição</th>
-                        <th style="text-align: center;">Qtd</th>
-                        <th style="text-align: right;">Valor Unit.</th>
-                        <th style="text-align: right;">Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${linhasItens}
-                </tbody>
-            </table>
-
-            <div class="total-box">
-                TOTAL: R$ ${totalGeral.toFixed(2)}
-            </div>
-
-            <div class="footer">
-                <p>Orçamento válido por 5 dias. Sujeito a disponibilidade de estoque.</p>
-                <p>Este documento não possui valor fiscal.</p>
-            </div>
-
-            <script>
-                window.print();
-            </script>
-        </body>
-        </html>
-    `;
-
-    // 4. Abre a janela e imprime
-    const janela = window.open('', '', 'width=900,height=700');
-    janela.document.write(conteudoHTML);
-    janela.document.close();
 }

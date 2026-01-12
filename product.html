@@ -147,14 +147,16 @@
                 Verificando estoque...
             </p>
 
-            <div id="affiliate-area" class="affiliate-profit-box" style="display:none;">                       
+            <div id="affiliate-area" class="affiliate-profit-box" style="display:none;">                      
                 <h4 style="margin-bottom:10px; color:#2c3e50;"><i class="ph ph-currency-circle-dollar"></i> Painel do Parceiro</h4>
+                
                 <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
                     <label>Sua Margem:</label>
                     <input type="number" id="input-margem" value="0" min="0" style="width:70px; padding:8px; border-radius:4px; border:1px solid #ccc; text-align:center;"> %
                 </div>
-                <div style="font-size:0.9rem; color:#27ae60; font-weight:bold;">
-                    Seu Lucro Total: <span id="lucro-estimado">R$ 0,00</span>
+
+                <div id="display-lucro-afiliado" style="background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #eee; font-size: 0.9rem; line-height: 1.6;">
+                    <span style="color:#7f8c8d;">Aguardando cálculo...</span>
                 </div>
             </div>
 
@@ -379,6 +381,7 @@ if (estoqueAtual <= 0) {
     
 
         // --- 3. LÓGICA DE PREÇO ---
+        // --- 3. LÓGICA DE PREÇO (ATUALIZADA COM CÁLCULO DE TAXAS) ---
         function atualizarPrecoTela() {
             if(!PRODUTO_ATUAL) return;
 
@@ -389,6 +392,7 @@ if (estoqueAtual <= 0) {
             const boxPreco = document.getElementById('prod-price');
             const boxLucro = document.getElementById('affiliate-area'); 
             const boxParcelas = document.querySelector('.detail-installments');
+            const displayLucroDetalhado = document.getElementById('display-lucro-afiliado'); // NOVO ELEMENTO
 
             // SE NÃO TIVER LOGADO: Bloqueia
             if (!estaLogado) {
@@ -413,19 +417,56 @@ if (estoqueAtual <= 0) {
             }
             if(boxParcelas) boxParcelas.style.display = 'block';
 
+            // =========================================================
+            // 🧮 CÁLCULOS FINANCEIROS (SIMULAÇÃO)
+            // =========================================================
             const precoBase = parseFloat(PRODUTO_ATUAL.preco_novo);
             const qtd = parseInt(document.getElementById('qtd').value) || 1;
 
+            // 1. Preço Final
             const precoUnitarioFinal = precoBase * (1 + (MARGEM_ATUAL / 100));
-            const lucroUnitario = precoUnitarioFinal - precoBase;
-            const lucroTotal = lucroUnitario * qtd; 
+            
+            // 2. Lucro Bruto (Markup puro)
+            const lucroBrutoUnitario = precoUnitarioFinal - precoBase;
+            
+            // 3. Estimativa de Taxas (30% do Lucro Bruto para cobrir Impostos + Asaas)
+            // Essa é a mesma lógica usada no cálculo visual do Cart.html
+            const FATOR_TAXAS = 0.30; 
+            const taxasUnitarias = lucroBrutoUnitario * FATOR_TAXAS;
+            
+            // 4. Lucro Líquido Real
+            const lucroLiquidoUnitario = lucroBrutoUnitario - taxasUnitarias;
 
+            // Totais (multiplicado pela quantidade)
+            const totalBruto = lucroBrutoUnitario * qtd;
+            const totalTaxas = taxasUnitarias * qtd;
+            const totalLiquido = lucroLiquidoUnitario * qtd;
+
+            // ATUALIZA O PREÇO NA TELA
             boxPreco.textContent = precoUnitarioFinal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
             
-            if(document.getElementById('lucro-estimado')) {
-                document.getElementById('lucro-estimado').innerHTML = `${lucroTotal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} <small style="color:#7f8c8d;">(${qtd} itens)</small>`;
+            // ATUALIZA O PAINEL DO AFILIADO (DETALHADO)
+            if(displayLucroDetalhado) {
+                displayLucroDetalhado.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; color:#7f8c8d;">
+                        <span>Ganho Bruto:</span>
+                        <span>${totalBruto.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; color:#c0392b; font-size:0.85rem;">
+                        <span>- Taxas/Imp (Est.):</span>
+                        <span>${totalTaxas.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</span>
+                    </div>
+                    <div style="margin-top:5px; padding-top:5px; border-top:1px dashed #ddd; display:flex; justify-content:space-between; color:#27ae60; font-weight:bold; font-size:1.1rem;">
+                        <span>Líquido:</span>
+                        <span>${totalLiquido.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</span>
+                    </div>
+                    <div style="text-align:right; font-size:0.7rem; color:#aaa; margin-top:2px;">
+                        (${qtd} itens)
+                    </div>
+                `;
             }
             
+            // Preço Antigo (se houver)
             if(PRODUTO_ATUAL.preco_antigo && PRODUTO_ATUAL.preco_antigo > precoBase) {
                 document.getElementById('prod-old-price').textContent = parseFloat(PRODUTO_ATUAL.preco_antigo).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
             } else {

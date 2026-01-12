@@ -135,10 +135,13 @@ document.addEventListener("DOMContentLoaded", async function() {
 // ==============================================================
 // 🛒 CARRINHO FINAL (COM BOTÃO ESVAZIAR NOS DOIS MODOS)
 // ==============================================================
+// ==============================================================
+// 🛒 CARRINHO FINAL (ATUALIZADO COM LUCRO LÍQUIDO)
+// ==============================================================
 async function carregarPaginaCarrinho() {
     if (!localStorage.getItem('afiliadoLogado')) {
         alert("Você precisa fazer login para acessar o carrinho.");
-        window.location.href = "login.html";
+        window.location.href = "login.html"; // Ajuste se seu login for afiliado_login.html
         return;
     }
 
@@ -153,18 +156,18 @@ async function carregarPaginaCarrinho() {
 
     let cart = getCarrinho();
     
-    // Limpa tudo
+    // Limpa tudo antes de recriar
     if (cartItemsContainer) cartItemsContainer.innerHTML = ''; 
     if (cartMobileContainer) cartMobileContainer.innerHTML = '';
     if (divAcoes) divAcoes.innerHTML = '';
     
     let totalVenda = 0;
-    let totalLucro = 0; 
+    let totalLucroLiquido = 0; // 🟢 Mudamos de totalLucro para totalLucroLiquido
     const isAfiliado = !!localStorage.getItem('afiliadoLogado');
 
     // 1. Carrinho Vazio
     if (cart.length === 0) {
-        if(cartItemsContainer) cartItemsContainer.innerHTML = '<tr><td colspan="6" align="center">Carrinho vazio.</td></tr>';
+        if(cartItemsContainer) cartItemsContainer.innerHTML = '<tr><td colspan="6" align="center" style="padding:20px;">Seu carrinho está vazio.</td></tr>';
         if(cartMobileContainer) cartMobileContainer.innerHTML = '<div style="text-align:center; padding:20px;">Carrinho vazio.</div>';
         
         if (cartTotalElement) cartTotalElement.innerText = 'R$ 0,00';
@@ -182,37 +185,57 @@ async function carregarPaginaCarrinho() {
 
             const nomeExibir = montarNomeCompleto(item, p);
 
-            // Cálculos
+            // ===========================================================
+            // 🟢 CÁLCULOS COM A NOVA LÓGICA FINANCEIRA
+            // ===========================================================
             const precoBase = parseFloat(p.price || p.preco_novo);
+            
+            // Pega a margem do item ou a global
             let margemAplicada = (item.customMargin !== undefined) ? item.customMargin : ((FATOR_GLOBAL - 1) * 100);
-            const precoFinal = precoBase * (1 + (margemAplicada / 100));
-            const subtotalItem = precoFinal * item.quantidade;
-            const lucroItem = (precoFinal - precoBase) * item.quantidade; 
+            
+            // Usa a calculadora de lucro líquido (mesma do produto.html)
+            // Se a função não existir ainda no final do arquivo, ela vai dar erro, certifique-se que ela está lá.
+            const math = calcularSimulacaoLiquida(precoBase, margemAplicada);
+
+            const subtotalItem = math.precoFinal * item.quantidade;
+            const lucroLiquidoItemTotal = math.lucroLiquido * item.quantidade;
 
             totalVenda += subtotalItem;
-            totalLucro += lucroItem;
+            totalLucroLiquido += lucroLiquidoItemTotal;
+            // ===========================================================
 
             // --- VERSÃO DESKTOP ---
             if (cartItemsContainer) {
+                // HTML da Margem com Visualização do Lucro Unitário
                 const htmlMargemPC = isAfiliado ? `
-                    <div style="margin-top:5px; font-size:0.85rem; color:#e67e22;">
-                        Lucro: <input type="number" value="${margemAplicada}" 
-                        style="width:50px; text-align:center; border:1px solid #ddd;" 
-                        onchange="atualizarMargemCarrinho(${item.id}, this.value)"> %
+                    <div style="margin-top:5px; font-size:0.85rem; color:#e67e22; display:flex; flex-direction:column; gap:2px;">
+                        <div>
+                            Margem: <input type="number" value="${margemAplicada}" 
+                            style="width:50px; text-align:center; border:1px solid #ddd; border-radius:3px;" 
+                            onchange="atualizarMargemCarrinho(${item.id}, this.value)"> %
+                        </div>
+                        <div style="font-size:0.75rem; color:#27ae60; font-weight:bold;">
+                            Líq: ${formatarMoeda(math.lucroLiquido)} <span style="color:#aaa; font-weight:normal;">/un</span>
+                        </div>
                     </div>` : '';
 
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td><img src="${p.image||p.imagem}" width="60" style="vertical-align:middle" onerror="this.src='https://placehold.co/100'"></td>
-                    <td><strong>${nomeExibir}</strong> ${htmlMargemPC}</td>
-                    <td>${formatarMoeda(precoFinal)}</td>
+                    <td><img src="${p.image||p.imagem}" width="60" style="vertical-align:middle; border-radius:4px;" onerror="this.src='https://placehold.co/100'"></td>
                     <td>
-                        <button onclick="alterarQuantidade(${item.id}, -1)">-</button> 
-                        ${item.quantidade} 
-                        <button onclick="alterarQuantidade(${item.id}, 1)">+</button>
+                        <strong>${nomeExibir}</strong> 
+                        ${htmlMargemPC}
                     </td>
-                    <td>${formatarMoeda(subtotalItem)}</td>
-                    <td><button onclick="removerItem(${item.id})" style="color:red;border:none;background:none;cursor:pointer;">&times;</button></td>
+                    <td>${formatarMoeda(math.precoFinal)}</td>
+                    <td>
+                        <div style="display:flex; gap:5px; align-items:center;">
+                            <button onclick="alterarQuantidade(${item.id}, -1)" style="padding:2px 8px;">-</button> 
+                            <span>${item.quantidade}</span> 
+                            <button onclick="alterarQuantidade(${item.id}, 1)" style="padding:2px 8px;">+</button>
+                        </div>
+                    </td>
+                    <td style="font-weight:bold;">${formatarMoeda(subtotalItem)}</td>
+                    <td><button onclick="removerItem(${item.id})" style="color:#c0392b; border:none; background:none; cursor:pointer; font-size:1.2rem;">&times;</button></td>
                 `;
                 cartItemsContainer.appendChild(row);
             }
@@ -220,36 +243,48 @@ async function carregarPaginaCarrinho() {
             // --- VERSÃO MOBILE ---
             if (cartMobileContainer) {
                 const htmlMargemMobile = isAfiliado ? `
-                    <div class="mobile-lucro-box">
-                        <strong>Lucro:</strong>
-                        <input type="number" value="${margemAplicada}" 
-                            onchange="atualizarMargemCarrinho(${item.id}, this.value)"> %
+                    <div class="mobile-lucro-box" style="background:#f9f9f9; padding:8px; border-radius:5px; margin:10px 0;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                            <strong>Sua Margem:</strong>
+                            <div>
+                                <input type="number" value="${margemAplicada}" 
+                                    style="width:50px; padding:5px; border:1px solid #ddd; text-align:center;"
+                                    onchange="atualizarMargemCarrinho(${item.id}, this.value)"> %
+                            </div>
+                        </div>
+                        <div style="text-align:right; font-size:0.9rem; color:#27ae60;">
+                            Lucro Líquido: <strong>${formatarMoeda(math.lucroLiquido)}</strong> /un
+                        </div>
                     </div>` : '';
 
                 const card = document.createElement('div');
                 card.className = 'mobile-cart-card';
                 card.innerHTML = `
-                    <img src="${p.image||p.imagem}" class="mobile-cart-img" onerror="this.src='https://placehold.co/100?text=Sem+Imagem'">
-                    <div class="mobile-cart-title">${nomeExibir}</div>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <img src="${p.image||p.imagem}" class="mobile-cart-img" style="width:60px; height:60px; object-fit:contain;" onerror="this.src='https://placehold.co/100?text=S/Img'">
+                        <div style="flex:1;">
+                            <div class="mobile-cart-title" style="font-weight:bold; font-size:0.95rem;">${nomeExibir}</div>
+                            <div style="color:#777; font-size:0.85rem;">${formatarMoeda(math.precoFinal)} unit.</div>
+                        </div>
+                    </div>
+
                     ${htmlMargemMobile}
                     
-                    <div class="mobile-cart-details">
-                        <div style="text-align:left;">
-                            <div style="font-size:0.8rem; color:#888;">Unitário</div>
-                            <div style="font-weight:bold; color:#333;">${formatarMoeda(precoFinal)}</div>
-                        </div>
+                    <div class="mobile-cart-details" style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
                         <div class="mobile-qty-box">
                             <button onclick="alterarQuantidade(${item.id}, -1)">-</button>
-                            <strong>${item.quantidade}</strong>
+                            <strong style="margin:0 10px;">${item.quantidade}</strong>
                             <button onclick="alterarQuantidade(${item.id}, 1)">+</button>
+                        </div>
+                        <div style="font-size:1.1rem; color:#2c3e50; font-weight:800;">
+                            ${formatarMoeda(subtotalItem)}
                         </div>
                     </div>
 
-                    <div style="margin-top:15px; display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-size:1.1rem; color:#27ae60; font-weight:800;">Total: ${formatarMoeda(subtotalItem)}</span>
-                    </div>
-
-                    <button class="mobile-remove-btn" onclick="removerItem(${item.id})">Remover Item</button>
+                    <button class="mobile-remove-btn" onclick="removerItem(${item.id})" style="width:100%; margin-top:10px; background:none; border:1px solid #fab1a0; color:#e17055; padding:8px; border-radius:4px;">
+                        Remover
+                    </button>
+                    <hr style="margin-top:15px; border:0; border-top:1px solid #eee;">
                 `;
                 cartMobileContainer.appendChild(card);
             }
@@ -257,46 +292,52 @@ async function carregarPaginaCarrinho() {
         } catch (e) { console.error(e); }
     }
     
-    // --- 3. BOTÃO DE ESVAZIAR (AQUI ESTÁ A CORREÇÃO) ---
-    
-    // Adiciona no Desktop (Tabela)
+    // 3. BOTÃO DE ESVAZIAR
     if (cartItemsContainer && cart.length > 0) {
         const rowLimpar = document.createElement('tr');
         rowLimpar.innerHTML = `
             <td colspan="6" style="text-align: right; padding-top: 15px;">
-                <button onclick="limparCarrinho()" style="background:none; border:1px solid #e74c3c; color:#e74c3c; padding:8px 15px; border-radius:4px; cursor:pointer; font-size:0.9rem; display:inline-flex; align-items:center; gap:5px; transition:0.3s;">
+                <button onclick="limparCarrinho()" style="background:none; border:1px solid #e74c3c; color:#e74c3c; padding:8px 15px; border-radius:4px; cursor:pointer; font-size:0.9rem; display:inline-flex; align-items:center; gap:5px;">
                     <i class="ph ph-trash"></i> Esvaziar Carrinho
                 </button>
             </td>`;
         cartItemsContainer.appendChild(rowLimpar);
     }
 
-    // Adiciona no Mobile (Lista)
     if (cartMobileContainer && cart.length > 0) {
         const btnLimparMobile = document.createElement('div');
         btnLimparMobile.style.textAlign = 'center';
         btnLimparMobile.style.marginTop = '20px';
         btnLimparMobile.innerHTML = `
             <button onclick="limparCarrinho()" style="background:white; border:1px solid #e74c3c; color:#e74c3c; padding:12px; width:100%; border-radius:8px; cursor:pointer; font-weight:bold; display:flex; justify-content:center; align-items:center; gap:8px;">
-                <i class="ph ph-trash" style="font-size:1.2rem;"></i> Esvaziar Todo o Carrinho
+                <i class="ph ph-trash" style="font-size:1.2rem;"></i> Esvaziar Tudo
             </button>
         `;
         cartMobileContainer.appendChild(btnLimparMobile);
     }
 
-    // 4. Atualiza Totais
+    // 4. ATUALIZA TOTAIS NO RODAPÉ DO CARRINHO
     if (cartTotalElement) cartTotalElement.innerText = formatarMoeda(totalVenda);
     if (cartSubtotalElement) cartSubtotalElement.innerText = formatarMoeda(totalVenda);
 
+    // Mostra o Lucro Líquido Estimado Total
     if (isAfiliado && rowLucro && valorLucro) {
         rowLucro.style.display = 'flex'; 
-        valorLucro.innerText = formatarMoeda(totalLucro);
+        rowLucro.style.justifyContent = 'space-between';
+        
+        // Atualiza a Label para ficar claro
+        const labelLucro = rowLucro.querySelector('span:first-child') || rowLucro;
+        if(labelLucro.innerText.includes('Lucro')) labelLucro.innerHTML = '<strong>Lucro Líquido Est.:</strong>';
+
+        valorLucro.innerHTML = `
+            <span style="color:#27ae60; font-size:1.2rem; font-weight:bold;">${formatarMoeda(totalLucroLiquido)}</span>
+        `;
     }
 
     // 5. Botão Finalizar
     if (divAcoes && isAfiliado && cart.length > 0) {
         divAcoes.innerHTML = `
-            <button onclick="window.location.href='checkout.html'" class="btn-place-order" style="width:100%; margin-top:15px;">
+            <button onclick="window.location.href='checkout.html'" class="btn-place-order" style="width:100%; margin-top:15px; background:#34495e; color:white; padding:15px; font-size:1.1rem;">
                 <i class="ph ph-whatsapp-logo"></i> Finalizar / Gerar Link
             </button>
         `;
@@ -1038,4 +1079,34 @@ function mostrarModalPix(pixData, linkPagamento) {
 function copiarCodigo() {
     const codigo = document.getElementById('pix-cola').innerText;
     navigator.clipboard.writeText(codigo).then(() => alert("Copiado!"));
+}
+
+// ============================================================
+// 🧮 CALCULADORA DE LUCRO LÍQUIDO (ESTIMATIVA FRONTEND)
+// ============================================================
+function calcularSimulacaoLiquida(precoBase, margemPorcentagem) {
+    // 1. Preços
+    const precoBaseFloat = parseFloat(precoBase);
+    const margem = parseFloat(margemPorcentagem);
+    
+    // Preço Final de Venda
+    const precoFinal = precoBaseFloat * (1 + (margem / 100));
+    
+    // 2. Lucro Bruto do Afiliado (O que ele adicionou)
+    const lucroBruto = precoFinal - precoBaseFloat;
+
+    // 3. Estimativa de Taxas (Rateio Proporcional)
+    // Baseado na lógica do Backend: 6% Gov + ~3.5% Asaas + Rateio do Custo
+    // Em média, cerca de 28% a 32% do Lucro Bruto do afiliado vai para pagar a parte dele das taxas.
+    const FATOR_TAXAS = 0.30; // 30% de retenção média para cobrir custos operacionais
+    
+    const descontoTaxas = lucroBruto * FATOR_TAXAS;
+    const lucroLiquido = lucroBruto - descontoTaxas;
+
+    return {
+        precoFinal: precoFinal,
+        lucroBruto: lucroBruto,
+        taxasEstimadas: descontoTaxas,
+        lucroLiquido: lucroLiquido
+    };
 }

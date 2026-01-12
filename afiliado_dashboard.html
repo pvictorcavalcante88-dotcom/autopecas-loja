@@ -104,7 +104,7 @@
         <div id="dashboard" class="tab-content active">
             <div class="stats-grid">
                 <div class="card money">
-                    <h3>Saldo Disponível</h3>
+                    <h3>Saldo Disponível (Líquido)</h3>
                     <div class="value" id="saldo-total">R$ 0,00</div>
                     <button id="btn-saque" onclick="solicitarSaque()" style="margin-top:10px; background:var(--success); color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer; width:100%;">
                         Solicitar Saque
@@ -116,25 +116,31 @@
                     <div class="value" id="qtd-vendas">0</div>
                 </div>
 
-<div class="card" style="border-left: 4px solid #3498db;">
-    <h3>📅 Vendas por Período</h3>
-    
-    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-        <div style="flex: 1;">
-            <small style="font-size: 0.75rem; color: #666;">De:</small>
-            <input type="date" id="data-inicio" onchange="calcularVendasPorPeriodo()" 
-                   style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit;">
-        </div>
-        <div style="flex: 1;">
-            <small style="font-size: 0.75rem; color: #666;">Até:</small>
-            <input type="date" id="data-fim" onchange="calcularVendasPorPeriodo()" 
-                   style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit;">
-        </div>
-    </div>
+                <div class="card" style="border-left: 4px solid #3498db;">
+                    <h3>📅 Filtro por Período</h3>
+                    
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <div style="flex: 1;">
+                            <small style="font-size: 0.75rem; color: #666;">De:</small>
+                            <input type="date" id="data-inicio" onchange="calcularVendasPorPeriodo()" 
+                                   style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit;">
+                        </div>
+                        <div style="flex: 1;">
+                            <small style="font-size: 0.75rem; color: #666;">Até:</small>
+                            <input type="date" id="data-fim" onchange="calcularVendasPorPeriodo()" 
+                                   style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit;">
+                        </div>
+                    </div>
 
-    <div style="font-size: 0.85rem; color: #666;">Total no período:</div>
-    <div class="value" id="total-periodo-valor" style="color: #2980b9;">R$ 0,00</div>
-</div>
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85rem; color: #666;">
+                        <span>Vendas Totais:</span>
+                        <strong id="total-periodo-valor" style="color: #2980b9;">R$ 0,00</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size: 0.9rem; margin-top:5px; padding-top:5px; border-top:1px dashed #eee;">
+                        <span style="color:#27ae60;">Seu Lucro Líquido:</span>
+                        <strong id="total-periodo-lucro" style="color: #27ae60;">R$ 0,00</strong>
+                    </div>
+                </div>
 
                 <div class="card">
                     <h3>Seu Código</h3>
@@ -154,7 +160,7 @@
                             <th>Data</th>
                             <th>Cliente</th>
                             <th>Valor Venda</th>
-                            <th>Comissão</th>
+                            <th>Lucro Líquido</th>
                             <th>Status</th>
                         </tr>
                     </thead>
@@ -184,7 +190,7 @@
                         <thead>
                             <tr>
                                 <th>Data Solicitação</th>
-                                <th>Valor</th>
+                                <th>Valor Líquido</th>
                                 <th>Data Pagamento</th>
                                 <th>Status</th>
                                 <th>Comprovante</th>
@@ -226,8 +232,8 @@
                 <tr>
                     <th>Data</th>
                     <th>Cliente</th>
-                    <th>Valor</th>
-                    <th>Sua Comissão</th>
+                    <th>Valor Venda</th>
+                    <th>Lucro Líquido</th>
                     <th>Status</th>
                 </tr>
             </thead>
@@ -237,7 +243,7 @@
     </div>
 </div>
 
-        <div id="orcamentos" class="tab-content">
+<div id="orcamentos" class="tab-content">
             <h2 class="section-title">Meus Orçamentos Salvos</h2>
             <div class="table-responsive">
                 <table class="data-table">

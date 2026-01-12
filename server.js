@@ -1078,7 +1078,7 @@ app.post('/api/checkout/pix', async (req, res) => {
         `);
 
         // 5. Gera o Link e Salva no Banco
-        const dadosPix = await asaasService.criarCobrancaPix(
+        const dadosPix = await criarCobrancaPix(
             cliente, 
             valorTotalVenda, 
             `Pedido AutoPeças (${metodoPagamento})`,

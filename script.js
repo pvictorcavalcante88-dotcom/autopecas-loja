@@ -986,11 +986,24 @@ async function finalizarCompraAsaas() {
 
     try {
         // Mapeia itens com margem
-        const itensParaEnviar = carrinho.map(i => ({ 
-            id: i.id, 
-            quantidade: i.quantidade,
-            customMargin: i.customMargin || 0 
-        }));
+        // --- CORREÇÃO DE MARGEM ---
+        // Pega a margem global salva no navegador (ex: 15%)
+        const margemGlobal = parseFloat(localStorage.getItem('minhaMargem') || 0);
+
+        // Mapeia itens com margem (Fallback de segurança)
+        const itensParaEnviar = carrinho.map(i => {
+            // Se o item tem margem definida (mesmo que 0), usa ela. 
+            // Se não tiver (undefined/null), usa a margem global do afiliado.
+            let margemFinal = (i.customMargin !== undefined && i.customMargin !== null) 
+                              ? i.customMargin 
+                              : margemGlobal;
+            
+            return { 
+                id: i.id, 
+                quantidade: i.quantidade,
+                customMargin: parseFloat(margemFinal) // Garante que vai como número
+            };
+        });
 
         const payload = {
             cliente: { 

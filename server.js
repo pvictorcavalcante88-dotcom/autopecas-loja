@@ -991,6 +991,7 @@ app.post('/api/checkout/pix', async (req, res) => {
             const totalItemCusto = custoPeca * qtd;
             const totalItemLojaBase = precoLoja * qtd;
 
+            console.log(`[DEBUG ITEM] ${prodBanco.titulo} | Margem enviada: ${item.customMargin}% | Lucro Bruto Calc: ${lucroItemAfiliado}`);
             // D. Separando os Lucros BRUTOS
             // Lucro Loja = (Preço Loja - Custo Peca) + (Diferença do Cartão se houver)
             // Nota: Se aumentou 15% pro cartão, esse extra teoricamente é pra pagar taxa, 
@@ -1009,6 +1010,7 @@ app.post('/api/checkout/pix', async (req, res) => {
                 const precoVendaSemTaxaCartao = precoLoja * (1 + (item.customMargin / 100));
                 lucroItemAfiliado = (precoVendaSemTaxaCartao - precoLoja) * qtd;
             }
+
 
             let lucroItemLoja = totalItemLojaBase - totalItemCusto;
 

@@ -32,13 +32,15 @@ async function criarCobrancaPix(cliente, valorTotal, descricao, walletIdAfiliado
         // 1. Configurações do Link
         let payload = {
             billingType: 'UNDEFINED', // Aceita Pix, Cartão e Boleto
-            chargeType: 'DETACHED',   // Cria uma cobrança nova para cada cliente
+            chargeType: 'INSTALLMENT',   // Cria uma cobrança nova para cada cliente
             name: descricao.substring(0, 255),
             description: descricao,
             endDate: null,            // Não expira o link principal (mas a cobrança sim)
             value: valorTotal,
             dueDateLimitDays: 1,      // Vencimento: 1 dia após clicar
-            maxInstallmentCount: 12   // <--- LIBERA ATÉ 12x NO CARTÃO
+            installmentCount: 2,       // Força 2 parcelas
+            installmentValue: valorTotal / 2, // Valor de cada parcela
+            maxInstallmentCount: 10   // <--- LIBERA ATÉ 10x NO CARTÃO
         };
 
         // 2. Cria o Link

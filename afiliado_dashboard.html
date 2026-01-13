@@ -116,31 +116,19 @@
                     <div class="value" id="qtd-vendas">0</div>
                 </div>
 
-                <div class="card" style="border-left: 4px solid #3498db;">
-                    <h3>📅 Filtro por Período</h3>
-                    
-                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                        <div style="flex: 1;">
-                            <small style="font-size: 0.75rem; color: #666;">De:</small>
-                            <input type="date" id="data-inicio" onchange="calcularVendasPorPeriodo()" 
-                                   style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit;">
-                        </div>
-                        <div style="flex: 1;">
-                            <small style="font-size: 0.75rem; color: #666;">Até:</small>
-                            <input type="date" id="data-fim" onchange="calcularVendasPorPeriodo()" 
-                                   style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit;">
-                        </div>
-                    </div>
+<div class="card" style="border-left: 4px solid #3498db;">
+    <h3>📅 Filtro por Período</h3>
+    
+    <div style="display:flex; justify-content:space-between; font-size: 0.85rem; color: #666; margin-top:10px;">
+        <span>Vendas Totais:</span>
+        <strong id="total-periodo-valor" style="color: #2980b9;">R$ 0,00</strong>
+    </div>
 
-                    <div style="display:flex; justify-content:space-between; font-size: 0.85rem; color: #666;">
-                        <span>Vendas Totais:</span>
-                        <strong id="total-periodo-valor" style="color: #2980b9;">R$ 0,00</strong>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; font-size: 0.9rem; margin-top:5px; padding-top:5px; border-top:1px dashed #eee;">
-                        <span style="color:#27ae60;">Seu Lucro Líquido:</span>
-                        <strong id="total-periodo-lucro" style="color: #27ae60;">R$ 0,00</strong>
-                    </div>
-                </div>
+    <div style="display:flex; justify-content:space-between; font-size: 0.9rem; margin-top:5px; padding-top:5px; border-top:1px dashed #eee;">
+        <span style="color:#27ae60;">Seu Lucro Líquido:</span>
+        <strong id="total-periodo-lucro" style="color: #27ae60;">R$ 0,00</strong>
+    </div>
+</div>
 
                 <div class="card">
                     <h3>Seu Código</h3>

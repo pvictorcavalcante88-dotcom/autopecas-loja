@@ -107,13 +107,15 @@ async function carregarDashboardCompleto() {
 }
 
 // ============================================================
-// 🟢 CÁLCULO DO WIDGET (ATUALIZADO COM LUCRO)
+// 🟢 CÁLCULO DO WIDGET (SOMA VENDA + SOMA LUCRO)
 // ============================================================
 function calcularVendasPorPeriodo() {
     const elInicio = document.getElementById('data-inicio');
     const elFim = document.getElementById('data-fim');
+    
+    // Elementos onde mostraremos os valores
     const elTotalVendas = document.getElementById('total-periodo-valor');
-    const elTotalLucro = document.getElementById('total-periodo-lucro'); // Novo elemento
+    const elTotalLucro = document.getElementById('total-periodo-lucro'); // Certifique-se que esse ID existe no HTML
     
     if(!elInicio || !elFim) return;
 
@@ -123,12 +125,14 @@ function calcularVendasPorPeriodo() {
     if (!inicioStr || !fimStr) return;
 
     let totalVendaPeriodo = 0;
-    let totalLucroPeriodo = 0;
+    let totalLucroPeriodo = 0; // 🟢 NOVO: Variável para acumular o lucro
 
     if (window.TODAS_VENDAS) {
         window.TODAS_VENDAS.forEach(v => {
-            if (['APROVADO','ENTREGUE','DEVOLUCAO_PARCIAL'].includes(v.status)) {
+            // Filtra status válidos
+            if (v.status === 'APROVADO' || v.status === 'ENTREGUE' || v.status === 'DEVOLUCAO_PARCIAL' || v.status === 'AGUARDANDO_PAGAMENTO' || v.status === 'PAGO') {
                 
+                // Filtro de Data
                 const dataObj = new Date(v.createdAt);
                 const ano = dataObj.getFullYear();
                 const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
@@ -136,15 +140,24 @@ function calcularVendasPorPeriodo() {
                 const dataVendaStr = `${ano}-${mes}-${dia}`;
 
                 if (dataVendaStr >= inicioStr && dataVendaStr <= fimStr) {
+                    // Soma Venda
                     totalVendaPeriodo += parseFloat(v.valorTotal || 0);
-                    totalLucroPeriodo += parseFloat(v.comissaoGerada || 0); // Soma o lucro líquido
+                    
+                    // 🟢 NOVO: Soma Lucro (Comissão)
+                    totalLucroPeriodo += parseFloat(v.comissaoGerada || 0);
                 }
             }
         });
     }
 
-    if(elTotalVendas) elTotalVendas.innerText = totalVendaPeriodo.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
-    if(elTotalLucro) elTotalLucro.innerText = totalLucroPeriodo.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+    // Exibe na tela
+    if(elTotalVendas) {
+        elTotalVendas.innerText = totalVendaPeriodo.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+    }
+    
+    if(elTotalLucro) {
+        elTotalLucro.innerText = totalLucroPeriodo.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+    }
 }
 
 function filtrarHistoricoVendas() {
@@ -179,7 +192,7 @@ function limparFiltroVendas() {
 }
 
 // ============================================================
-// RENDERIZAÇÃO DE TABELAS (COM INDICADOR DE LÍQUIDO)
+// RENDERIZAÇÃO DE TABELAS (COM LUCRO LÍQUIDO)
 // ============================================================
 function preencherTabelaVendas(elementId, vendas) {
     const tbody = document.getElementById(elementId);
@@ -194,16 +207,19 @@ function preencherTabelaVendas(elementId, vendas) {
 
     vendas.forEach(v => {
         const data = new Date(v.createdAt).toLocaleDateString('pt-BR');
-        const valor = parseFloat(v.valorTotal).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
-        const comissao = parseFloat(v.comissaoGerada || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+        
+        const valor = parseFloat(v.valorTotal || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+        
+        // 🟢 AQUI: Pega a comissão salva no banco
+        const comissaoValor = parseFloat(v.comissaoGerada || 0);
+        const comissaoDisplay = comissaoValor.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
         
         let statusStyle = "background:#eee; color:#333;";
         if(v.status === 'APROVADO') statusStyle = "background:#d4edda; color:#155724;";
         if(v.status === 'ENTREGUE') statusStyle = "background:#d4edda; color:#155724;";
-        if(v.status === 'PENDENTE') statusStyle = "background:#fff3cd; color:#856404;";
+        if(v.status === 'PENDENTE' || v.status === 'AGUARDANDO_PAGAMENTO') statusStyle = "background:#fff3cd; color:#856404;";
         if(v.status === 'CANCELADO') statusStyle = "background:#f8d7da; color:#721c24;";
         if(v.status === 'PAGO') statusStyle = "background:#cce5ff; color:#004085;";
-        if(v.status === 'DEVOLUCAO_PARCIAL') statusStyle = "background:#e1bee7; color:#4a148c;";
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -212,7 +228,7 @@ function preencherTabelaVendas(elementId, vendas) {
             <td>${valor}</td>
             <td>
                 <div style="display:flex; flex-direction:column;">
-                    <span style="color:#27ae60; font-weight:bold;">+ ${comissao}</span>
+                    <span style="color:#27ae60; font-weight:bold;">+ ${comissaoDisplay}</span>
                     <span style="font-size:0.7rem; color:#95a5a6;">Líquido</span>
                 </div>
             </td>

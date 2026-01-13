@@ -938,7 +938,6 @@ app.get('/admin/saques-pendentes', authenticateToken, async (req, res) => {
 // ============================================================
 app.post('/api/checkout/pix', async (req, res) => {
     try {
-        // 1. Recebendo dados (IMPORTANTE: O Frontend precisa mandar 'metodoPagamento')
         const { itens, cliente, afiliadoId, afiliadoCodigo, metodoPagamento } = req.body;
 
         // Identificar Afiliado
@@ -955,14 +954,10 @@ app.post('/api/checkout/pix', async (req, res) => {
             }
         }
 
-        // Variáveis Financeiras
         let valorTotalVenda = 0;      
         let custoTotalProdutos = 0;   
-        
-        // Vamos separar o "Lucro Bruto" de cada um antes das taxas
         let lucroBrutoLoja = 0;       
         let lucroBrutoAfiliado = 0;   
-        
         let itensParaBanco = [];
 
         // 2. Loop dos Produtos
@@ -980,27 +975,18 @@ app.post('/api/checkout/pix', async (req, res) => {
             const qtd = parseInt(item.quantidade);
             const margemItem = item.customMargin ? parseFloat(item.customMargin) : 0;
 
-            // A. Preço de Venda (SEM AUMENTO DE 15%)
-            // O preço é o preço. As taxas sairão do lucro de vocês.
             let precoVendaUnitario = precoLoja;
             if (margemItem > 0) {
                 precoVendaUnitario = precoLoja * (1 + (margemItem / 100));
             }
 
-            // B. Totais do Item
             const totalItemVenda = precoVendaUnitario * qtd;
             const totalItemCusto = custoPeca * qtd;
-            const totalItemLojaBase = precoLoja * qtd; // O quanto a loja faturaria "limpo" de margem extra
+            const totalItemLojaBase = precoLoja * qtd; 
 
-            // C. Separando os Lucros Brutos (O "Bolo" antes de pagar a conta)
-            
-            // Parte do Afiliado: Tudo que excede o preço da loja
             const faturamentoAfiliado = totalItemVenda - totalItemLojaBase; 
-            
-            // Parte da Loja: Preço Loja - Custo da Peça
             const faturamentoLoja = totalItemLojaBase - totalItemCusto;
 
-            // Acumuladores
             valorTotalVenda += totalItemVenda;
             custoTotalProdutos += totalItemCusto;
             lucroBrutoAfiliado += faturamentoAfiliado;
@@ -1016,75 +1002,65 @@ app.post('/api/checkout/pix', async (req, res) => {
             });
         }
 
-        // 3. CÁLCULO DAS TAXAS TOTAIS (A "CONTA DE LUZ") 🧾
+        // 3. CÁLCULO DAS TAXAS TOTAIS
         let custoTaxasTotal = 0;
-        
-        // Imposto Governo (Sobre o total da venda)
         custoTaxasTotal += (valorTotalVenda * CONFIG_FINANCEIRA.impostoGoverno);
 
-        // Taxas Asaas (Depende se é Cartão ou Pix)
         if (metodoPagamento === 'CARTAO') {
-            // Usa a taxa de ~5.5% + 0.49 (Simulação 2x)
             custoTaxasTotal += (valorTotalVenda * CONFIG_FINANCEIRA.taxaAsaasCartaoPct) + CONFIG_FINANCEIRA.taxaAsaasCartaoFixo;
         } else {
-            // Pix
             custoTaxasTotal += CONFIG_FINANCEIRA.taxaAsaasPix;
         }
 
-        // 4. RATEIO PROPORCIONAL (QUEM GANHA MAIS, PAGA MAIS) ⚖️
-        
-        // Qual o lucro total disponível para pagar as contas?
+        // 4. RATEIO PROPORCIONAL CORRIGIDO ⚖️
         const lucroOperacionalTotal = lucroBrutoLoja + lucroBrutoAfiliado;
         
         let comissaoLiquidaAfiliado = 0;
         let parteTaxaAfiliado = 0;
+        // Inicializa as taxas da loja como o total (caso não haja afiliado)
+        let parteTaxaLoja = custoTaxasTotal;
+        let lucroLiquidoLoja = lucroBrutoLoja - custoTaxasTotal;
 
         if (lucroOperacionalTotal > 0 && lucroBrutoAfiliado > 0) {
-            // Calcula a porcentagem de participação do afiliado no lucro
-            // Ex: Se o lucro total é 100 e o afiliado gerou 30, o peso é 0.3 (30%)
             const pesoAfiliado = lucroBrutoAfiliado / lucroOperacionalTotal;
-            
-            // O afiliado paga X% da conta total de taxas
             parteTaxaAfiliado = custoTaxasTotal * pesoAfiliado;
-            
-            // Comissão Final = O Bruto dele - A Parte da taxa dele
             comissaoLiquidaAfiliado = lucroBrutoAfiliado - parteTaxaAfiliado;
+
+            // Recalcula a parte da loja subtraindo o que o afiliado já pagou
+            parteTaxaLoja = custoTaxasTotal - parteTaxaAfiliado;
+            lucroLiquidoLoja = lucroBrutoLoja - parteTaxaLoja;
         }
 
-        // Segurança para não dar negativo
         if (comissaoLiquidaAfiliado < 0) comissaoLiquidaAfiliado = 0;
 
-        // --- LOG DE AUDITORIA FINANCEIRA DETALHADA ---
+        // --- LOG DE AUDITORIA (Substitua o console.log antigo por este) ---
         const pctTaxaSobreLoja = lucroBrutoLoja > 0 ? (parteTaxaLoja / lucroBrutoLoja) * 100 : 0;
         const pctTaxaSobreAfiliado = lucroBrutoAfiliado > 0 ? (parteTaxaAfiliado / lucroBrutoAfiliado) * 100 : 0;
         const margemLiquidaLoja = valorTotalVenda > 0 ? (lucroLiquidoLoja / valorTotalVenda) * 100 : 0;
 
         console.log(`
         ============================================================
-        📊 AUDITORIA DE TAXAS E RATEIO - MÉTODO: ${metodoPagamento}
+        📊 AUDITORIA DE TAXAS - MÉTODO: ${metodoPagamento}
         ============================================================
-        💰 FATURAMENTO BRUTO:    R$ ${valorTotalVenda.toFixed(2)}
-        📦 CUSTO MERCADORIA:     R$ ${custoTotalProdutos.toFixed(2)}
+        💰 VENDA TOTAL:          R$ ${valorTotalVenda.toFixed(2)}
+        📦 CUSTO PRODUTOS:       R$ ${custoTotalProdutos.toFixed(2)}
         ------------------------------------------------------------
         🧾 TAXAS TOTAIS (CONTA): R$ ${custoTaxasTotal.toFixed(2)}
-           (Imposto: 6% | Gateway: ${metodoPagamento === 'CARTAO' ? '5.5% + 0.49' : 'R$ 0.99'})
         
-        ⚖️ RATEIO DAS TAXAS (QUEM PAGOU O QUÊ):
-        ------------------------------------------------------------
-        🏢 PARTE DA LOJA:
+        ⚖️ QUEM PAGOU A CONTA (RATEIO):
+        🏢 LOJA:
            - Lucro Bruto:        R$ ${lucroBrutoLoja.toFixed(2)}
-           - Taxa Paga:         -R$ ${parteTaxaLoja.toFixed(2)} (${pctTaxaSobreLoja.toFixed(1)}% do seu lucro)
-           - LUCRO LÍQUIDO:      R$ ${lucroLiquidoLoja.toFixed(2)} (Margem: ${margemLiquidaLoja.toFixed(1)}%)
+           - Taxa Paga:         -R$ ${parteTaxaLoja.toFixed(2)} (${pctTaxaSobreLoja.toFixed(1)}% do lucro)
+           - LUCRO LÍQUIDO:      R$ ${lucroLiquidoLoja.toFixed(2)} (Margem Final: ${margemLiquidaLoja.toFixed(1)}%)
 
-        🤝 PARTE DO AFILIADO:
+        🤝 AFILIADO:
            - Lucro Bruto:        R$ ${lucroBrutoAfiliado.toFixed(2)}
-           - Taxa Paga:         -R$ ${parteTaxaAfiliado.toFixed(2)} (${pctTaxaSobreAfiliado.toFixed(1)}% do lucro dele)
+           - Taxa Paga:         -R$ ${parteTaxaAfiliado.toFixed(2)} (${pctTaxaSobreAfiliado.toFixed(1)}% do lucro)
            - COMISSÃO LÍQUIDA:   R$ ${comissaoLiquidaAfiliado.toFixed(2)}
-
         ============================================================
         `);
 
-        // 5. Gera Link e Salva
+        // 5. Gera Link e Salva no Banco
         const dadosPix = await criarCobrancaPix(
             cliente, 
             valorTotalVenda, 

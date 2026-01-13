@@ -1054,31 +1054,34 @@ app.post('/api/checkout/pix', async (req, res) => {
         // Segurança para não dar negativo
         if (comissaoLiquidaAfiliado < 0) comissaoLiquidaAfiliado = 0;
 
-        // Para seu controle (Lucro Líquido da Loja)
-        const parteTaxaLoja = custoTaxasTotal - parteTaxaAfiliado;
-        const lucroLiquidoLoja = lucroBrutoLoja - parteTaxaLoja;
+        // --- LOG DE AUDITORIA FINANCEIRA DETALHADA ---
+        const pctTaxaSobreLoja = lucroBrutoLoja > 0 ? (parteTaxaLoja / lucroBrutoLoja) * 100 : 0;
+        const pctTaxaSobreAfiliado = lucroBrutoAfiliado > 0 ? (parteTaxaAfiliado / lucroBrutoAfiliado) * 100 : 0;
+        const margemLiquidaLoja = valorTotalVenda > 0 ? (lucroLiquidoLoja / valorTotalVenda) * 100 : 0;
 
         console.log(`
-        =========================================
-        ⚖️ FECHAMENTO PROPORCIONAL (SÓCIOS)
-        =========================================
-        + Venda Total:       R$ ${valorTotalVenda.toFixed(2)}
-        - Custo Produtos:    R$ ${custoTotalProdutos.toFixed(2)}
-        -----------------------------------------
-        🧾 TAXAS TOTAIS:     R$ ${custoTaxasTotal.toFixed(2)} (Gov + Asaas)
-        -----------------------------------------
-        💎 DIVISÃO DO BOLO (LUCRO BRUTO):
-        - Loja:              R$ ${lucroBrutoLoja.toFixed(2)}
-        - Afiliado:          R$ ${lucroBrutoAfiliado.toFixed(2)} (Peso: ${((lucroBrutoAfiliado/lucroOperacionalTotal)*100).toFixed(1)}%)
-        -----------------------------------------
-        💸 QUEM PAGA A CONTA:
-        - Loja Paga:         R$ ${parteTaxaLoja.toFixed(2)}
-        - Afiliado Paga:     R$ ${parteTaxaAfiliado.toFixed(2)}
-        -----------------------------------------
-        ✅ RESULTADO FINAL (LÍQUIDO):
-        💰 LOJA:             R$ ${lucroLiquidoLoja.toFixed(2)}
-        💰 AFILIADO:         R$ ${comissaoLiquidaAfiliado.toFixed(2)}
-        =========================================
+        ============================================================
+        📊 AUDITORIA DE TAXAS E RATEIO - MÉTODO: ${metodoPagamento}
+        ============================================================
+        💰 FATURAMENTO BRUTO:    R$ ${valorTotalVenda.toFixed(2)}
+        📦 CUSTO MERCADORIA:     R$ ${custoTotalProdutos.toFixed(2)}
+        ------------------------------------------------------------
+        🧾 TAXAS TOTAIS (CONTA): R$ ${custoTaxasTotal.toFixed(2)}
+           (Imposto: 6% | Gateway: ${metodoPagamento === 'CARTAO' ? '5.5% + 0.49' : 'R$ 0.99'})
+        
+        ⚖️ RATEIO DAS TAXAS (QUEM PAGOU O QUÊ):
+        ------------------------------------------------------------
+        🏢 PARTE DA LOJA:
+           - Lucro Bruto:        R$ ${lucroBrutoLoja.toFixed(2)}
+           - Taxa Paga:         -R$ ${parteTaxaLoja.toFixed(2)} (${pctTaxaSobreLoja.toFixed(1)}% do seu lucro)
+           - LUCRO LÍQUIDO:      R$ ${lucroLiquidoLoja.toFixed(2)} (Margem: ${margemLiquidaLoja.toFixed(1)}%)
+
+        🤝 PARTE DO AFILIADO:
+           - Lucro Bruto:        R$ ${lucroBrutoAfiliado.toFixed(2)}
+           - Taxa Paga:         -R$ ${parteTaxaAfiliado.toFixed(2)} (${pctTaxaSobreAfiliado.toFixed(1)}% do lucro dele)
+           - COMISSÃO LÍQUIDA:   R$ ${comissaoLiquidaAfiliado.toFixed(2)}
+
+        ============================================================
         `);
 
         // 5. Gera Link e Salva

@@ -965,13 +965,21 @@ app.post('/api/checkout/pix', async (req, res) => {
 
         // 3. Loop dos Produtos (Calculando item a item)
         // 3. Loop dos Produtos
+// 3. Loop dos Produtos (BLINDADO CONTRA NaN)
         for (const item of itens) {
             const prodBanco = await prisma.produto.findUnique({ where: { id: item.id } });
             if (!prodBanco) continue;
 
-            // --- A. DEFINIÇÃO DE PREÇOS ---
-            const custoPeca = parseFloat(prodBanco.preco);           
-            const precoLoja = parseFloat(prodBanco.preco_novo);      
+            // --- A. DEFINIÇÃO DE PREÇOS (COM TRATAMENTO DE VÍRGULA/PONTO) ---
+            
+            // Função auxiliar para limpar dinheiro
+            const limparValor = (val) => {
+                if (!val) return 0;
+                return parseFloat(String(val).replace(',', '.'));
+            };
+
+            const custoPeca = limparValor(prodBanco.preco);       // Custo
+            const precoLoja = limparValor(prodBanco.preco_novo);  // Venda Base
             const qtd = parseInt(item.quantidade);
 
             // Define Preço de Venda Unitário (Baseado na Margem)
@@ -984,7 +992,7 @@ app.post('/api/checkout/pix', async (req, res) => {
                 precoVendaUnitario = precoLoja * (1 + (margemItem / 100));
             }
             
-            // Acréscimo Cartão (Se for o caso)
+            // Acréscimo Cartão
             if (metodoPagamento === 'CARTAO') {
                 precoVendaUnitario = precoVendaUnitario * 1.15; 
             }
@@ -992,34 +1000,31 @@ app.post('/api/checkout/pix', async (req, res) => {
             // --- B. CÁLCULO DOS TOTAIS DO ITEM ---
             const totalItemVenda = precoVendaUnitario * qtd;
             const totalItemCusto = custoPeca * qtd;
-            const totalItemLojaBase = precoLoja * qtd; // O que a loja receberia sem margem extra
+            const totalItemLojaBase = precoLoja * qtd; 
 
-            // --- C. CÁLCULO DOS LUCROS (AQUI ESTAVA O ERRO) ---
-            
-            // 1. Primeiro declaramos a variável com let
+            // --- C. CÁLCULO DOS LUCROS ---
             let lucroItemAfiliado = 0;
 
-            // 2. Calculamos o valor base
+            // Cálculo Base
             lucroItemAfiliado = totalItemVenda - totalItemLojaBase;
             
-            // 3. Ajuste fino para Cartão (para não dar lucro sobre a taxa da maquininha)
+            // Ajuste Cartão
             if (metodoPagamento === 'CARTAO') {
-                // Recalcula qual seria o preço de venda "limpo" (só com a margem do afiliado, sem os 15% do cartão)
                 const precoVendaSemTaxaCartao = precoLoja * (1 + (margemItem / 100));
                 lucroItemAfiliado = (precoVendaSemTaxaCartao - precoLoja) * qtd;
             }
 
-            // 4. Lucro da Loja
-            let lucroItemLoja = totalItemLojaBase - totalItemCusto;
+            // Lucro da Loja (Se custo for 0 ou erro, assume lucro total da base)
+            let lucroItemLoja = totalItemLojaBase - (isNaN(totalItemCusto) ? 0 : totalItemCusto);
 
-            // --- D. ACUMULADORES (SÓ AGORA SOMAMOS) ---
+            // --- D. ACUMULADORES ---
             valorTotalVenda += totalItemVenda;
-            custoTotalProdutos += totalItemCusto;
-            lucroBrutoAfiliado += lucroItemAfiliado; // Agora a variável já existe!
+            custoTotalProdutos += (isNaN(totalItemCusto) ? 0 : totalItemCusto); // Proteção extra
+            lucroBrutoAfiliado += lucroItemAfiliado;
             lucroBrutoLoja += lucroItemLoja;
 
-            // Log de Debug para garantir
-            console.log(`[ITEM] ${prodBanco.titulo} | Margem: ${margemItem}% | Lucro Afiliado: ${lucroItemAfiliado.toFixed(2)}`);
+            // Log de Debug Item
+            console.log(`[ITEM] ${prodBanco.titulo} | Custo: ${custoPeca} | VendaBase: ${precoLoja} | Margem: ${margemItem}% | Lucro Afiliado: ${lucroItemAfiliado.toFixed(2)}`);
 
             itensParaBanco.push({
                 id: prodBanco.id, 

@@ -1047,7 +1047,7 @@ async function finalizarCompraAsaas() {
 
         if (res.ok) {
             // SUCESSO! Mostra o Modal com o Link/QR Code
-            mostrarModalPix(data.pix, data.linkPagamento);
+            mostrarModalPix(data.pix, data.linkPagamento, metodoEscolhido);
             
             // Limpa o carrinho e avisa na tela
             localStorage.removeItem('nossoCarrinho');
@@ -1067,40 +1067,51 @@ async function finalizarCompraAsaas() {
 }
 
 // Funções auxiliares do Modal
-function mostrarModalPix(pixData, linkPagamento) {
+function mostrarModalPix(pixData, linkPagamento, metodoEscolhido) {
     const imgPix = document.getElementById('pix-img');
     const txtCola = document.getElementById('pix-cola');
     const btnLink = document.getElementById('btn-link-pagamento');
+    const btnCopiar = document.querySelector('button[onclick="copiarCodigo()"]');
     const titulo = document.querySelector('#modal-pix h3');
     const desc = document.querySelector('#modal-pix p');
+    const modal = document.getElementById('modal-pix');
 
-    // Esconde elementos de Pix direto (já que usamos Link agora)
-    if (imgPix) imgPix.style.display = 'none';
-    if (txtCola) txtCola.style.display = 'none';
-    if (document.querySelector('button[onclick="copiarCodigo()"]')) {
-        document.querySelector('button[onclick="copiarCodigo()"]').style.display = 'none';
-    }
+    if (!modal) return;
 
+    // --- LÓGICA PARA CARTÃO ---
     if (metodoEscolhido === 'CARTAO') {
-    document.getElementById('btn-link-pagamento').style.display = 'block';
-    document.getElementById('pix-img').style.display = 'none'; // Esconde QR Code se for cartão
-}
+        if (titulo) titulo.innerText = "💳 Pagamento via Cartão";
+        if (desc) desc.innerText = "Clique no botão abaixo para abrir o checkout seguro e parcelar em até 10x.";
+        
+        if (imgPix) imgPix.style.display = 'none';
+        if (txtCola) txtCola.style.display = 'none';
+        if (btnCopiar) btnCopiar.style.display = 'none';
 
-    // Atualiza Textos
-    if (titulo) titulo.innerText = "🚀 Quase lá!";
-    if (desc) desc.innerText = "Clique no botão abaixo para escolher entre PIX ou CARTÃO (até 10x) e finalizar seu pagamento com segurança.";
-    
-    // Botão Principal
-    if (linkPagamento && btnLink) {
-        btnLink.href = linkPagamento;
-        btnLink.style.display = 'block'; 
-        btnLink.style.background = '#27ae60'; // Verde destaque
-        btnLink.style.fontSize = '1.1rem';
-        btnLink.style.padding = '15px';
-        btnLink.innerHTML = `<i class="ph ph-credit-card"></i> IR PARA PAGAMENTO (PIX / CARTÃO)`;
+        if (btnLink) {
+            btnLink.href = linkPagamento;
+            btnLink.style.display = 'block';
+            btnLink.style.background = '#8e44ad'; // Roxo para Cartão
+            btnLink.innerHTML = `<i class="ph ph-credit-card"></i> PAGAR COM CARTÃO AGORA`;
+        }
+    } 
+    // --- LÓGICA PARA PIX ---
+    else {
+        if (titulo) titulo.innerText = "⚡ Pagamento via PIX";
+        if (desc) desc.innerText = "Escaneie o QR Code ou copie o código abaixo para confirmar sua compra na hora.";
+
+        if (imgPix && pixData) {
+            imgPix.src = `data:image/png;base64, ${pixData.encodedImage || pixData}`; // Ajuste conforme o retorno do Asaas
+            imgPix.style.display = 'block';
+        }
+        if (txtCola && pixData) {
+            txtCola.innerText = pixData.payload || pixData;
+            txtCola.style.display = 'block';
+        }
+        if (btnCopiar) btnCopiar.style.display = 'inline-block';
+        if (btnLink) btnLink.style.display = 'none';
     }
-    
-    document.getElementById('modal-pix').style.display = 'flex';
+
+    modal.style.display = 'flex';
 }
 
 function copiarCodigo() {

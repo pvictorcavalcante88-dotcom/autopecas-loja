@@ -138,14 +138,14 @@
         
         <div style="margin-bottom: 15px;">
             <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                <input type="radio" name="metodo-pagamento" id="pagamento-pix" checked style="width: 18px; height: 18px;">
+                <input type="radio" name="pagamento" id="pagamento-pix" checked style="width: 18px; height: 18px;">
                 <span style="font-weight: bold;">PIX (Aprovação na hora)</span>
             </label>
         </div>
 
         <div>
             <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                <input type="radio" name="metodo-pagamento" id="pagamento-cartao" style="width: 18px; height: 18px;">
+                <input type="radio" name="pagamento" id="pagamento-cartao" style="width: 18px; height: 18px;">
                 <span style="font-weight: bold;">Cartão de Crédito</span>
             </label>
         </div>
@@ -241,6 +241,14 @@
                 btn.disabled = false;
             }
         }
+
+        // Garante que o sistema perceba a mudança de PIX para Cartão
+document.addEventListener('change', (e) => {
+    if (e.target.name === 'pagamento') {
+        console.log("Forma de pagamento alterada para:", e.target.id);
+    }
+});
+
     </script>
 
     <script src="script.js"></script> 

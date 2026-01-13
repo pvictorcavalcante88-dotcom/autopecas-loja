@@ -1081,9 +1081,14 @@ function mostrarModalPix(pixData, linkPagamento) {
         document.querySelector('button[onclick="copiarCodigo()"]').style.display = 'none';
     }
 
+    if (metodoEscolhido === 'CARTAO') {
+    document.getElementById('btn-link-pagamento').style.display = 'block';
+    document.getElementById('pix-img').style.display = 'none'; // Esconde QR Code se for cartão
+}
+
     // Atualiza Textos
     if (titulo) titulo.innerText = "🚀 Quase lá!";
-    if (desc) desc.innerText = "Clique no botão abaixo para escolher entre PIX ou CARTÃO (até 12x) e finalizar seu pagamento com segurança.";
+    if (desc) desc.innerText = "Clique no botão abaixo para escolher entre PIX ou CARTÃO (até 10x) e finalizar seu pagamento com segurança.";
     
     // Botão Principal
     if (linkPagamento && btnLink) {
@@ -1132,3 +1137,15 @@ function calcularSimulacaoLiquida(precoBase, margemPorcentagem) {
         lucroLiquido: lucroLiquido
     };
 }
+
+// Adicione isso no seu script.js para mudar o texto do botão
+document.addEventListener('change', (e) => {
+    if (e.target.name === 'metodo-pagamento') {
+        const btn = document.getElementById('btn-finalizar-pix');
+        if (btn) {
+            btn.innerHTML = e.target.id === 'pagamento-cartao' 
+                ? '<i class="ph ph-credit-card"></i> Finalizar com Cartão' 
+                : '<i class="ph ph-qr-code"></i> Finalizar e Gerar PIX';
+        }
+    }
+});

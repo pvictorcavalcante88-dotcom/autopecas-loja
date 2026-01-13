@@ -8,14 +8,13 @@ const multer = require('multer');
 const fs = require('fs');
 
 // ==============================================================
-// 📊 CONFIGURAÇÃO DE TAXAS E IMPOSTOS
+// 📊 CONFIGURAÇÃO DE TAXAS E IMPOSTOS (ATUALIZADO)
 // ==============================================================
 const CONFIG_FINANCEIRA = {
-    impostoGoverno: 0.06,      // 6% (Ex: Simples Nacional)
-    taxaAsaasPix: 0.99,        // R$ 0,99 fixo por Pix recebido
-    taxaAsaasCartaoPct: 0.0299,// 2.99% sobre a venda (Cartão)
-    taxaAsaasCartaoFixo: 0.49, // R$ 0,49 fixo por transação
-    taxaAntecipacao: 0.10      // 10% (Caso queira descontar antecipação do lucro)
+    impostoGoverno: 0.06,        // 6% (Simples Nacional)
+    taxaAsaasPix: 0.99,          // R$ 0,99 fixo por Pix
+    taxaAsaasCartaoPct: 0.055,   // 5.5% (Cobre Crédito + Antecipação)
+    taxaAsaasCartaoFixo: 0.49    // R$ 0,49 fixo por transação
 };
 
 const { criarCobrancaPix } = require('./services/asaasService');
@@ -935,13 +934,14 @@ app.get('/admin/saques-pendentes', authenticateToken, async (req, res) => {
 });
 
 // ============================================================
-// ROTA DE CHECKOUT (PIX + LINK) - VERSÃO BLINDADA 🛡️
+// ROTA DE CHECKOUT (DIVISÃO PROPORCIONAL DE TAXAS) ⚖️
 // ============================================================
 app.post('/api/checkout/pix', async (req, res) => {
     try {
+        // 1. Recebendo dados (IMPORTANTE: O Frontend precisa mandar 'metodoPagamento')
         const { itens, cliente, afiliadoId, afiliadoCodigo, metodoPagamento } = req.body;
 
-        // 1. Identificar Afiliado
+        // Identificar Afiliado
         let idFinalAfiliado = null;
         let walletIdAfiliado = null;
 
@@ -955,133 +955,139 @@ app.post('/api/checkout/pix', async (req, res) => {
             }
         }
 
-        // 2. Preparar Variáveis Financeiras (NOVOS NOMES)
-        let totalVendaFinal = 0;      // O que o cliente paga de fato
-        let totalVendaBase = 0;       // O que a loja venderia originalmente (Preço Novo)
-        let custoTotalProdutos = 0;   // Custo de compra da peça (Preço Custo)
+        // Variáveis Financeiras
+        let valorTotalVenda = 0;      
+        let custoTotalProdutos = 0;   
+        
+        // Vamos separar o "Lucro Bruto" de cada um antes das taxas
+        let lucroBrutoLoja = 0;       
+        let lucroBrutoAfiliado = 0;   
         
         let itensParaBanco = [];
 
-        // 3. Loop dos Produtos (CALCULANDO BASE vs FINAL)
+        // 2. Loop dos Produtos
         for (const item of itens) {
             const prodBanco = await prisma.produto.findUnique({ where: { id: item.id } });
             if (!prodBanco) continue;
 
-            // Função auxiliar para limpar dinheiro (Evita NaN)
             const limparValor = (val) => {
                 if (!val) return 0;
                 return parseFloat(String(val).replace(',', '.'));
             };
 
             const custoPeca = limparValor(prodBanco.preco);       
-            const precoLojaBase = limparValor(prodBanco.preco_novo); // Preço original da loja
+            const precoLoja = limparValor(prodBanco.preco_novo); 
             const qtd = parseInt(item.quantidade);
-            
-            // Margem do afiliado
             const margemItem = item.customMargin ? parseFloat(item.customMargin) : 0;
 
-            // A. Preço Final (Com a margem do afiliado)
-            let precoUnitarioFinal = precoLojaBase;
+            // A. Preço de Venda (SEM AUMENTO DE 15%)
+            // O preço é o preço. As taxas sairão do lucro de vocês.
+            let precoVendaUnitario = precoLoja;
             if (margemItem > 0) {
-                precoUnitarioFinal = precoLojaBase * (1 + (margemItem / 100));
-            }
-            
-            // Ajuste Cartão (Aumenta o preço final para cobrir taxa)
-            if (metodoPagamento === 'CARTAO') {
-                precoUnitarioFinal = precoUnitarioFinal * 1.15; 
+                precoVendaUnitario = precoLoja * (1 + (margemItem / 100));
             }
 
             // B. Totais do Item
-            const subtotalFinal = precoUnitarioFinal * qtd;
-            const subtotalBase = precoLojaBase * qtd; // O quanto a loja faturaria sozinha
-            const subtotalCusto = custoPeca * qtd;
+            const totalItemVenda = precoVendaUnitario * qtd;
+            const totalItemCusto = custoPeca * qtd;
+            const totalItemLojaBase = precoLoja * qtd; // O quanto a loja faturaria "limpo" de margem extra
+
+            // C. Separando os Lucros Brutos (O "Bolo" antes de pagar a conta)
+            
+            // Parte do Afiliado: Tudo que excede o preço da loja
+            const faturamentoAfiliado = totalItemVenda - totalItemLojaBase; 
+            
+            // Parte da Loja: Preço Loja - Custo da Peça
+            const faturamentoLoja = totalItemLojaBase - totalItemCusto;
 
             // Acumuladores
-            totalVendaFinal += subtotalFinal;
-            totalVendaBase += subtotalBase;
-            custoTotalProdutos += subtotalCusto;
-
-            // Debug Item
-            // console.log(`[ITEM] ${prodBanco.titulo} | Base: ${precoLojaBase} | Final: ${precoUnitarioFinal}`);
+            valorTotalVenda += totalItemVenda;
+            custoTotalProdutos += totalItemCusto;
+            lucroBrutoAfiliado += faturamentoAfiliado;
+            lucroBrutoLoja += faturamentoLoja;
 
             itensParaBanco.push({
                 id: prodBanco.id, 
                 nome: prodBanco.titulo, 
                 qtd: qtd,
-                unitario: precoUnitarioFinal, 
-                total: subtotalFinal, 
+                unitario: precoVendaUnitario, 
+                total: totalItemVenda, 
                 imagem: prodBanco.imagem
             });
         }
 
-        // 4. CÁLCULO FINANCEIRO (MODELO DE PROTEÇÃO DA LOJA) 🛡️
+        // 3. CÁLCULO DAS TAXAS TOTAIS (A "CONTA DE LUZ") 🧾
+        let custoTaxasTotal = 0;
         
-        // A. Definição das Taxas
-        let taxaPercentualTotal = CONFIG_FINANCEIRA.impostoGoverno; // Ex: 0.06
-        let taxaFixa = 0;
+        // Imposto Governo (Sobre o total da venda)
+        custoTaxasTotal += (valorTotalVenda * CONFIG_FINANCEIRA.impostoGoverno);
 
+        // Taxas Asaas (Depende se é Cartão ou Pix)
         if (metodoPagamento === 'CARTAO') {
-            taxaPercentualTotal += CONFIG_FINANCEIRA.taxaAsaasCartaoPct; 
-            taxaFixa += CONFIG_FINANCEIRA.taxaAsaasCartaoFixo;
+            // Usa a taxa de ~5.5% + 0.49 (Simulação 2x)
+            custoTaxasTotal += (valorTotalVenda * CONFIG_FINANCEIRA.taxaAsaasCartaoPct) + CONFIG_FINANCEIRA.taxaAsaasCartaoFixo;
         } else {
-            taxaFixa += CONFIG_FINANCEIRA.taxaAsaasPix; 
+            // Pix
+            custoTaxasTotal += CONFIG_FINANCEIRA.taxaAsaasPix;
         }
 
-        // B. Quanto seria o imposto se a loja vendesse sozinha? (Cenário Base)
-        const impostosCenarioBase = (totalVendaBase * taxaPercentualTotal) + taxaFixa;
+        // 4. RATEIO PROPORCIONAL (QUEM GANHA MAIS, PAGA MAIS) ⚖️
         
-        // C. Quanto é o imposto real agora? (Cenário Com Afiliado)
-        const impostosCenarioReal = (totalVendaFinal * taxaPercentualTotal) + taxaFixa;
+        // Qual o lucro total disponível para pagar as contas?
+        const lucroOperacionalTotal = lucroBrutoLoja + lucroBrutoAfiliado;
+        
+        let comissaoLiquidaAfiliado = 0;
+        let parteTaxaAfiliado = 0;
 
-        // D. O "Delta" (A diferença de imposto quem paga é o afiliado)
-        const impostoExtraGerado = impostosCenarioReal - impostosCenarioBase;
-
-        // E. Definição dos Lucros
-        
-        // 1. Lucro do Afiliado: O que ele adicionou - O imposto extra que ele gerou
-        const valorAdicionadoPeloAfiliado = totalVendaFinal - totalVendaBase;
-        
-        let baseCalculoAfiliado = valorAdicionadoPeloAfiliado;
-        
-        // Se for cartão, tira a "gordura" dos 15% do cálculo do afiliado, pois isso vai pra operadora
-        if (metodoPagamento === 'CARTAO') {
-             // Subtrai o valor que foi adicionado apenas pelo fator 1.15
-             const valorSemTaxaCartao = totalVendaFinal / 1.15;
-             const taxaCartaoValor = totalVendaFinal - valorSemTaxaCartao;
-             baseCalculoAfiliado = baseCalculoAfiliado - taxaCartaoValor;
+        if (lucroOperacionalTotal > 0 && lucroBrutoAfiliado > 0) {
+            // Calcula a porcentagem de participação do afiliado no lucro
+            // Ex: Se o lucro total é 100 e o afiliado gerou 30, o peso é 0.3 (30%)
+            const pesoAfiliado = lucroBrutoAfiliado / lucroOperacionalTotal;
+            
+            // O afiliado paga X% da conta total de taxas
+            parteTaxaAfiliado = custoTaxasTotal * pesoAfiliado;
+            
+            // Comissão Final = O Bruto dele - A Parte da taxa dele
+            comissaoLiquidaAfiliado = lucroBrutoAfiliado - parteTaxaAfiliado;
         }
-
-        let comissaoLiquidaAfiliado = baseCalculoAfiliado - impostoExtraGerado;
 
         // Segurança para não dar negativo
         if (comissaoLiquidaAfiliado < 0) comissaoLiquidaAfiliado = 0;
 
-        // 2. Lucro da Loja (Apenas informativo no console)
-        const lucroLiquidoLoja = totalVendaBase - custoTotalProdutos - impostosCenarioBase;
+        // Para seu controle (Lucro Líquido da Loja)
+        const parteTaxaLoja = custoTaxasTotal - parteTaxaAfiliado;
+        const lucroLiquidoLoja = lucroBrutoLoja - parteTaxaLoja;
 
         console.log(`
         =========================================
-        🛡️ FECHAMENTO BLINDADO (CURVA PRODUTO)
+        ⚖️ FECHAMENTO PROPORCIONAL (SÓCIOS)
         =========================================
-        + Venda Final (Cliente): R$ ${totalVendaFinal.toFixed(2)}
-        + Venda Base (Loja):     R$ ${totalVendaBase.toFixed(2)}
+        + Venda Total:       R$ ${valorTotalVenda.toFixed(2)}
+        - Custo Produtos:    R$ ${custoTotalProdutos.toFixed(2)}
         -----------------------------------------
-        - Imposto Real:          R$ ${impostosCenarioReal.toFixed(2)}
-        - Imposto Base (Loja):   R$ ${impostosCenarioBase.toFixed(2)}
-        - Diferença (Afi paga):  R$ ${impostoExtraGerado.toFixed(2)}
+        🧾 TAXAS TOTAIS:     R$ ${custoTaxasTotal.toFixed(2)} (Gov + Asaas)
         -----------------------------------------
-        💰 LUCRO LOJA:           R$ ${lucroLiquidoLoja.toFixed(2)} (Protegido)
-        💰 LUCRO AFILIADO:       R$ ${comissaoLiquidaAfiliado.toFixed(2)} (Líquido)
+        💎 DIVISÃO DO BOLO (LUCRO BRUTO):
+        - Loja:              R$ ${lucroBrutoLoja.toFixed(2)}
+        - Afiliado:          R$ ${lucroBrutoAfiliado.toFixed(2)} (Peso: ${((lucroBrutoAfiliado/lucroOperacionalTotal)*100).toFixed(1)}%)
+        -----------------------------------------
+        💸 QUEM PAGA A CONTA:
+        - Loja Paga:         R$ ${parteTaxaLoja.toFixed(2)}
+        - Afiliado Paga:     R$ ${parteTaxaAfiliado.toFixed(2)}
+        -----------------------------------------
+        ✅ RESULTADO FINAL (LÍQUIDO):
+        💰 LOJA:             R$ ${lucroLiquidoLoja.toFixed(2)}
+        💰 AFILIADO:         R$ ${comissaoLiquidaAfiliado.toFixed(2)}
         =========================================
         `);
 
-        // 5. Gera o Link
+        // 5. Gera Link e Salva
         const dadosPix = await criarCobrancaPix(
             cliente, 
-            totalVendaFinal, // Cliente paga o cheio
-            `Pedido AutoPeças (${metodoPagamento})`,
+            valorTotalVenda, 
+            `Pedido AutoPeças (${metodoPagamento || 'PIX'})`,
             walletIdAfiliado,
-            comissaoLiquidaAfiliado // Afiliado recebe o dele já descontado o custo extra
+            comissaoLiquidaAfiliado
         );
 
         const novoPedido = await prisma.pedido.create({
@@ -1091,7 +1097,7 @@ app.post('/api/checkout/pix', async (req, res) => {
                 clienteEmail: cliente.email,
                 clienteTelefone: cliente.telefone,
                 clienteEndereco: cliente.endereco,
-                valorTotal: totalVendaFinal,
+                valorTotal: valorTotalVenda,
                 itens: JSON.stringify(itensParaBanco),
                 status: 'AGUARDANDO_PAGAMENTO',
                 asaasId: dadosPix.id, 

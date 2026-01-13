@@ -949,51 +949,45 @@ function calcularTotalVisual(carrinho) {
     if(elTotal) elTotal.innerText = total.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
 }
 
-// 🟢 FUNÇÃO DE FINALIZAR COM ASAAS
+// 🟢 FUNÇÃO DE FINALIZAR COM ASAAS (ATUALIZADA COM SELEÇÃO DE PAGAMENTO)
 async function finalizarCompraAsaas() {
-    // 1. PEGAR DADOS (CORRIGIDO PARA NÃO USAR PROMPT)
+    // 1. PEGAR DADOS DO FORMULÁRIO
     const nome = document.getElementById('nome_cliente').value; 
     const emailContato = document.getElementById('input-email-contato').value;
     const telefone = document.getElementById('input-telefone').value;
     const endereco = document.getElementById('rua').value;
     
-    // 🟢 TENTA PEGAR O CPF DO CAMPO DE BUSCA PRIMEIRO
+    // Tenta pegar o CPF do campo de busca ou do input específico
     let doc = document.getElementById('input-doc-cliente').value;
     if (!doc) doc = document.getElementById('doc-busca').value;
     
-    // Validações
+    // Validações Básicas
     if (!nome || !endereco || !telefone) {
         return alert("Por favor, preencha Nome, Endereço e Telefone.");
     }
 
     if (!doc) {
-        // Só pede no prompt se o campo estiver vazio mesmo
         doc = prompt("CPF obrigatório para nota fiscal. Digite apenas números:");
         if(!doc) return;
-        // Preenche o input para o usuário ver
         document.getElementById('doc-busca').value = doc;
     }
 
-    // Limpa o CPF para enviar só números
+    // Limpa o CPF (deixa só números)
     const cpfLimpo = doc.replace(/\D/g,'');
     if (cpfLimpo.length < 11) return alert("CPF inválido.");
 
-    // ... (Lógica do botão "Processando" continua igual) ...
+    // Atualiza botão para feedback visual
     const btn = document.getElementById('btn-finalizar-pix');
     if(btn) { btn.innerHTML = "Processando..."; btn.disabled = true; }
 
     const carrinho = JSON.parse(localStorage.getItem('nossoCarrinho') || '[]');
 
     try {
-        // Mapeia itens com margem
-        // --- CORREÇÃO DE MARGEM ---
-        // Pega a margem global salva no navegador (ex: 15%)
+        // Pega a margem global salva (fallback)
         const margemGlobal = parseFloat(localStorage.getItem('minhaMargem') || 0);
 
-        // Mapeia itens com margem (Fallback de segurança)
+        // Prepara os itens garantindo que a margem vá correta
         const itensParaEnviar = carrinho.map(i => {
-            // Se o item tem margem definida (mesmo que 0), usa ela. 
-            // Se não tiver (undefined/null), usa a margem global do afiliado.
             let margemFinal = (i.customMargin !== undefined && i.customMargin !== null) 
                               ? i.customMargin 
                               : margemGlobal;
@@ -1001,9 +995,20 @@ async function finalizarCompraAsaas() {
             return { 
                 id: i.id, 
                 quantidade: i.quantidade,
-                customMargin: parseFloat(margemFinal) // Garante que vai como número
+                customMargin: parseFloat(margemFinal)
             };
         });
+
+        // 🔴🔴🔴 MUDANÇA IMPORTANTE: DETECTA O MÉTODO DE PAGAMENTO 🔴🔴🔴
+        // Verifica se o cliente marcou a bolinha (radio button) do Cartão no HTML
+        let metodoEscolhido = 'PIX'; // Começa assumindo PIX
+        const radioCartao = document.getElementById('pagamento-cartao'); 
+        
+        if (radioCartao && radioCartao.checked) {
+            metodoEscolhido = 'CARTAO';
+        }
+
+        console.log(`Enviando método de pagamento: ${metodoEscolhido}`);
 
         const payload = {
             cliente: { 
@@ -1015,21 +1020,23 @@ async function finalizarCompraAsaas() {
             },
             itens: itensParaEnviar,
             afiliadoId: null,
-            afiliadoCodigo: null
+            afiliadoCodigo: null,
+            metodoPagamento: metodoEscolhido // <--- ENVIA PARA O SERVIDOR CALCULAR AS TAXAS CERTAS
         };
 
+        // Verifica se tem afiliado logado ou código de referência
         const afLogado = localStorage.getItem('afiliadoLogado');
         const refCode = localStorage.getItem('afiliadoCodigo');
+        
         if(afLogado) {
             const dadosAf = JSON.parse(afLogado);
             payload.afiliadoId = dadosAf.id;
-        }else if (refCode) {
-            // Se for um cliente vindo pelo link
-            payload.afiliadoCodigo = refCode; // <--- ENVIA O CÓDIGO
+        } else if (refCode) {
+            payload.afiliadoCodigo = refCode;
         }
 
-        // ENVIA
-        const API_URL = 'https://autopecas-loja.onrender.com'; // Sua URL
+        // ENVIA PARA O BACKEND
+        const API_URL = ''; // Deixe vazio se estiver no mesmo domínio
         const res = await fetch(`${API_URL}/api/checkout/pix`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1039,20 +1046,22 @@ async function finalizarCompraAsaas() {
         const data = await res.json();
 
         if (res.ok) {
-            // SUCESSO!
-            // Mostra o QR Code
-            mostrarModalPix(data.pix, data.linkPagamento); // 🟢 Passa o link também
+            // SUCESSO! Mostra o Modal com o Link/QR Code
+            mostrarModalPix(data.pix, data.linkPagamento);
             
-            // Limpa carrinho
+            // Limpa o carrinho e avisa na tela
             localStorage.removeItem('nossoCarrinho');
-            document.getElementById('container-botoes-dinamicos').innerHTML = '<p style="color:#27ae60; text-align:center;">Pedido Realizado!</p>';
+            const containerBotoes = document.getElementById('container-botoes-dinamicos');
+            if(containerBotoes) containerBotoes.innerHTML = '<p style="color:#27ae60; text-align:center; font-weight:bold;">Pedido Realizado com Sucesso!</p>';
         } else {
-            alert("Erro: " + (data.erro || "Falha ao processar."));
+            // ERRO DO SERVIDOR
+            alert("Erro: " + (data.erro || "Falha ao processar pedido."));
             if(btn) { btn.disabled = false; btn.innerHTML = "Tentar Novamente"; }
         }
     } catch (e) {
+        // ERRO DE CONEXÃO
         console.error(e);
-        alert("Erro de conexão.");
+        alert("Erro de conexão com o servidor.");
         if(btn) { btn.disabled = false; btn.innerHTML = "Tentar Novamente"; }
     }
 }

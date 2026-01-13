@@ -109,41 +109,47 @@ async function carregarDashboardCompleto() {
 // ============================================================
 // 🟢 CÁLCULO DO WIDGET (SOMA VENDA + SOMA LUCRO)
 // ============================================================
+// ============================================================
+// 🟢 CÁLCULO DO WIDGET (CORRIGIDO PARA FUSO HORÁRIO)
+// ============================================================
 function calcularVendasPorPeriodo() {
     const elInicio = document.getElementById('data-inicio');
     const elFim = document.getElementById('data-fim');
-    
-    // Elementos onde mostraremos os valores
     const elTotalVendas = document.getElementById('total-periodo-valor');
-    const elTotalLucro = document.getElementById('total-periodo-lucro'); // Certifique-se que esse ID existe no HTML
+    const elTotalLucro = document.getElementById('total-periodo-lucro'); 
     
     if(!elInicio || !elFim) return;
 
+    // Pega as datas do input (YYYY-MM-DD)
     const inicioStr = elInicio.value; 
     const fimStr = elFim.value;
 
     if (!inicioStr || !fimStr) return;
 
     let totalVendaPeriodo = 0;
-    let totalLucroPeriodo = 0; // 🟢 NOVO: Variável para acumular o lucro
+    let totalLucroPeriodo = 0;
 
     if (window.TODAS_VENDAS) {
         window.TODAS_VENDAS.forEach(v => {
-            // Filtra status válidos
-            if (v.status === 'APROVADO' || v.status === 'ENTREGUE' || v.status === 'DEVOLUCAO_PARCIAL' || v.status === 'AGUARDANDO_PAGAMENTO' || v.status === 'PAGO') {
+            // Verifica se o status conta como venda válida
+            if (['APROVADO', 'ENTREGUE', 'DEVOLUCAO_PARCIAL', 'PAGO', 'AGUARDANDO_PAGAMENTO'].includes(v.status)) {
                 
-                // Filtro de Data
+                // 🟢 CORREÇÃO DE DATA:
+                // Cria a data ajustada para o fuso horário local do navegador
                 const dataObj = new Date(v.createdAt);
+                
+                // Pega ano, mês e dia locais
                 const ano = dataObj.getFullYear();
                 const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
                 const dia = String(dataObj.getDate()).padStart(2, '0');
-                const dataVendaStr = `${ano}-${mes}-${dia}`;
+                
+                // Monta a string YYYY-MM-DD local para comparar com o input
+                const dataVendaLocal = `${ano}-${mes}-${dia}`;
 
-                if (dataVendaStr >= inicioStr && dataVendaStr <= fimStr) {
-                    // Soma Venda
+                // Compara String com String (Funciona perfeitamente agora)
+                if (dataVendaLocal >= inicioStr && dataVendaLocal <= fimStr) {
+                    // Soma
                     totalVendaPeriodo += parseFloat(v.valorTotal || 0);
-                    
-                    // 🟢 NOVO: Soma Lucro (Comissão)
                     totalLucroPeriodo += parseFloat(v.comissaoGerada || 0);
                 }
             }

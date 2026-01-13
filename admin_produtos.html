@@ -134,6 +134,11 @@
                     </div>
 
                     <div class="form-group">
+                        <label>Preço Custo (R$) *</label>
+                        <input type="number" id="prod-custo" step="0.01" required>
+                    </div>
+
+                    <div class="form-group">
                         <label>Estoque Atual *</label>
                         <input type="number" id="prod-estoque" required>
                     </div>
@@ -259,6 +264,7 @@
                 document.getElementById('prod-id').value = p.id;
                 document.getElementById('prod-titulo').value = p.titulo;
                 document.getElementById('prod-preco').value = p.preco_novo;
+                document.getElementById('prod-custo').value = p.preco_custo;
                 document.getElementById('prod-estoque').value = p.estoque;
                 document.getElementById('prod-imagem').value = p.imagem;
                 
@@ -289,6 +295,7 @@
             const body = {
                 titulo: document.getElementById('prod-titulo').value,
                 preco_novo: parseFloat(document.getElementById('prod-preco').value),
+                preco_custo: parseFloat(document.getElementById('prod-custo').value),
                 estoque: parseInt(document.getElementById('prod-estoque').value),
                 imagem: document.getElementById('prod-imagem').value,
                 

@@ -46,6 +46,7 @@ model Produto {
   id                  Int      @id @default(autoincrement())
   titulo              String
   pesquisa            String?
+  preco_custo           Float    @default(0.0)
   preco_novo          Float
   preco_antigo        Float?
   desconto            String?

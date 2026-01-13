@@ -970,8 +970,10 @@ app.post('/api/checkout/pix', async (req, res) => {
                 return parseFloat(String(val).replace(',', '.'));
             };
 
-            const custoPeca = limparValor(prodBanco.preco);       
+            // Tenta pegar o preco_custo, se não existir/for zero, assume margem de 20% (multiplica por 0.8)
             const precoLoja = limparValor(prodBanco.preco_novo); 
+            const custoPeca = limparValor(prodBanco.preco_custo) || (precoLoja * 0.8); // SEGURANÇA
+            
             const qtd = parseInt(item.quantidade);
             const margemItem = item.customMargin ? parseFloat(item.customMargin) : 0;
 
@@ -984,8 +986,9 @@ app.post('/api/checkout/pix', async (req, res) => {
             const totalItemCusto = custoPeca * qtd;
             const totalItemLojaBase = precoLoja * qtd; 
 
+            // Cálculo Real do Lucro Bruto
             const faturamentoAfiliado = totalItemVenda - totalItemLojaBase; 
-            const faturamentoLoja = totalItemLojaBase - totalItemCusto;
+            const faturamentoLoja = totalItemLojaBase - totalItemCusto; // Aqui agora o custo é subtraído!
 
             valorTotalVenda += totalItemVenda;
             custoTotalProdutos += totalItemCusto;

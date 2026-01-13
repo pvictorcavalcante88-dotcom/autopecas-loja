@@ -133,14 +133,28 @@
                 </div>
 
                 <div style="margin-top: 30px;">
-                    <h2><i class="ph ph-credit-card"></i> Pagamento</h2>
-                    <div style="background:#f9f9f9; padding:15px; border:1px solid #eee; border-radius:6px;">
-                        <input type="radio" checked> <b>PIX / Boleto / Cartão</b> (Acertar na Entrega)
-                        <p style="font-size:0.9rem; color:#666; margin-top:5px;">
-                            O pagamento será processado diretamente com o vendedor ou no ato da entrega.
-                        </p>
-                    </div>
-                </div>
+    <h2><i class="ph ph-credit-card"></i> Pagamento</h2>
+    <div style="background:#f9f9f9; padding:20px; border:1px solid #ddd; border-radius:8px;">
+        
+        <div style="margin-bottom: 15px;">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                <input type="radio" name="metodo-pagamento" id="pagamento-pix" checked style="width: 18px; height: 18px;">
+                <span style="font-weight: bold;">PIX (Aprovação na hora)</span>
+            </label>
+        </div>
+
+        <div>
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                <input type="radio" name="metodo-pagamento" id="pagamento-cartao" style="width: 18px; height: 18px;">
+                <span style="font-weight: bold;">Cartão de Crédito</span>
+            </label>
+        </div>
+
+        <p style="font-size:0.8rem; color:#888; margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+            * Selecione o método desejado para gerar a cobrança correta.
+        </p>
+    </div>
+</div>
             </form>
         </div>
 

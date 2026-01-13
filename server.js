@@ -1005,15 +1005,25 @@ app.post('/api/checkout/pix', async (req, res) => {
             });
         }
 
+        
         // 3. CÁLCULO DAS TAXAS TOTAIS
-        let custoTaxasTotal = 0;
-        custoTaxasTotal += (valorTotalVenda * CONFIG_FINANCEIRA.impostoGoverno);
+let custoTaxasTotal = 0;
 
-        if (metodoPagamento === 'CARTAO') {
-            custoTaxasTotal += (valorTotalVenda * CONFIG_FINANCEIRA.taxaAsaasCartaoPct) + CONFIG_FINANCEIRA.taxaAsaasCartaoFixo;
-        } else {
-            custoTaxasTotal += CONFIG_FINANCEIRA.taxaAsaasPix;
-        }
+// Imposto fixo de 6% sobre o faturamento
+const valorImposto = valorTotalVenda * CONFIG_FINANCEIRA.impostoGoverno;
+custoTaxasTotal += valorImposto;
+
+// Normaliza o método de pagamento para evitar erros de digitação (ex: 'cartao' virar 'CARTAO')
+const metodoPuro = metodoPagamento ? metodoPagamento.toUpperCase().trim() : 'PIX';
+
+if (metodoPuro === 'CARTAO' || metodoPuro === 'CREDIT_CARD') {
+    // TAXA CARTÃO: 5.5% + 0.49
+    const taxaVariavelCartao = valorTotalVenda * CONFIG_FINANCEIRA.taxaAsaasCartaoPct;
+    custoTaxasTotal += taxaVariavelCartao + CONFIG_FINANCEIRA.taxaAsaasCartaoFixo;
+} else {
+    // TAXA PIX: R$ 0.99
+    custoTaxasTotal += CONFIG_FINANCEIRA.taxaAsaasPix;
+}
 
         // 4. RATEIO PROPORCIONAL CORRIGIDO ⚖️
         const lucroOperacionalTotal = lucroBrutoLoja + lucroBrutoAfiliado;

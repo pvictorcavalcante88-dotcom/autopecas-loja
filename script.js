@@ -144,7 +144,7 @@ async function carregarPaginaCarrinho() {
         window.location.href = "login.html";
         return;
     }
-
+    const numParcelas = parseInt(document.getElementById('simular-parcelas')?.value || 1);
     const cartItemsContainer = document.getElementById('cart-items-desktop');
     const cartMobileContainer = document.getElementById('cart-items-mobile');
     
@@ -192,10 +192,11 @@ async function carregarPaginaCarrinho() {
             const precoBase = parseFloat(p.price || p.preco_novo);
             let margemAplicada = (item.customMargin !== undefined) ? item.customMargin : ((FATOR_GLOBAL - 1) * 100);
             
-            const math = calcularSimulacaoLiquida(precoBase, margemAplicada);
+            const math = calcularSimulacaoLiquida(precoBase, margemAplicada, numParcelas);
 
             const subtotalItem = math.precoFinal * item.quantidade;
             const lucroLiquidoItemTotal = math.lucroLiquido * item.quantidade;
+            
             
             // 🟢 SOMA OS VALORES PARA O DETALHAMENTO
             totalVenda += subtotalItem;
@@ -311,6 +312,14 @@ async function carregarPaginaCarrinho() {
     if (divAcoes && isAfiliado && cart.length > 0) {
         divAcoes.innerHTML = `<button onclick="window.location.href='checkout.html'" class="btn-place-order" style="width:100%; margin-top:15px; background:#34495e; color:white; padding:15px; font-size:1.1rem;"><i class="ph ph-whatsapp-logo"></i> Finalizar / Gerar Link</button>`;
     }
+
+    const infoParcela = document.getElementById('info-parcela');
+    if (infoParcela && numParcelas > 1) {
+    const valorParcela = totalVenda / numParcelas;
+    infoParcela.innerText = `${numParcelas}x de ${formatarMoeda(valorParcela)}`;
+    } else if (infoParcela) {
+    infoParcela.innerText = "";
+}
 }
 
 // --- FUNÇÃO NOVA: LIMPAR TUDO ---
@@ -1108,28 +1117,34 @@ function copiarCodigo() {
 // ============================================================
 // 🧮 CALCULADORA DE LUCRO LÍQUIDO (ESTIMATIVA FRONTEND)
 // ============================================================
-function calcularSimulacaoLiquida(precoBase, margemPorcentagem) {
-    // 1. Preços
-    const precoBaseFloat = parseFloat(precoBase);
-    const margem = parseFloat(margemPorcentagem);
-    
-    // Preço Final de Venda
-    const precoFinal = precoBaseFloat * (1 + (margem / 100));
-    
-    // 2. Lucro Bruto do Afiliado (O que ele adicionou)
-    const lucroBruto = precoFinal - precoBaseFloat;
+// script.js
 
-    // 3. Estimativa de Taxas (Rateio Proporcional)
-    // Baseado na lógica do Backend: 6% Gov + ~3.5% Asaas + Rateio do Custo
-    // Em média, cerca de 28% a 32% do Lucro Bruto do afiliado vai para pagar a parte dele das taxas.
-    const FATOR_TAXAS = 0.30; // 30% de retenção média para cobrir custos operacionais
+function calcularSimulacaoLiquida(precoBase, margemPorcentagem, parcelas = 1) {
+    const margem = parseFloat(margemPorcentagem);
+    let precoVendaOriginal = precoBase * (1 + (margem / 100));
     
-    const descontoTaxas = lucroBruto * FATOR_TAXAS;
-    const lucroLiquido = lucroBruto - descontoTaxas;
+    // --- LÓGICA DE JUROS E ANTECIPAÇÃO ---
+    // Se for acima de 2x, aplicamos uma taxa aproximada de 1.99% a.m. (padrão antecipação)
+    // Isso protege o seu caixa.
+    let precoFinalComJuros = precoVendaOriginal;
+    if (parcelas > 2) {
+        const taxaAntecipacaoEstimada = 0.0249; // Ex: 2.49% por parcela adicional
+        precoFinalComJuros = precoVendaOriginal * (1 + (taxaAntecipacaoEstimada * (parcelas - 2)));
+    }
+
+    // Lucro Bruto (Diferença entre o que você vende e o custo base)
+    const lucroBrutoTotal = precoFinalComJuros - precoBase;
+
+    // Estimativa de Taxas (Rateio Proporcional)
+    // Mantemos os 30% de retenção para cobrir Impostos + Taxa Fixa Asaas
+    const FATOR_TAXAS = 0.30; 
+    const descontoTaxas = lucroBrutoTotal * FATOR_TAXAS;
+    const lucroLiquido = lucroBrutoTotal - descontoTaxas;
 
     return {
-        precoFinal: precoFinal,
-        lucroBruto: lucroBruto,
+        precoFinal: precoFinalComJuros,
+        valorParcela: precoFinalComJuros / parcelas,
+        lucroBruto: lucroBrutoTotal,
         taxasEstimadas: descontoTaxas,
         lucroLiquido: lucroLiquido
     };

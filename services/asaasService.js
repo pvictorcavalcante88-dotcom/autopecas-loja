@@ -28,51 +28,70 @@ async function criarClienteAsaas(cliente) {
 
 // ... (imports e criarClienteAsaas continuam iguais) ...
 
-async function criarCobrancaPix(cliente, valorTotal, descricao, walletIdAfiliado = null, comissaoAfiliado = 0) {
+// services/asaasService.js
+
+// Função para gerar PIX DIRETO (com QR Code e Copia e Cola)
+async function criarCobrancaPixDireto(cliente, valorTotal, descricao, walletIdAfiliado, comissaoAfiliado) {
     try {
-        // 1. Configurações do Link para o Cliente ESCOLHER
-        let payload = {
-            billingType: 'UNDEFINED', // Aceita Pix, Cartão e Boleto
-            chargeType: 'DETACHED',   // <--- ISSO É IMPORTANTE! Cria cobrança avulsa
-            name: descricao.substring(0, 255),
-            description: descricao,
+        const clienteId = await criarClienteAsaas(cliente);
+
+        const payload = {
+            customer: clienteId,
+            billingType: 'PIX',
             value: valorTotal,
-            dueDateLimitDays: 1,      // Vencimento do link
-            
-            // 🟢 O SEGREDO ESTÁ AQUI:
-            // NÃO enviamos 'installmentCount' (isso travaria o número)
-            // Enviamos APENAS o 'maxInstallmentCount' (o limite)
-            maxInstallmentCount: 12   
+            dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Amanhã
+            description: descricao,
         };
 
-        // Lógica de Split (se tiver)
         if (walletIdAfiliado && comissaoAfiliado > 0) {
             payload.split = [{
                 walletId: walletIdAfiliado,
-                fixedValue: comissaoAfiliado, 
+                fixedValue: comissaoAfiliado,
             }];
         }
 
-        console.log("🚀 Gerando Link Flexível...");
-        const response = await api.post('/paymentLinks', payload);
-        
-        console.log("✅ Link Gerado:", response.data.url);
+        // 1. Cria a cobrança
+        const cobranca = await api.post('/payments', payload);
+        const paymentId = cobranca.data.id;
+
+        // 2. Busca o QR Code e o Copia e Cola
+        const qrCodeData = await api.get(`/payments/${paymentId}/pixQrCode`);
 
         return {
-            id: response.data.id,
-            encodedImage: null, 
-            payload: null,
-            invoiceUrl: response.data.url 
+            id: paymentId,
+            payload: qrCodeData.data.payload,
+            encodedImage: qrCodeData.data.encodedImage,
+            invoiceUrl: cobranca.data.invoiceUrl
         };
-
-    } catch (error) {
-        const erroDetalhe = error.response?.data?.errors 
-            ? JSON.stringify(error.response.data.errors) 
-            : error.message;
-        console.error("❌ ERRO ASAAS:", erroDetalhe);
-        throw new Error(`Erro Asaas: ${erroDetalhe}`);
+    } catch (e) {
+        throw new Error("Erro ao gerar PIX Direto: " + e.message);
     }
 }
 
+// Sua função de LINK (usada para Cartão/Parcelamento)
+async function criarLinkPagamento(cliente, valorTotal, descricao, walletIdAfiliado, comissaoAfiliado) {
+    try {
+        // ... sua lógica atual de /paymentLinks
+        const payload = {
+            billingType: 'UNDEFINED',
+            chargeType: 'DETACHED',
+            name: descricao,
+            value: valorTotal,
+            maxInstallmentCount: 12
+        };
 
-module.exports = { criarCobrancaPix };
+        if (walletIdAfiliado && comissaoAfiliado > 0) {
+            payload.split = [{ walletId: walletIdAfiliado, fixedValue: comissaoAfiliado }];
+        }
+
+        const response = await api.post('/paymentLinks', payload);
+        return {
+            id: response.data.id,
+            payload: null,
+            encodedImage: null,
+            invoiceUrl: response.data.url
+        };
+    } catch (e) { throw e; }
+}
+
+module.exports = { criarCobrancaPixDireto, criarLinkPagamento };

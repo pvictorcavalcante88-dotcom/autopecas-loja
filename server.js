@@ -17,7 +17,7 @@ const CONFIG_FINANCEIRA = {
     taxaAsaasCartaoFixo: 0.49    // R$ 0,49 fixo por transação
 };
 
-const { criarCobrancaPix } = require('./services/asaasService');
+const { criarCobrancaPixDireto, criarLinkPagamento } = require('./services/asaasService');
 
 const prisma = new PrismaClient();
 const app = express();
@@ -940,10 +940,9 @@ app.post('/api/checkout/pix', async (req, res) => {
     try {
         const { itens, cliente, afiliadoId, afiliadoCodigo, metodoPagamento } = req.body;
 
-        // Identificar Afiliado
+        // 1. Identificar Afiliado
         let idFinalAfiliado = null;
         let walletIdAfiliado = null;
-
         if (afiliadoId) {
             idFinalAfiliado = parseInt(afiliadoId);
         } else if (afiliadoCodigo) {
@@ -960,7 +959,7 @@ app.post('/api/checkout/pix', async (req, res) => {
         let lucroBrutoAfiliado = 0;   
         let itensParaBanco = [];
 
-        // 2. Loop dos Produtos
+        // 2. Loop dos Produtos (Cálculo de Lucros e Custos)
         for (const item of itens) {
             const prodBanco = await prisma.produto.findUnique({ where: { id: item.id } });
             if (!prodBanco) continue;
@@ -970,9 +969,8 @@ app.post('/api/checkout/pix', async (req, res) => {
                 return parseFloat(String(val).replace(',', '.'));
             };
 
-            // Tenta pegar o preco_custo, se não existir/for zero, assume margem de 20% (multiplica por 0.8)
             const precoLoja = limparValor(prodBanco.preco_novo); 
-            const custoPeca = limparValor(prodBanco.preco_custo) || (precoLoja * 0.8); // SEGURANÇA
+            const custoPeca = limparValor(prodBanco.preco_custo) || (precoLoja * 0.8); 
             
             const qtd = parseInt(item.quantidade);
             const margemItem = item.customMargin ? parseFloat(item.customMargin) : 0;
@@ -986,9 +984,8 @@ app.post('/api/checkout/pix', async (req, res) => {
             const totalItemCusto = custoPeca * qtd;
             const totalItemLojaBase = precoLoja * qtd; 
 
-            // Cálculo Real do Lucro Bruto
             const faturamentoAfiliado = totalItemVenda - totalItemLojaBase; 
-            const faturamentoLoja = totalItemLojaBase - totalItemCusto; // Aqui agora o custo é subtraído!
+            const faturamentoLoja = totalItemLojaBase - totalItemCusto;
 
             valorTotalVenda += totalItemVenda;
             custoTotalProdutos += totalItemCusto;
@@ -1005,32 +1002,23 @@ app.post('/api/checkout/pix', async (req, res) => {
             });
         }
 
-        
         // 3. CÁLCULO DAS TAXAS TOTAIS
-let custoTaxasTotal = 0;
+        let custoTaxasTotal = 0;
+        const valorImposto = valorTotalVenda * CONFIG_FINANCEIRA.impostoGoverno;
+        custoTaxasTotal += valorImposto;
 
-// Imposto fixo de 6% sobre o faturamento
-const valorImposto = valorTotalVenda * CONFIG_FINANCEIRA.impostoGoverno;
-custoTaxasTotal += valorImposto;
+        const metodoPuro = metodoPagamento ? metodoPagamento.toUpperCase().trim() : 'PIX';
 
-// Normaliza o método de pagamento para evitar erros de digitação (ex: 'cartao' virar 'CARTAO')
-const metodoPuro = metodoPagamento ? metodoPagamento.toUpperCase().trim() : 'PIX';
+        if (metodoPuro === 'CARTAO') {
+            custoTaxasTotal += (valorTotalVenda * CONFIG_FINANCEIRA.taxaAsaasCartaoPct) + CONFIG_FINANCEIRA.taxaAsaasCartaoFixo;
+        } else {
+            custoTaxasTotal += CONFIG_FINANCEIRA.taxaAsaasPix;
+        }
 
-if (metodoPuro === 'CARTAO' || metodoPuro === 'CREDIT_CARD') {
-    // TAXA CARTÃO: 5.5% + 0.49
-    const taxaVariavelCartao = valorTotalVenda * CONFIG_FINANCEIRA.taxaAsaasCartaoPct;
-    custoTaxasTotal += taxaVariavelCartao + CONFIG_FINANCEIRA.taxaAsaasCartaoFixo;
-} else {
-    // TAXA PIX: R$ 0.99
-    custoTaxasTotal += CONFIG_FINANCEIRA.taxaAsaasPix;
-}
-
-        // 4. RATEIO PROPORCIONAL CORRIGIDO ⚖️
+        // 4. RATEIO PROPORCIONAL
         const lucroOperacionalTotal = lucroBrutoLoja + lucroBrutoAfiliado;
-        
         let comissaoLiquidaAfiliado = 0;
         let parteTaxaAfiliado = 0;
-        // Inicializa as taxas da loja como o total (caso não haja afiliado)
         let parteTaxaLoja = custoTaxasTotal;
         let lucroLiquidoLoja = lucroBrutoLoja - custoTaxasTotal;
 
@@ -1038,18 +1026,35 @@ if (metodoPuro === 'CARTAO' || metodoPuro === 'CREDIT_CARD') {
             const pesoAfiliado = lucroBrutoAfiliado / lucroOperacionalTotal;
             parteTaxaAfiliado = custoTaxasTotal * pesoAfiliado;
             comissaoLiquidaAfiliado = lucroBrutoAfiliado - parteTaxaAfiliado;
-
-            // Recalcula a parte da loja subtraindo o que o afiliado já pagou
             parteTaxaLoja = custoTaxasTotal - parteTaxaAfiliado;
             lucroLiquidoLoja = lucroBrutoLoja - parteTaxaLoja;
         }
-
         if (comissaoLiquidaAfiliado < 0) comissaoLiquidaAfiliado = 0;
 
-        // --- LOG DE AUDITORIA (Substitua o console.log antigo por este) ---
-        const pctTaxaSobreLoja = lucroBrutoLoja > 0 ? (parteTaxaLoja / lucroBrutoLoja) * 100 : 0;
-        const pctTaxaSobreAfiliado = lucroBrutoAfiliado > 0 ? (parteTaxaAfiliado / lucroBrutoAfiliado) * 100 : 0;
-        const margemLiquidaLoja = valorTotalVenda > 0 ? (lucroLiquidoLoja / valorTotalVenda) * 100 : 0;
+        // 5. GERAÇÃO DA COBRANÇA (MUDANÇA AQUI PARA CORRIGIR O PIX) 🚀
+        let dadosAsaas;
+        
+        if (metodoPuro === 'CARTAO') {
+            // Se for cartão, usamos o Link de Pagamento (Flexível/Parcelado)
+            dadosAsaas = await criarCobrancaPix( // Sua função atual que usa /paymentLinks
+                cliente, 
+                valorTotalVenda, 
+                `Pedido AutoPeças - Cartão`,
+                walletIdAfiliado,
+                comissaoLiquidaAfiliado
+            );
+        } else {
+            // Se for PIX, precisamos de uma função que retorne QR Code (Cobranca Direta)
+            // Se você não criou a 'criarCobrancaPixDireto', o PIX continuará vindo vazio.
+            dadosAsaas = await criarCobrancaPixDireto( 
+                cliente, 
+                valorTotalVenda, 
+                `Pedido AutoPeças - PIX`,
+                walletIdAfiliado,
+                comissaoLiquidaAfiliado
+            );
+        }
+
 
         console.log(`
         ============================================================
@@ -1073,15 +1078,6 @@ if (metodoPuro === 'CARTAO' || metodoPuro === 'CREDIT_CARD') {
         ============================================================
         `);
 
-        // 5. Gera Link e Salva no Banco
-        const dadosPix = await criarCobrancaPix(
-            cliente, 
-            valorTotalVenda, 
-            `Pedido AutoPeças (${metodoPagamento || 'PIX'})`,
-            walletIdAfiliado,
-            comissaoLiquidaAfiliado
-        );
-
         const novoPedido = await prisma.pedido.create({
             data: {
                 clienteNome: cliente.nome,
@@ -1092,27 +1088,26 @@ if (metodoPuro === 'CARTAO' || metodoPuro === 'CREDIT_CARD') {
                 valorTotal: valorTotalVenda,
                 itens: JSON.stringify(itensParaBanco),
                 status: 'AGUARDANDO_PAGAMENTO',
-                asaasId: dadosPix.id, 
+                asaasId: dadosAsaas.id, 
                 afiliadoId: idFinalAfiliado, 
                 comissaoGerada: comissaoLiquidaAfiliado 
             }
         });
 
-        // Localize o res.json no final da sua rota app.post('/api/checkout/pix')
-res.json({
-    sucesso: true,
-    pedidoId: novoPedido.id,
-    // Enviamos o objeto 'pix' com os campos que o modal usa
-    pix: {
-        payload: dadosPix.payload,           // O código Copia e Cola
-        encodedImage: dadosPix.encodedImage  // A imagem do QR Code
-    }, 
-    linkPagamento: dadosPix.invoiceUrl       // Link para Cartão
-});
+        // Resposta para o Modal
+        res.json({
+            sucesso: true,
+            pedidoId: novoPedido.id,
+            pix: {
+                payload: dadosAsaas.payload,           // Agora preenchido se for PIX
+                encodedImage: dadosAsaas.encodedImage  // Agora preenchido se for PIX
+            }, 
+            linkPagamento: dadosAsaas.invoiceUrl       // URL do checkout Asaas
+        });
 
     } catch (e) {
         console.error("Erro checkout:", e);
-        res.status(500).json({ erro: "Erro ao processar pedido." });
+        res.status(500).json({ erro: e.message });
     }
 });
 

@@ -1067,54 +1067,61 @@ async function finalizarCompraAsaas() {
 }
 
 function mostrarModalPix(pixData, linkPagamento, metodoEscolhido) {
-    // LOG DE DEBUG - Abra o F12 no navegador para ver isso
-    console.log("Dados recebidos para o Modal:", { pixData, metodoEscolhido });
+    // LOG DE DEBUG para conferência no F12
+    console.log("Dados recebidos no Modal:", { pixData, metodoEscolhido });
 
     const imgPix = document.getElementById('pix-img');
     const txtCola = document.getElementById('pix-cola');
     const btnLink = document.getElementById('btn-link-pagamento');
     const btnCopiar = document.querySelector('button[onclick="copiarCodigo()"]');
+    const titulo = document.querySelector('#modal-pix h3');
+    const desc = document.querySelector('#modal-pix p');
     const modal = document.getElementById('modal-pix');
 
     if (!modal) return;
 
+    // --- CONFIGURAÇÃO PARA CARTÃO ---
     if (metodoEscolhido === 'CARTAO') {
-        // ... Lógica de Cartão (Já funcionando) ...
+        if (titulo) titulo.innerText = "🚀 Quase lá!";
+        if (desc) desc.innerText = "Clique no botão abaixo para finalizar seu pagamento com segurança via Cartão ou PIX no checkout.";
+        
         if (imgPix) imgPix.style.display = 'none';
         if (txtCola) txtCola.style.display = 'none';
         if (btnCopiar) btnCopiar.style.display = 'none';
-        if (btnLink) {
+
+        if (linkPagamento && btnLink) {
             btnLink.href = linkPagamento;
-            btnLink.style.display = 'block';
+            btnLink.style.display = 'block'; 
+            btnLink.style.background = '#27ae60'; // Seu verde destaque
+            btnLink.innerHTML = `<i class="ph ph-credit-card"></i> IR PARA PAGAMENTO (CARTÃO / PIX)`;
         }
     } 
+    // --- CONFIGURAÇÃO PARA PIX DIRETO ---
     else {
-        // --- LÓGICA PIX REFORÇADA ---
+        if (titulo) titulo.innerText = "⚡ Pagamento via PIX";
+        if (desc) desc.innerText = "Escaneie o QR Code ou copie o código abaixo para confirmar sua compra na hora.";
+        
         if (btnLink) btnLink.style.display = 'none';
 
-        // 1. Tratando a Imagem (QR Code)
-        if (imgPix) {
-            // Tenta pegar de 'encodedImage', senão assume que o pixData já é a string base64
-            const rawImage = pixData.encodedImage || (typeof pixData === 'string' ? null : pixData.image);
-            
-            if (rawImage) {
-                imgPix.src = `data:image/png;base64, ${rawImage}`;
+        // Tratando a Imagem (QR Code) do Asaas
+        if (imgPix && pixData) {
+            const qrCode = pixData.encodedImage || (typeof pixData === 'string' ? null : pixData.image);
+            if (qrCode) {
+                imgPix.src = `data:image/png;base64, ${qrCode}`;
                 imgPix.style.display = 'block';
             } else {
                 imgPix.style.display = 'none';
             }
         }
 
-        // 2. Tratando o Texto (Copia e Cola)
-        if (txtCola) {
-            // Tenta 'payload', depois tenta o próprio pixData se for string, ou 'text'
-            const textoPix = pixData.payload || (typeof pixData === 'string' ? pixData : pixData.text);
-            
-            if (textoPix) {
-                txtCola.innerText = textoPix;
+        // Tratando o Código Copia e Cola
+        if (txtCola && pixData) {
+            const payload = pixData.payload || (typeof pixData === 'string' ? pixData : pixData.text);
+            if (payload) {
+                txtCola.innerText = payload;
                 txtCola.style.display = 'block';
             } else {
-                txtCola.innerText = "Erro ao carregar código. Tente gerar novamente.";
+                txtCola.innerText = "Erro ao carregar código. Tente novamente.";
             }
         }
 

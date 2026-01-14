@@ -1066,7 +1066,6 @@ async function finalizarCompraAsaas() {
     }
 }
 
-// Funções auxiliares do Modal
 function mostrarModalPix(pixData, linkPagamento, metodoEscolhido) {
     const imgPix = document.getElementById('pix-img');
     const txtCola = document.getElementById('pix-cola');
@@ -1080,8 +1079,8 @@ function mostrarModalPix(pixData, linkPagamento, metodoEscolhido) {
 
     // --- LÓGICA PARA CARTÃO ---
     if (metodoEscolhido === 'CARTAO') {
-        if (titulo) titulo.innerText = "💳 Pagamento via Cartão";
-        if (desc) desc.innerText = "Clique no botão abaixo para abrir o checkout seguro e parcelar em até 10x.";
+        if (titulo) titulo.innerHTML = "💳 Pagamento via Cartão";
+        if (desc) desc.innerText = "Clique no botão abaixo para abrir o checkout seguro e parcelar.";
         
         if (imgPix) imgPix.style.display = 'none';
         if (txtCola) txtCola.style.display = 'none';
@@ -1090,23 +1089,27 @@ function mostrarModalPix(pixData, linkPagamento, metodoEscolhido) {
         if (btnLink) {
             btnLink.href = linkPagamento;
             btnLink.style.display = 'block';
-            btnLink.style.background = '#8e44ad'; // Roxo para Cartão
-            btnLink.innerHTML = `<i class="ph ph-credit-card"></i> PAGAR COM CARTÃO AGORA`;
+            btnLink.innerHTML = `<i class="ph ph-credit-card"></i> IR PARA PAGAMENTO`;
         }
     } 
-    // --- LÓGICA PARA PIX ---
+    // --- LÓGICA PARA PIX (CORRIGIDA) ---
     else {
-        if (titulo) titulo.innerText = "⚡ Pagamento via PIX";
-        if (desc) desc.innerText = "Escaneie o QR Code ou copie o código abaixo para confirmar sua compra na hora.";
+        if (titulo) titulo.innerHTML = "⚡ Pagamento via PIX";
+        if (desc) desc.innerText = "Escaneie o QR Code ou copie o código abaixo.";
 
+        // O Asaas envia a imagem em base64 e o código no campo 'payload' ou 'encodedImage'
         if (imgPix && pixData) {
-            imgPix.src = `data:image/png;base64, ${pixData.encodedImage || pixData}`; // Ajuste conforme o retorno do Asaas
+            // Se pixData for o objeto completo do Asaas:
+            imgPix.src = `data:image/png;base64, ${pixData.encodedImage}`; 
             imgPix.style.display = 'block';
         }
+        
         if (txtCola && pixData) {
-            txtCola.innerText = pixData.payload || pixData;
+            // 🔴 CORREÇÃO AQUI: Em vez de mostrar o objeto, mostramos o texto (payload)
+            txtCola.innerText = pixData.payload; 
             txtCola.style.display = 'block';
         }
+
         if (btnCopiar) btnCopiar.style.display = 'inline-block';
         if (btnLink) btnLink.style.display = 'none';
     }

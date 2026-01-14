@@ -1098,12 +1098,17 @@ if (metodoPuro === 'CARTAO' || metodoPuro === 'CREDIT_CARD') {
             }
         });
 
-        res.json({
-            sucesso: true,
-            pedidoId: novoPedido.id,
-            pix: dadosPix, 
-            linkPagamento: dadosPix.invoiceUrl 
-        });
+        // Localize o res.json no final da sua rota app.post('/api/checkout/pix')
+res.json({
+    sucesso: true,
+    pedidoId: novoPedido.id,
+    // Enviamos o objeto 'pix' com os campos que o modal usa
+    pix: {
+        payload: dadosPix.payload,           // O código Copia e Cola
+        encodedImage: dadosPix.encodedImage  // A imagem do QR Code
+    }, 
+    linkPagamento: dadosPix.invoiceUrl       // Link para Cartão
+});
 
     } catch (e) {
         console.error("Erro checkout:", e);

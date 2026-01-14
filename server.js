@@ -1036,13 +1036,13 @@ app.post('/api/checkout/pix', async (req, res) => {
         
         if (metodoPuro === 'CARTAO') {
             // Se for cartão, usamos o Link de Pagamento (Flexível/Parcelado)
-            dadosAsaas = await criarCobrancaPix( // Sua função atual que usa /paymentLinks
-                cliente, 
-                valorTotalVenda, 
-                `Pedido AutoPeças - Cartão`,
-                walletIdAfiliado,
-                comissaoLiquidaAfiliado
-            );
+            dadosAsaas = await criarLinkPagamento(
+                 cliente, 
+                 valorTotalVenda, 
+                 `Pedido Cartão - AutoPeças`,
+                 walletIdAfiliado,
+                 comissaoLiquidaAfiliado
+    );
         } else {
             // Se for PIX, precisamos de uma função que retorne QR Code (Cobranca Direta)
             // Se você não criou a 'criarCobrancaPixDireto', o PIX continuará vindo vazio.

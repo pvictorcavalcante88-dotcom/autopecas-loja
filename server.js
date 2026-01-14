@@ -1110,6 +1110,8 @@ if (metodoPuro === 'CARTAO' || metodoPuro === 'CREDIT_CARD') {
         res.status(500).json({ erro: "Erro ao processar pedido." });
     }
 });
+
+
 // ==============================================================
 // 🤖 WEBHOOK ASAAS (RECEBE CONFIRMAÇÃO DE PAGAMENTO)
 // ==============================================================
@@ -1191,6 +1193,49 @@ app.post('/api/webhook/asaas', async (req, res) => {
     } catch (error) {
         console.error("Erro Fatal no Webhook:", error);
         res.status(500).json({ error: 'Erro interno' });
+    }
+});
+
+// ROTA PARA O DASHBOARD DO AFILIADO (Cards de Resumo)
+app.get('/afiliado/estatisticas', authenticateToken, async (req, res) => {
+    try {
+        const { inicio, fim } = req.query; // Datas enviadas pelo filtro do dashboard
+        const afiliadoId = req.user.id; // Pegando o ID do afiliado logado pelo token
+
+        // Filtro de data básico
+        const filtroData = {};
+        if (inicio && fim) {
+            filtroData.createdAt = {
+                gte: new Date(inicio + "T00:00:00Z"),
+                lte: new Date(fim + "T23:59:59Z")
+            };
+        }
+
+        // Busca pedidos APROVADOS ou ENTREGUES para não somar lixo/cancelados
+        const pedidos = await prisma.pedido.findMany({
+            where: {
+                afiliadoId: afiliadoId,
+                status: { in: ['APROVADO', 'ENTREGUE'] },
+                ...filtroData
+            },
+            select: {
+                valorTotal: true,
+                comissaoGerada: true
+            }
+        });
+
+        // Somatória manual dos valores
+        const totalVendas = pedidos.reduce((acc, p) => acc + parseFloat(p.valorTotal || 0), 0);
+        const lucroLiquido = pedidos.reduce((acc, p) => acc + parseFloat(p.comissaoGerada || 0), 0);
+
+        res.json({
+            vendasTotais: totalVendas,
+            lucroLiquido: lucroLiquido
+        });
+
+    } catch (e) {
+        console.error("Erro nas estatísticas:", e);
+        res.status(500).json({ erro: "Erro ao carregar dados do período." });
     }
 });
 

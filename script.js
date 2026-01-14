@@ -1119,34 +1119,42 @@ function copiarCodigo() {
 // ============================================================
 // script.js
 
+// script.js
+
 function calcularSimulacaoLiquida(precoBase, margemPorcentagem, parcelas = 1) {
     const margem = parseFloat(margemPorcentagem);
-    let precoVendaOriginal = precoBase * (1 + (margem / 100));
     
-    // --- LÓGICA DE JUROS E ANTECIPAÇÃO ---
-    // Se for acima de 2x, aplicamos uma taxa aproximada de 1.99% a.m. (padrão antecipação)
-    // Isso protege o seu caixa.
-    let precoFinalComJuros = precoVendaOriginal;
+    // 1. Preço Original (À Vista) - É aqui que o lucro é gerado
+    const precoVendaAVista = precoBase * (1 + (margem / 100));
+    const lucroBrutoOriginal = precoVendaAVista - precoBase;
+
+    // 2. Cálculo dos Juros de Antecipação (Apenas para parcelas > 2)
+    // Esse valor é cobrado do cliente, mas repassado integralmente para o custo financeiro
+    let jurosAntecipacaoTotal = 0;
     if (parcelas > 2) {
-        const taxaAntecipacaoEstimada = 0.0249; // Ex: 2.49% por parcela adicional
-        precoFinalComJuros = precoVendaOriginal * (1 + (taxaAntecipacaoEstimada * (parcelas - 2)));
+        const taxaAntecipacaoEstimada = 0.0249; // Sua taxa de antecipação
+        jurosAntecipacaoTotal = precoVendaAVista * (taxaAntecipacaoEstimada * (parcelas - 2));
     }
 
-    // Lucro Bruto (Diferença entre o que você vende e o custo base)
-    const lucroBrutoTotal = precoFinalComJuros - precoBase;
+    // 3. Preço Final que o cliente paga na tela
+    const precoFinalVenda = precoVendaAVista + jurosAntecipacaoTotal;
 
-    // Estimativa de Taxas (Rateio Proporcional)
-    // Mantemos os 30% de retenção para cobrir Impostos + Taxa Fixa Asaas
-    const FATOR_TAXAS = 0.30; 
-    const descontoTaxas = lucroBrutoTotal * FATOR_TAXAS;
-    const lucroLiquido = lucroBrutoTotal - descontoTaxas;
+    // 4. Rateio de Taxas Operacionais (Impostos + Taxa Fixa Asaas)
+    // Aplicado apenas sobre o lucro original da venda para não inflar a comissão
+    const FATOR_TAXAS_OPERACIONAIS = 0.30; 
+    const descontoTaxasOperacionais = lucroBrutoOriginal * FATOR_TAXAS_OPERACIONAIS;
+    
+    // 5. Lucro Líquido Real (Protegido)
+    // O juros entra como "Ganho Bruto" mas sai como "Taxa", ficando neutro para o afiliado
+    const lucroLiquidoFinal = lucroBrutoOriginal - descontoTaxasOperacionais;
 
     return {
-        precoFinal: precoFinalComJuros,
-        valorParcela: precoFinalComJuros / parcelas,
-        lucroBruto: lucroBrutoTotal,
-        taxasEstimadas: descontoTaxas,
-        lucroLiquido: lucroLiquido
+        precoFinal: precoFinalVenda,
+        valorParcela: precoFinalVenda / parcelas,
+        lucroBruto: lucroBrutoOriginal, // Agora fixo no valor à vista
+        taxasEstimadas: descontoTaxasOperacionais,
+        lucroLiquido: lucroLiquidoFinal,
+        jurosIncluso: jurosAntecipacaoTotal // Para controle interno
     };
 }
 

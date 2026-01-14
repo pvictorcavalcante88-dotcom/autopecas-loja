@@ -69,24 +69,32 @@ async function criarCobrancaPixDireto(cliente, valorTotal, descricao, walletIdAf
 }
 
 // Função de LINK (usada para Cartão/Parcelamento)
+// services/asaasService.js
+
 async function criarLinkPagamento(cliente, valorTotal, descricao, walletIdAfiliado, comissaoAfiliado) {
     try {
         const payload = {
             billingType: 'UNDEFINED',
             chargeType: 'DETACHED',
             name: descricao.substring(0, 255),
-            value: Number(valorTotal.toFixed(2)), // 🔴 ARREDONDAMENTO OBRIGATÓRIO
-            maxInstallmentCount: 12
+            value: Number(valorTotal.toFixed(2)),
+            // 🔴 CORREÇÃO DO ERRO AQUI:
+            dueDateLimitDays: 3, // O link ficará ativo por 3 dias
+            maxInstallmentCount: 12,
+            notificationDisabled: false
         };
 
         if (walletIdAfiliado && comissaoAfiliado > 0) {
             payload.split = [{ 
                 walletId: walletIdAfiliado, 
-                fixedValue: Number(comissaoAfiliado.toFixed(2)) // 🔴 ARREDONDAMENTO OBRIGATÓRIO
+                fixedValue: Number(comissaoAfiliado.toFixed(2)) 
             }];
         }
 
+        console.log("🚀 Enviando payload para Asaas Link:", JSON.stringify(payload));
+
         const response = await api.post('/paymentLinks', payload);
+        
         return {
             id: response.data.id,
             payload: null,
@@ -94,11 +102,12 @@ async function criarLinkPagamento(cliente, valorTotal, descricao, walletIdAfilia
             invoiceUrl: response.data.url
         };
     } catch (e) { 
+        // Log detalhado para capturar erros do Asaas
         const msg = e.response?.data?.errors ? JSON.stringify(e.response.data.errors) : e.message;
+        console.error("❌ Erro detalhado no Asaas Link:", msg);
         throw new Error("Erro Asaas Link: " + msg);
     }
 }
 
-module.exports = { criarCobrancaPixDireto, criarLinkPagamento };
 
 module.exports = { criarCobrancaPixDireto, criarLinkPagamento };

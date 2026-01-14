@@ -1035,34 +1035,31 @@ app.post('/api/checkout/pix', async (req, res) => {
         let dadosAsaas;
         
         if (metodoPuro === 'CARTAO') {
-            // Se for cartão, usamos o Link de Pagamento (Flexível/Parcelado)
             dadosAsaas = await criarLinkPagamento(
-                 cliente, 
-                 valorTotalVenda, 
-                 `Pedido Cartão - AutoPeças`,
-                 walletIdAfiliado,
-                 comissaoLiquidaAfiliado
-    );
+                cliente, 
+                valorTotalVenda, 
+                `Pedido Cartão - AutoPeças`,
+                walletIdAfiliado,
+                comissaoLiquidaAfiliado
+            );
         } else {
-            // Se for PIX, precisamos de uma função que retorne QR Code (Cobranca Direta)
-            // Se você não criou a 'criarCobrancaPixDireto', o PIX continuará vindo vazio.
             dadosAsaas = await criarCobrancaPixDireto( 
                 cliente, 
                 valorTotalVenda, 
-                `Pedido AutoPeças - PIX`,
+                `Pedido PIX - AutoPeças`,
                 walletIdAfiliado,
                 comissaoLiquidaAfiliado
             );
         }
 
-        // --- LOG DE AUDITORIA (Substitua o console.log antigo por este) ---
+        // --- LOG DE AUDITORIA CORRIGIDO ---
         const pctTaxaSobreLoja = lucroBrutoLoja > 0 ? (parteTaxaLoja / lucroBrutoLoja) * 100 : 0;
         const pctTaxaSobreAfiliado = lucroBrutoAfiliado > 0 ? (parteTaxaAfiliado / lucroBrutoAfiliado) * 100 : 0;
         const margemLiquidaLoja = valorTotalVenda > 0 ? (lucroLiquidoLoja / valorTotalVenda) * 100 : 0;
 
         console.log(`
         ============================================================
-        📊 AUDITORIA DE TAXAS - MÉTODO: ${metodoPagamento}
+        📊 AUDITORIA DE TAXAS - MÉTODO: ${metodoPuro}
         ============================================================
         💰 VENDA TOTAL:          R$ ${valorTotalVenda.toFixed(2)}
         📦 CUSTO PRODUTOS:       R$ ${custoTotalProdutos.toFixed(2)}

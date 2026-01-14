@@ -30,6 +30,8 @@ async function criarClienteAsaas(cliente) {
 
 // services/asaasService.js
 
+// services/asaasService.js
+
 // Função para gerar PIX DIRETO (com QR Code e Copia e Cola)
 async function criarCobrancaPixDireto(cliente, valorTotal, descricao, walletIdAfiliado, comissaoAfiliado) {
     try {
@@ -38,23 +40,20 @@ async function criarCobrancaPixDireto(cliente, valorTotal, descricao, walletIdAf
         const payload = {
             customer: clienteId,
             billingType: 'PIX',
-            value: valorTotal,
-            dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Amanhã
+            value: Number(valorTotal.toFixed(2)), // 🔴 ARREDONDAMENTO OBRIGATÓRIO
+            dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
             description: descricao,
         };
 
         if (walletIdAfiliado && comissaoAfiliado > 0) {
             payload.split = [{
                 walletId: walletIdAfiliado,
-                fixedValue: comissaoAfiliado,
+                fixedValue: Number(comissaoAfiliado.toFixed(2)), // 🔴 ARREDONDAMENTO OBRIGATÓRIO
             }];
         }
 
-        // 1. Cria a cobrança
         const cobranca = await api.post('/payments', payload);
         const paymentId = cobranca.data.id;
-
-        // 2. Busca o QR Code e o Copia e Cola
         const qrCodeData = await api.get(`/payments/${paymentId}/pixQrCode`);
 
         return {
@@ -64,24 +63,27 @@ async function criarCobrancaPixDireto(cliente, valorTotal, descricao, walletIdAf
             invoiceUrl: cobranca.data.invoiceUrl
         };
     } catch (e) {
-        throw new Error("Erro ao gerar PIX Direto: " + e.message);
+        const msg = e.response?.data?.errors ? JSON.stringify(e.response.data.errors) : e.message;
+        throw new Error("Erro Asaas PIX: " + msg);
     }
 }
 
-// Sua função de LINK (usada para Cartão/Parcelamento)
+// Função de LINK (usada para Cartão/Parcelamento)
 async function criarLinkPagamento(cliente, valorTotal, descricao, walletIdAfiliado, comissaoAfiliado) {
     try {
-        // ... sua lógica atual de /paymentLinks
         const payload = {
             billingType: 'UNDEFINED',
             chargeType: 'DETACHED',
-            name: descricao,
-            value: valorTotal,
+            name: descricao.substring(0, 255),
+            value: Number(valorTotal.toFixed(2)), // 🔴 ARREDONDAMENTO OBRIGATÓRIO
             maxInstallmentCount: 12
         };
 
         if (walletIdAfiliado && comissaoAfiliado > 0) {
-            payload.split = [{ walletId: walletIdAfiliado, fixedValue: comissaoAfiliado }];
+            payload.split = [{ 
+                walletId: walletIdAfiliado, 
+                fixedValue: Number(comissaoAfiliado.toFixed(2)) // 🔴 ARREDONDAMENTO OBRIGATÓRIO
+            }];
         }
 
         const response = await api.post('/paymentLinks', payload);
@@ -91,7 +93,12 @@ async function criarLinkPagamento(cliente, valorTotal, descricao, walletIdAfilia
             encodedImage: null,
             invoiceUrl: response.data.url
         };
-    } catch (e) { throw e; }
+    } catch (e) { 
+        const msg = e.response?.data?.errors ? JSON.stringify(e.response.data.errors) : e.message;
+        throw new Error("Erro Asaas Link: " + msg);
+    }
 }
+
+module.exports = { criarCobrancaPixDireto, criarLinkPagamento };
 
 module.exports = { criarCobrancaPixDireto, criarLinkPagamento };

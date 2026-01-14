@@ -115,12 +115,13 @@ async function carregarDashboardCompleto() {
 function calcularVendasPorPeriodo() {
     const elInicio = document.getElementById('data-inicio');
     const elFim = document.getElementById('data-fim');
-    const elTotalVendas = document.getElementById('total-periodo-valor');
+    
+    // IDs ATUALIZADOS PARA BATER COM O HTML
+    const elTotalVendas = document.getElementById('total-periodo-venda'); 
     const elTotalLucro = document.getElementById('total-periodo-lucro'); 
     
     if(!elInicio || !elFim) return;
 
-    // Pega as datas do input (YYYY-MM-DD)
     const inicioStr = elInicio.value; 
     const fimStr = elFim.value;
 
@@ -131,36 +132,31 @@ function calcularVendasPorPeriodo() {
 
     if (window.TODAS_VENDAS) {
         window.TODAS_VENDAS.forEach(v => {
-            // Verifica se o status conta como venda válida
-            if (['APROVADO', 'ENTREGUE', 'DEVOLUCAO_PARCIAL', 'PAGO', 'AGUARDANDO_PAGAMENTO'].includes(v.status)) {
+            // Filtra apenas vendas que geram dinheiro real
+            if (['APROVADO', 'ENTREGUE', 'DEVOLUCAO_PARCIAL', 'PAGO'].includes(v.status)) {
                 
-                // 🟢 CORREÇÃO DE DATA:
-                // Cria a data ajustada para o fuso horário local do navegador
                 const dataObj = new Date(v.createdAt);
-                
-                // Pega ano, mês e dia locais
                 const ano = dataObj.getFullYear();
                 const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
                 const dia = String(dataObj.getDate()).padStart(2, '0');
-                
-                // Monta a string YYYY-MM-DD local para comparar com o input
                 const dataVendaLocal = `${ano}-${mes}-${dia}`;
 
-                // Compara String com String (Funciona perfeitamente agora)
                 if (dataVendaLocal >= inicioStr && dataVendaLocal <= fimStr) {
-                    // Soma
+                    // SOMA O VALOR BRUTO DA VENDA
                     totalVendaPeriodo += parseFloat(v.valorTotal || 0);
+                    // SOMA A COMISSÃO LÍQUIDA (O que sobra para o afiliado)
                     totalLucroPeriodo += parseFloat(v.comissaoGerada || 0);
                 }
             }
         });
     }
 
-    // Exibe na tela
+    // Exibe o Faturamento Bruto
     if(elTotalVendas) {
         elTotalVendas.innerText = totalVendaPeriodo.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
     }
     
+    // Exibe o Lucro Líquido do Parceiro
     if(elTotalLucro) {
         elTotalLucro.innerText = totalLucroPeriodo.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
     }

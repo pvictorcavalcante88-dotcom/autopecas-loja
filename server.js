@@ -1055,6 +1055,10 @@ app.post('/api/checkout/pix', async (req, res) => {
             );
         }
 
+        // --- LOG DE AUDITORIA (Substitua o console.log antigo por este) ---
+        const pctTaxaSobreLoja = lucroBrutoLoja > 0 ? (parteTaxaLoja / lucroBrutoLoja) * 100 : 0;
+        const pctTaxaSobreAfiliado = lucroBrutoAfiliado > 0 ? (parteTaxaAfiliado / lucroBrutoAfiliado) * 100 : 0;
+        const margemLiquidaLoja = valorTotalVenda > 0 ? (lucroLiquidoLoja / valorTotalVenda) * 100 : 0;
 
         console.log(`
         ============================================================

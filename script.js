@@ -1067,51 +1067,58 @@ async function finalizarCompraAsaas() {
 }
 
 function mostrarModalPix(pixData, linkPagamento, metodoEscolhido) {
+    // LOG DE DEBUG - Abra o F12 no navegador para ver isso
+    console.log("Dados recebidos para o Modal:", { pixData, metodoEscolhido });
+
     const imgPix = document.getElementById('pix-img');
     const txtCola = document.getElementById('pix-cola');
     const btnLink = document.getElementById('btn-link-pagamento');
     const btnCopiar = document.querySelector('button[onclick="copiarCodigo()"]');
-    const titulo = document.querySelector('#modal-pix h3');
-    const desc = document.querySelector('#modal-pix p');
     const modal = document.getElementById('modal-pix');
 
     if (!modal) return;
 
-    // --- LÓGICA PARA CARTÃO ---
     if (metodoEscolhido === 'CARTAO') {
-        if (titulo) titulo.innerHTML = "💳 Pagamento via Cartão";
-        if (desc) desc.innerText = "Clique no botão abaixo para abrir o checkout seguro e parcelar.";
-        
+        // ... Lógica de Cartão (Já funcionando) ...
         if (imgPix) imgPix.style.display = 'none';
         if (txtCola) txtCola.style.display = 'none';
         if (btnCopiar) btnCopiar.style.display = 'none';
-
         if (btnLink) {
             btnLink.href = linkPagamento;
             btnLink.style.display = 'block';
-            btnLink.innerHTML = `<i class="ph ph-credit-card"></i> IR PARA PAGAMENTO`;
         }
     } 
-    // --- LÓGICA PARA PIX (CORRIGIDA) ---
     else {
-        if (titulo) titulo.innerHTML = "⚡ Pagamento via PIX";
-        if (desc) desc.innerText = "Escaneie o QR Code ou copie o código abaixo.";
+        // --- LÓGICA PIX REFORÇADA ---
+        if (btnLink) btnLink.style.display = 'none';
 
-        // O Asaas envia a imagem em base64 e o código no campo 'payload' ou 'encodedImage'
-        if (imgPix && pixData) {
-            // Se pixData for o objeto completo do Asaas:
-            imgPix.src = `data:image/png;base64, ${pixData.encodedImage}`; 
-            imgPix.style.display = 'block';
+        // 1. Tratando a Imagem (QR Code)
+        if (imgPix) {
+            // Tenta pegar de 'encodedImage', senão assume que o pixData já é a string base64
+            const rawImage = pixData.encodedImage || (typeof pixData === 'string' ? null : pixData.image);
+            
+            if (rawImage) {
+                imgPix.src = `data:image/png;base64, ${rawImage}`;
+                imgPix.style.display = 'block';
+            } else {
+                imgPix.style.display = 'none';
+            }
         }
-        
-        if (txtCola && pixData) {
-            // 🔴 CORREÇÃO AQUI: Em vez de mostrar o objeto, mostramos o texto (payload)
-            txtCola.innerText = pixData.payload; 
-            txtCola.style.display = 'block';
+
+        // 2. Tratando o Texto (Copia e Cola)
+        if (txtCola) {
+            // Tenta 'payload', depois tenta o próprio pixData se for string, ou 'text'
+            const textoPix = pixData.payload || (typeof pixData === 'string' ? pixData : pixData.text);
+            
+            if (textoPix) {
+                txtCola.innerText = textoPix;
+                txtCola.style.display = 'block';
+            } else {
+                txtCola.innerText = "Erro ao carregar código. Tente gerar novamente.";
+            }
         }
 
         if (btnCopiar) btnCopiar.style.display = 'inline-block';
-        if (btnLink) btnLink.style.display = 'none';
     }
 
     modal.style.display = 'flex';

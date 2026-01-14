@@ -72,10 +72,21 @@
                 <span id="cart-subtotal">R$ 0,00</span>
             </div>
             
-            <div class="summary-row" id="row-afiliado-lucro" style="display: none; color: #27ae60; font-weight: bold; background: #e8f5e9; padding: 5px; border-radius: 4px; margin: 5px 0;">
-                <span>Seu Lucro Estimado:</span>
-                <span id="afiliado-lucro-valor">R$ 0,00</span>
-            </div>
+            <div id="row-afiliado-lucro" style="display: none; flex-direction: column; background: #fff8f0; padding: 12px; border-radius: 8px; border: 1px dashed #e67e22; margin: 10px 0; gap: 5px;">
+    <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #666;">
+        <span>Ganho Bruto:</span>
+        <span id="cart-ganho-bruto">R$ 0,00</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: #c0392b;">
+        <span>- Taxas/Imp (Est.):</span>
+        <span id="cart-taxas-estimadas">R$ 0,00</span>
+    </div>
+    <hr style="border: 0; border-top: 1px solid #eee; margin: 5px 0;">
+    <div style="display: flex; justify-content: space-between; font-weight: bold; color: #27ae60;">
+        <span>Líquido:</span>
+        <span id="afiliado-lucro-valor">R$ 0,00</span>
+    </div>
+</div>
 
             <div class="summary-row">
                 <span>Frete</span>

@@ -141,12 +141,12 @@ document.addEventListener("DOMContentLoaded", async function() {
 async function carregarPaginaCarrinho() {
     if (!localStorage.getItem('afiliadoLogado')) {
         alert("Você precisa fazer login para acessar o carrinho.");
-        window.location.href = "login.html"; // Ajuste se seu login for afiliado_login.html
+        window.location.href = "login.html";
         return;
     }
 
-    const cartItemsContainer = document.getElementById('cart-items-desktop'); // Tabela PC
-    const cartMobileContainer = document.getElementById('cart-items-mobile'); // Div Mobile
+    const cartItemsContainer = document.getElementById('cart-items-desktop');
+    const cartMobileContainer = document.getElementById('cart-items-mobile');
     
     const cartTotalElement = document.getElementById('cart-total');
     const cartSubtotalElement = document.getElementById('cart-subtotal');
@@ -154,18 +154,23 @@ async function carregarPaginaCarrinho() {
     const valorLucro = document.getElementById('afiliado-lucro-valor');
     const divAcoes = document.getElementById('afiliado-cart-actions');
 
+    // 🟢 NOVOS ELEMENTOS DO DETALHAMENTO
+    const elGanhoBruto = document.getElementById('cart-ganho-bruto');
+    const elTaxasEstimadas = document.getElementById('cart-taxas-estimadas');
+
     let cart = getCarrinho();
     
-    // Limpa tudo antes de recriar
     if (cartItemsContainer) cartItemsContainer.innerHTML = ''; 
     if (cartMobileContainer) cartMobileContainer.innerHTML = '';
     if (divAcoes) divAcoes.innerHTML = '';
     
     let totalVenda = 0;
-    let totalLucroLiquido = 0; // 🟢 Mudamos de totalLucro para totalLucroLiquido
+    let totalLucroLiquido = 0; 
+    let totalGanhoBruto = 0;   // 🟢 Acumulador novo
+    let totalTaxas = 0;        // 🟢 Acumulador novo
+
     const isAfiliado = !!localStorage.getItem('afiliadoLogado');
 
-    // 1. Carrinho Vazio
     if (cart.length === 0) {
         if(cartItemsContainer) cartItemsContainer.innerHTML = '<tr><td colspan="6" align="center" style="padding:20px;">Seu carrinho está vazio.</td></tr>';
         if(cartMobileContainer) cartMobileContainer.innerHTML = '<div style="text-align:center; padding:20px;">Carrinho vazio.</div>';
@@ -176,7 +181,6 @@ async function carregarPaginaCarrinho() {
         return;
     }
 
-    // 2. Loop dos Itens
     for (const item of cart) {
         try {
             const response = await fetch(`${API_URL}/products/${item.id}`);
@@ -185,28 +189,22 @@ async function carregarPaginaCarrinho() {
 
             const nomeExibir = montarNomeCompleto(item, p);
 
-            // ===========================================================
-            // 🟢 CÁLCULOS COM A NOVA LÓGICA FINANCEIRA
-            // ===========================================================
             const precoBase = parseFloat(p.price || p.preco_novo);
-            
-            // Pega a margem do item ou a global
             let margemAplicada = (item.customMargin !== undefined) ? item.customMargin : ((FATOR_GLOBAL - 1) * 100);
             
-            // Usa a calculadora de lucro líquido (mesma do produto.html)
-            // Se a função não existir ainda no final do arquivo, ela vai dar erro, certifique-se que ela está lá.
             const math = calcularSimulacaoLiquida(precoBase, margemAplicada);
 
             const subtotalItem = math.precoFinal * item.quantidade;
             const lucroLiquidoItemTotal = math.lucroLiquido * item.quantidade;
-
+            
+            // 🟢 SOMA OS VALORES PARA O DETALHAMENTO
             totalVenda += subtotalItem;
             totalLucroLiquido += lucroLiquidoItemTotal;
-            // ===========================================================
+            totalGanhoBruto += math.lucroBruto * item.quantidade;
+            totalTaxas += math.taxasEstimadas * item.quantidade;
 
             // --- VERSÃO DESKTOP ---
             if (cartItemsContainer) {
-                // HTML da Margem com Visualização do Lucro Unitário
                 const htmlMargemPC = isAfiliado ? `
                     <div style="margin-top:5px; font-size:0.85rem; color:#e67e22; display:flex; flex-direction:column; gap:2px;">
                         <div>
@@ -267,9 +265,7 @@ async function carregarPaginaCarrinho() {
                             <div style="color:#777; font-size:0.85rem;">${formatarMoeda(math.precoFinal)} unit.</div>
                         </div>
                     </div>
-
                     ${htmlMargemMobile}
-                    
                     <div class="mobile-cart-details" style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
                         <div class="mobile-qty-box">
                             <button onclick="alterarQuantidade(${item.id}, -1)">-</button>
@@ -280,7 +276,6 @@ async function carregarPaginaCarrinho() {
                             ${formatarMoeda(subtotalItem)}
                         </div>
                     </div>
-
                     <button class="mobile-remove-btn" onclick="removerItem(${item.id})" style="width:100%; margin-top:10px; background:none; border:1px solid #fab1a0; color:#e17055; padding:8px; border-radius:4px;">
                         Remover
                     </button>
@@ -292,55 +287,29 @@ async function carregarPaginaCarrinho() {
         } catch (e) { console.error(e); }
     }
     
-    // 3. BOTÃO DE ESVAZIAR
+    // 3. BOTÃO DE ESVAZIAR (Mantém igual)
     if (cartItemsContainer && cart.length > 0) {
         const rowLimpar = document.createElement('tr');
-        rowLimpar.innerHTML = `
-            <td colspan="6" style="text-align: right; padding-top: 15px;">
-                <button onclick="limparCarrinho()" style="background:none; border:1px solid #e74c3c; color:#e74c3c; padding:8px 15px; border-radius:4px; cursor:pointer; font-size:0.9rem; display:inline-flex; align-items:center; gap:5px;">
-                    <i class="ph ph-trash"></i> Esvaziar Carrinho
-                </button>
-            </td>`;
+        rowLimpar.innerHTML = `<td colspan="6" style="text-align: right; padding-top: 15px;"><button onclick="limparCarrinho()" style="background:none; border:1px solid #e74c3c; color:#e74c3c; padding:8px 15px; border-radius:4px; cursor:pointer; font-size:0.9rem; display:inline-flex; align-items:center; gap:5px;"><i class="ph ph-trash"></i> Esvaziar Carrinho</button></td>`;
         cartItemsContainer.appendChild(rowLimpar);
-    }
-
-    if (cartMobileContainer && cart.length > 0) {
-        const btnLimparMobile = document.createElement('div');
-        btnLimparMobile.style.textAlign = 'center';
-        btnLimparMobile.style.marginTop = '20px';
-        btnLimparMobile.innerHTML = `
-            <button onclick="limparCarrinho()" style="background:white; border:1px solid #e74c3c; color:#e74c3c; padding:12px; width:100%; border-radius:8px; cursor:pointer; font-weight:bold; display:flex; justify-content:center; align-items:center; gap:8px;">
-                <i class="ph ph-trash" style="font-size:1.2rem;"></i> Esvaziar Tudo
-            </button>
-        `;
-        cartMobileContainer.appendChild(btnLimparMobile);
     }
 
     // 4. ATUALIZA TOTAIS NO RODAPÉ DO CARRINHO
     if (cartTotalElement) cartTotalElement.innerText = formatarMoeda(totalVenda);
     if (cartSubtotalElement) cartSubtotalElement.innerText = formatarMoeda(totalVenda);
 
-    // Mostra o Lucro Líquido Estimado Total
-    if (isAfiliado && rowLucro && valorLucro) {
+    // 🟢 ATUALIZA O LUCRO DETALHADO (PASSO FINAL)
+    if (isAfiliado && rowLucro) {
         rowLucro.style.display = 'flex'; 
-        rowLucro.style.justifyContent = 'space-between';
         
-        // Atualiza a Label para ficar claro
-        const labelLucro = rowLucro.querySelector('span:first-child') || rowLucro;
-        if(labelLucro.innerText.includes('Lucro')) labelLucro.innerHTML = '<strong>Lucro Líquido Est.:</strong>';
-
-        valorLucro.innerHTML = `
-            <span style="color:#27ae60; font-size:1.2rem; font-weight:bold;">${formatarMoeda(totalLucroLiquido)}</span>
-        `;
+        if (elGanhoBruto) elGanhoBruto.innerText = formatarMoeda(totalGanhoBruto);
+        if (elTaxasEstimadas) elTaxasEstimadas.innerText = formatarMoeda(totalTaxas);
+        if (valorLucro) valorLucro.innerText = formatarMoeda(totalLucroLiquido);
     }
 
     // 5. Botão Finalizar
     if (divAcoes && isAfiliado && cart.length > 0) {
-        divAcoes.innerHTML = `
-            <button onclick="window.location.href='checkout.html'" class="btn-place-order" style="width:100%; margin-top:15px; background:#34495e; color:white; padding:15px; font-size:1.1rem;">
-                <i class="ph ph-whatsapp-logo"></i> Finalizar / Gerar Link
-            </button>
-        `;
+        divAcoes.innerHTML = `<button onclick="window.location.href='checkout.html'" class="btn-place-order" style="width:100%; margin-top:15px; background:#34495e; color:white; padding:15px; font-size:1.1rem;"><i class="ph ph-whatsapp-logo"></i> Finalizar / Gerar Link</button>`;
     }
 }
 

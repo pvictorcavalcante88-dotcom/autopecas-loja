@@ -799,37 +799,48 @@ async function executarBusca(q, categoria) {
             }
 
             data.forEach(p => {
-                // --- 🟢 LÓGICA DE DESTAQUE INTELIGENTE ---
+                // --- 🟢 LÓGICA DE DESTAQUE AVANÇADO (CARRO + MOTOR) ---
                 let carroExibir = "";
+                let motorExibir = "";
+                
                 const listaCarrosBanco = (p.carros || '').toUpperCase();
+                const listaMotoresBanco = (p.motor || '').toUpperCase();
 
                 if (termoPesquisado) {
-                    // 1. Criamos um array com os carros que o produto atende
-                    const carrosDoProduto = listaCarrosBanco.split(',').map(c => c.trim());
+                    // 1. Tentar encontrar o CARRO no termo pesquisado
+                    const carrosArray = listaCarrosBanco.split(',').map(c => c.trim());
+                    const matchCarro = carrosArray.find(carro => termoPesquisado.includes(carro));
+                    
+                    if (matchCarro) {
+                        carroExibir = matchCarro;
+                    }
 
-                    // 2. Verificamos se algum desses carros está na pesquisa do usuário
-                    // Ex: pesquisa "Civic", lista do produto [Accord, City, Civic] -> Acha Civic
-                    const match = carrosDoProduto.find(carro => termoPesquisado.includes(carro));
-
-                    if (match) {
-                        carroExibir = match;
-                    } else {
-                        // 3. Se não achou o nome do carro, mas o usuário pesquisou um modelo específico (ex: "Pastilha Gol")
-                        // Varre a LISTA_CARROS global para ver se o que ele digitou bate com algo que o produto atende
-                        const matchGlobal = LISTA_CARROS.find(c => 
-                            termoPesquisado.includes(c) && listaCarrosBanco.includes(c)
-                        );
-                        if (matchGlobal) carroExibir = matchGlobal;
+                    // 2. Tentar encontrar o MOTOR no termo pesquisado
+                    // Ex: Pesquisa "Civic 1.8", banco tem motores "1.8, 2.0" -> Acha 1.8
+                    const motoresArray = listaMotoresBanco.split(',').map(m => m.trim());
+                    const matchMotor = motoresArray.find(m => termoPesquisado.includes(m));
+                    
+                    if (matchMotor) {
+                        motorExibir = ` ${matchMotor}`; // Espaço antes para separar do carro
                     }
                 }
 
-                // 4. Fallback: Se ainda não achou nada, volta para o primeiro da lista
+                // 3. Fallbacks caso a pesquisa seja genérica (ex: apenas "Pastilha")
                 if (!carroExibir && p.carros) {
                     carroExibir = p.carros.split(',')[0].trim().toUpperCase();
                 }
+                // Se achou o motor na pesquisa, mas não o carro (ex: "Peças 1.8")
+                // ou se não achou motor na pesquisa, pegamos o motor principal do cadastro
+                if (!motorExibir && p.motor && p.motor.length < 15) { 
+                    // Só exibe motor se a string for curta (evita textos gigantes no card)
+                    motorExibir = ` ${p.motor.split(',')[0].trim().toUpperCase()}`;
+                }
+
+                // --- 4. MONTAGEM FINAL DA STRING DE APLICAÇÃO ---
+                const anoExibir = p.ano ? ` (${p.ano})` : "";
+                const aplicacaoCompleta = `${carroExibir}${motorExibir}${anoExibir}`;
 
                 // --- RESTO DA MONTAGEM DO CARD ---
-                const anoExibir = p.ano ? ` (${p.ano})` : "";
                 const termoParaLink = q ? `&q=${encodeURIComponent(q)}` : '';
                 const textoBotao = isLogado ? 'Ver Detalhes' : 'Entrar';
                 
@@ -847,7 +858,7 @@ async function executarBusca(q, categoria) {
                         
                         <div class="app-tag">
                             <i class="ph ph-car" style="vertical-align: middle;"></i> 
-                            <span>${carroExibir}${anoExibir}</span>
+                            <span title="${aplicacaoCompleta}">${aplicacaoCompleta}</span>
                         </div>
                     </div>
 

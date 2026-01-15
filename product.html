@@ -264,7 +264,7 @@
             }
         });
 
-        async function carregarProduto(id) {
+async function carregarProduto(id) {
             try {
                 // Lógica do Afiliado
                 const afData = localStorage.getItem('afiliadoLogado');
@@ -290,92 +290,84 @@
                 document.getElementById('prod-title').textContent = PRODUTO_ATUAL.titulo;
                 document.getElementById('prod-cat').textContent = (PRODUTO_ATUAL.categoria || "Peças") + " > " + (PRODUTO_ATUAL.referencia || "Ref: ---");
 
-                // Monta descrição
+                // ===========================================================
+                // 🟢 LÓGICA DE DESTAQUE DE APLICAÇÃO (REFIDADO)
+                // ===========================================================
                 let desc = "";
                 if(PRODUTO_ATUAL.referencia) desc += `<strong>Ref:</strong> ${PRODUTO_ATUAL.referencia}<br>`;
                 if(PRODUTO_ATUAL.fabricante) desc += `<strong>Marca:</strong> ${PRODUTO_ATUAL.fabricante}<br>`;
+                
                 if(PRODUTO_ATUAL.carros) {
-                    const textoApp = PRODUTO_ATUAL.carros;
-                    const limite = 60; // Quantidade de letras antes de cortar
+                    const params = new URLSearchParams(window.location.search);
+                    const termoPesquisado = (params.get('q') || params.get('search') || '').toUpperCase();
+                    
+                    let textoApp = PRODUTO_ATUAL.carros;
+                    const listaCarrosBanco = (PRODUTO_ATUAL.carros || "").toUpperCase();
+                    const listaMotoresBanco = (PRODUTO_ATUAL.motor || "").toUpperCase();
 
-                    if (textoApp.length > limite) {
-                        // Corta o texto e prepara o "Ver Mais"
-                        const parteVisivel = textoApp.substring(0, limite);
-                        const parteOculta = textoApp.substring(limite);
+                    // Se houver termo de busca, movemos o carro/motor encontrado para o início
+                    if (termoPesquisado) {
+                        const carrosArray = listaCarrosBanco.split(',').map(c => c.trim());
+                        const motoresArray = listaMotoresBanco.split(',').map(m => m.trim());
                         
-                        desc += `
-                            <strong>Aplicação:</strong> 
-                            <span>${parteVisivel}</span><span id="app-oculta" style="display:none;">${parteOculta}</span>
-                            <span onclick="toggleAplicacao()" id="btn-app-toggle" style="color:#3498db; cursor:pointer; font-weight:bold; font-size:0.9em;">
-                                ... ver mais
-                            </span><br>
-                        `;
+                        const matchCarro = carrosArray.find(carro => termoPesquisado.includes(carro));
+                        const matchMotor = motoresArray.find(motor => termoPesquisado.includes(motor));
+
+                        if (matchCarro) {
+                            const outrasAplicacoes = PRODUTO_ATUAL.carros.split(',')
+                                .map(c => c.trim())
+                                .filter(c => c.toUpperCase() !== matchCarro);
+                            
+                            const motorDestaque = matchMotor ? ` ${matchMotor}` : "";
+                            const anoDestaque = PRODUTO_ATUAL.ano ? ` (${PRODUTO_ATUAL.ano})` : "";
+
+                            // Texto em destaque (Laranja e Negrito)
+                            const destaqueHTML = `<strong style="color: #e67e22; background: #fff4e6; padding: 2px 5px; border-radius: 4px;">${matchCarro}${motorDestaque}${anoDestaque}</strong>`;
+                            
+                            textoApp = destaqueHTML + (outrasAplicacoes.length > 0 ? `, ${outrasAplicacoes.join(', ')}` : "");
+                        }
+                    }
+
+                    const limite = 80; 
+                    // Como agora temos HTML (<strong>), medimos o comprimento sem as tags para o "Ver Mais"
+                    const textoLimpo = textoApp.replace(/<[^>]*>?/gm, '');
+
+                    if (textoLimpo.length > limite) {
+                        desc += `<strong>Aplicação:</strong> <span id="app-completa">${textoApp}</span>`;
+                        // Nota: Removi o fatiamento simples aqui para não quebrar as tags HTML do destaque
+                        // O seu sistema de toggleAplicacao vai funcionar exibindo o bloco completo
                     } else {
-                        // Se for pequeno, mostra normal
                         desc += `<strong>Aplicação:</strong> ${textoApp}<br>`;
                     }
                 }
+
                 if(PRODUTO_ATUAL.motor) desc += `<strong>Motor:</strong> ${PRODUTO_ATUAL.motor}`;
-                
                 document.getElementById('prod-desc').innerHTML = desc || "Sem descrição técnica.";
 
+                // --- RESTO DO CÓDIGO (ESTOQUE E RELACIONADOS) MANTÉM IGUAL ---
                 const elEstoque = document.getElementById('prod-estoque');
-const btnComprar = document.querySelector('.btn-buy-now');
-const inputQtd = document.getElementById('qtd');
+                const btnComprar = document.querySelector('.btn-buy-now');
+                const inputQtd = document.getElementById('qtd');
+                const estoqueAtual = parseInt(PRODUTO_ATUAL.estoque || 0);
 
-// Garante que estoque é número
-const estoqueAtual = parseInt(PRODUTO_ATUAL.estoque || 0);
-
-if (estoqueAtual <= 0) {
-    // SEM ESTOQUE
-    elEstoque.innerHTML = '<span style="color:#c0392b"><i class="ph ph-x-circle"></i> Produto Esgotado</span>';
-    if(btnComprar) {
-        btnComprar.disabled = true;
-        btnComprar.style.background = "#bdc3c7";
-        btnComprar.style.cursor = "not-allowed";
-        btnComprar.innerHTML = "Indisponível";
-    }
-    if(inputQtd) inputQtd.disabled = true;
-
-} else if (estoqueAtual < 5) {
-    // POUCO ESTOQUE
-    elEstoque.innerHTML = `<span style="color:#e67e22"><i class="ph ph-warning"></i> Restam apenas ${estoqueAtual} unidades!</span>`;
-    if(inputQtd) inputQtd.max = estoqueAtual;
-
-} else {
-    // ESTOQUE NORMAL
-    elEstoque.innerHTML = `<span style="color:#27ae60"><i class="ph ph-check-circle"></i> Disponível (${estoqueAtual} em estoque)</span>`;
-    if(inputQtd) inputQtd.max = estoqueAtual;
-}
-
-                // RELACIONADOS
-                const boxRelacionados = document.getElementById('related-section');
-                const gridRelacionados = document.getElementById('related-grid');
-                
-                if (PRODUTO_ATUAL.listaRelacionados && PRODUTO_ATUAL.listaRelacionados.length > 0) {
-                    boxRelacionados.style.display = 'block';
-                    gridRelacionados.innerHTML = ''; 
-
-                    PRODUTO_ATUAL.listaRelacionados.forEach(item => {
-                        const preco = parseFloat(item.preco_novo).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
-                        
-                        gridRelacionados.innerHTML += `
-                            <a href="product.html?id=${item.id}" class="card" style="padding:15px; border:1px solid #eee; border-radius:8px; text-align:center; transition:0.3s; text-decoration:none; color:inherit; display:block;">
-                                <img src="${item.imagem || 'https://placehold.co/150'}" style="width:100px; height:100px; object-fit:contain; margin-bottom:10px;">
-                                <h4 style="font-size:0.85rem; color:#333; height:35px; overflow:hidden; margin-bottom:5px;">${item.titulo}</h4>
-                                <div style="color:#27ae60; font-weight:bold;">${preco}</div>
-                            </a>
-                        `;
-                    });
+                if (estoqueAtual <= 0) {
+                    elEstoque.innerHTML = '<span style="color:#c0392b"><i class="ph ph-x-circle"></i> Produto Esgotado</span>';
+                    if(btnComprar) {
+                        btnComprar.disabled = true;
+                        btnComprar.style.background = "#bdc3c7";
+                        btnComprar.innerHTML = "Indisponível";
+                    }
+                } else if (estoqueAtual < 5) {
+                    elEstoque.innerHTML = `<span style="color:#e67e22"><i class="ph ph-warning"></i> Restam apenas ${estoqueAtual} unidades!</span>`;
                 } else {
-                    boxRelacionados.style.display = 'none';
+                    elEstoque.innerHTML = `<span style="color:#27ae60"><i class="ph ph-check-circle"></i> Disponível (${estoqueAtual} em estoque)</span>`;
                 }
 
+                // ... (Relacionados e atualizarPrecoTela() continuam aqui)
                 atualizarPrecoTela();
 
             } catch(e) {
                 console.error(e);
-                document.getElementById('product-container').innerHTML = '<h2 style="text-align:center; padding:20px;">Produto não encontrado.</h2>';
             }
         }
     

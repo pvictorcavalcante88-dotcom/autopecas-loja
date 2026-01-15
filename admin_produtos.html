@@ -177,6 +177,11 @@
                         <input type="text" id="prod-ano" placeholder="Ex: 2008-2012">
                     </div>
 
+                    <div class="form-group">
+                        <label>Motor</label>
+                        <input type="text" id="prod-motor" placeholder="Ex: 1.0, 1.6, 2.0">
+                    </div>
+
                     <div class="form-group full">
                         <label>Carros Compatíveis (Separar por vírgula)</label>
                         <textarea id="prod-carros" placeholder="Ex: Gol G5, Voyage, Saveiro"></textarea>
@@ -272,6 +277,7 @@
                 document.getElementById('prod-categoria').value = p.categoria || '';
                 document.getElementById('prod-fabricante').value = p.fabricante || '';
                 document.getElementById('prod-ano').value = p.ano || '';
+                document.getElementById('prod-motor').value = p.motor || '';
                 document.getElementById('prod-carros').value = p.carros || '';
                 document.getElementById('prod-pesquisa').value = p.pesquisa || '';
 
@@ -303,6 +309,7 @@
                 categoria: document.getElementById('prod-categoria').value,
                 fabricante: document.getElementById('prod-fabricante').value,
                 ano: document.getElementById('prod-ano').value,
+                motor: document.getElementById('prod-motor').value,
                 carros: document.getElementById('prod-carros').value,
                 pesquisa: document.getElementById('prod-pesquisa').value,
                 

@@ -805,23 +805,30 @@ async function executarBusca(q, categoria) {
                 const listaCarrosBanco = (p.carros || '').toUpperCase();
                 const listaMotoresBanco = (p.motor || '').toUpperCase();
 
-                // 🟢 BUSCA O MATCH PRIORITÁRIO BASEADO NO QUE O USUÁRIO DIGITOU
                 if (termoPesquisado) {
+                    // 🟢 BUSCA O CARRO (Tenta encontrar qual carro da lista está dentro da pesquisa)
                     const carrosArray = listaCarrosBanco.split(',').map(c => c.trim());
-                    const matchCarro = carrosArray.find(carro => termoPesquisado.includes(carro));
+                    const matchCarro = carrosArray.find(carro => carro !== "" && termoPesquisado.includes(carro));
                     
                     if (matchCarro) {
                         carroExibir = matchCarro;
                     }
 
+                    // 🟢 BUSCA O MOTOR (Tenta encontrar qual motor da lista está dentro da pesquisa)
                     const motoresArray = listaMotoresBanco.split(',').map(m => m.trim());
-                    const matchMotor = motoresArray.find(m => termoPesquisado.includes(m));
-                    if (matchMotor) motorExibir = ` ${matchMotor}`;
+                    const matchMotor = motoresArray.find(m => m !== "" && termoPesquisado.includes(m));
+                    
+                    if (matchMotor) {
+                        motorExibir = ` ${matchMotor}`;
+                    }
                 }
 
-                // Fallback: Se não achou na pesquisa, pega o primeiro do banco
+                // Fallbacks: Se a pesquisa foi genérica (ex: "Pastilha"), pega os primeiros itens do banco
                 if (!carroExibir && p.carros) {
                     carroExibir = p.carros.split(',')[0].trim().toUpperCase();
+                }
+                if (!motorExibir && p.motor) {
+                    motorExibir = ` ${p.motor.split(',')[0].trim().toUpperCase()}`;
                 }
 
                 const anoExibir = p.ano ? ` (${p.ano})` : "";
@@ -839,8 +846,8 @@ async function executarBusca(q, categoria) {
                         <div class="product-image"><img src="${p.image || p.imagem}" onerror="this.src='https://placehold.co/150'"></div>
                         <h3>${p.name || p.titulo}</h3>
                         <div class="app-tag">
-                            <i class="ph ph-car" style="vertical-align: middle;"></i> 
-                            <span>${aplicacaoExibir}</span>
+                            <i class="ph ph-car"></i> 
+                            <span title="${aplicacaoExibir}">${aplicacaoExibir}</span>
                         </div>
                     </div>
                     <div>

@@ -787,38 +787,62 @@ async function executarBusca(q, categoria) {
         const data = await res.json();
         const track = document.getElementById("search-track");
         
-        // VERIFICAÇÃO DE LOGIN
         const isLogado = localStorage.getItem('afiliadoLogado');
-        
+        const termoPesquisado = (q || '').toUpperCase();
+
         if(track) {
             track.innerHTML = '';
             
             if (data.length === 0) {
-                track.innerHTML = '<p style="padding:20px; width:100%; text-align:center;">Nenhum produto encontrado.</p>';
+                track.innerHTML = '<p style="padding:20px; width:100%; text-align:center;">Nenhum produto encontrado para sua busca.</p>';
                 return;
             }
 
             data.forEach(p => {
-                // Se logado: Preço. Se não: Cadeado.
+                // 1. LÓGICA DE REFINO DO CARRO
+                let carroExibir = "";
+                const listaCarrosBanco = (p.carros || '').toUpperCase();
+
+                if (termoPesquisado) {
+                    const carroEncontrado = LISTA_CARROS.find(c => 
+                        termoPesquisado.includes(c) && listaCarrosBanco.includes(c)
+                    );
+                    if (carroEncontrado) carroExibir = carroEncontrado;
+                }
+
+                // Fallback: pega o primeiro carro cadastrado se não houver termo de busca
+                if (!carroExibir && p.carros) {
+                    carroExibir = p.carros.split(',')[0].trim().toUpperCase();
+                }
+
+                // 2. LÓGICA DO ANO
+                const anoExibir = p.ano ? ` (${p.ano})` : "";
+
                 const htmlPreco = isLogado 
-                    ? `<p class="price-new">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p>`
-                    : `<p class="price-new" style="font-size:0.9rem; color:#777;"><i class="ph ph-lock-key"></i> Login p/ ver</p>`;
+                    ? `<p class="price-new" style="margin-top:auto;">${formatarMoeda(parseFloat(p.price||p.preco_novo))}</p>`
+                    : `<p class="price-new" style="font-size:0.85rem; color:#777; margin-top:auto;"><i class="ph ph-lock-key"></i> Login para ver preço</p>`;
 
                 const textoBotao = isLogado ? 'Ver Detalhes' : 'Entrar';
-
-                // 🔥 CORREÇÃO AQUI: Passar o termo pesquisado para o link 🔥
-                // Se 'q' existir, adiciona "&q=..." ao final do link
                 const termoParaLink = q ? `&q=${encodeURIComponent(q)}` : '';
 
                 track.innerHTML += `
                 <a href="product.html?id=${p.id}${termoParaLink}" class="product-card">
-                    <div class="product-image">
-                        <img src="${p.image||p.imagem}" onerror="this.src='https://placehold.co/150'">
+                    <div>
+                        <div class="product-image">
+                            <img src="${p.image||p.imagem}" onerror="this.src='https://placehold.co/150'">
+                        </div>
+                        <h3>${p.name||p.titulo}</h3>
+                        
+                        <div class="app-tag">
+                            <i class="ph ph-car"></i>
+                            <span>${carroExibir}${anoExibir}</span>
+                        </div>
                     </div>
-                    <h3>${p.name||p.titulo}</h3>
-                    ${htmlPreco}
-                    
-                    <div class="btn-card-action">${textoBotao}</div> 
+
+                    <div>
+                        ${htmlPreco}
+                        <div class="btn-card-action" style="width:100%; margin-top:10px;">${textoBotao}</div> 
+                    </div>
                 </a>`;
             });
         }

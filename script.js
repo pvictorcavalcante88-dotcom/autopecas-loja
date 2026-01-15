@@ -779,6 +779,7 @@ function fazerPesquisa(t, c) { window.location.href = `busca.html?q=${encodeURIC
 function setupSearchPage() { const params = new URLSearchParams(window.location.search); if(params.get('q') || params.get('categoria')) executarBusca(params.get('q'), params.get('categoria')); }
 async function executarBusca(q, categoria) {
     try {
+        // 1. MONTAGEM DA URL DE BUSCA
         let url = `${API_URL}/search?`;
         if (q) url += `q=${encodeURIComponent(q)}&`;
         if (categoria) url += `categoria=${encodeURIComponent(categoria)}`;
@@ -787,77 +788,87 @@ async function executarBusca(q, categoria) {
         const data = await res.json();
         const track = document.getElementById("search-track");
         
+        // Contexto do Usuário
         const isLogado = localStorage.getItem('afiliadoLogado');
         const termoPesquisado = (q || '').toUpperCase().trim();
 
-        if(track) {
-            track.innerHTML = '';
+        if (!track) return;
+        track.innerHTML = '';
+
+        // 2. VERIFICAÇÃO DE RESULTADOS VAZIOS
+        if (data.length === 0) {
+            track.innerHTML = '<p style="padding:40px; width:100%; text-align:center; color:#7f8c8d;">Nenhum produto encontrado para sua busca.</p>';
+            return;
+        }
+
+        // 3. RENDERIZAÇÃO DOS CARDS
+        data.forEach(p => {
+            let carroExibir = "";
+            let motorExibir = "";
             
-            if (data.length === 0) {
-                track.innerHTML = '<p style="padding:20px; width:100%; text-align:center;">Nenhum produto encontrado.</p>';
-                return;
+            const listaCarrosBanco = (p.carros || '').toUpperCase();
+            const listaMotoresBanco = (p.motor || '').toUpperCase();
+
+            // --- LÓGICA DE MATCH (CARRO + MOTOR) ---
+            if (termoPesquisado) {
+                // Procura qual carro da lista do banco está no que o usuário digitou
+                const carrosArray = listaCarrosBanco.split(',').map(c => c.trim());
+                const matchCarro = carrosArray.find(carro => carro !== "" && termoPesquisado.includes(carro));
+                
+                if (matchCarro) {
+                    carroExibir = matchCarro;
+                }
+
+                // Procura o motor
+                const motoresArray = listaMotoresBanco.split(',').map(m => m.trim());
+                const matchMotor = motoresArray.find(m => m !== "" && termoPesquisado.includes(m));
+                if (matchMotor) motorExibir = ` ${matchMotor}`;
             }
 
-            data.forEach(p => {
-                let carroExibir = "";
-                let motorExibir = "";
-                
-                const listaCarrosBanco = (p.carros || '').toUpperCase();
-                const listaMotoresBanco = (p.motor || '').toUpperCase();
+            // Fallbacks (se a pesquisa for genérica, pega o primeiro item do banco)
+            if (!carroExibir && p.carros) {
+                carroExibir = p.carros.split(',')[0].trim().toUpperCase();
+            }
+            if (!motorExibir && p.motor) {
+                motorExibir = ` ${p.motor.split(',')[0].trim().toUpperCase()}`;
+            }
 
-                if (termoPesquisado) {
-                    // 🟢 BUSCA O CARRO (Tenta encontrar qual carro da lista está dentro da pesquisa)
-                    const carrosArray = listaCarrosBanco.split(',').map(c => c.trim());
-                    const matchCarro = carrosArray.find(carro => carro !== "" && termoPesquisado.includes(carro));
-                    
-                    if (matchCarro) {
-                        carroExibir = matchCarro;
-                    }
+            const anoExibir = p.ano ? ` (${p.ano})` : "";
+            const aplicacaoFinal = `${carroExibir}${motorExibir}${anoExibir}`;
 
-                    // 🟢 BUSCA O MOTOR (Tenta encontrar qual motor da lista está dentro da pesquisa)
-                    const motoresArray = listaMotoresBanco.split(',').map(m => m.trim());
-                    const matchMotor = motoresArray.find(m => m !== "" && termoPesquisado.includes(m));
-                    
-                    if (matchMotor) {
-                        motorExibir = ` ${matchMotor}`;
-                    }
-                }
+            // --- LINKS E PREÇOS ---
+            // 🔴 IMPORTANTE: Adicionamos o termo de busca 'q' no link para o product.html saber o que destacar
+            const linkProduto = `product.html?id=${p.id}${q ? '&q=' + encodeURIComponent(q) : ''}`;
+            const textoBotao = isLogado ? 'Ver Detalhes' : 'Entrar';
+            
+            const htmlPreco = isLogado 
+                ? `<p class="price-new" style="margin-top:auto;">${formatarMoeda(parseFloat(p.price || p.preco_novo))}</p>`
+                : `<p class="price-new" style="font-size:0.85rem; color:#777; margin-top:auto;"><i class="ph ph-lock-key"></i> Login p/ ver</p>`;
 
-                // Fallbacks: Se a pesquisa foi genérica (ex: "Pastilha"), pega os primeiros itens do banco
-                if (!carroExibir && p.carros) {
-                    carroExibir = p.carros.split(',')[0].trim().toUpperCase();
-                }
-                if (!motorExibir && p.motor) {
-                    motorExibir = ` ${p.motor.split(',')[0].trim().toUpperCase()}`;
-                }
-
-                const anoExibir = p.ano ? ` (${p.ano})` : "";
-                const aplicacaoExibir = `${carroExibir}${motorExibir}${anoExibir}`;
-
-                const termoParaLink = q ? `&q=${encodeURIComponent(q)}` : '';
-                const textoBotao = isLogado ? 'Ver Detalhes' : 'Entrar';
-                const htmlPreco = isLogado 
-                    ? `<p class="price-new" style="margin-top:auto;">${formatarMoeda(parseFloat(p.price || p.preco_novo))}</p>`
-                    : `<p class="price-new" style="font-size:0.85rem; color:#777; margin-top:auto;"><i class="ph ph-lock-key"></i> Login p/ ver</p>`;
-
-                track.innerHTML += `
-                <a href="product.html?id=${p.id}${termoParaLink}" class="product-card">
-                    <div>
-                        <div class="product-image"><img src="${p.image || p.imagem}" onerror="this.src='https://placehold.co/150'"></div>
-                        <h3>${p.name || p.titulo}</h3>
-                        <div class="app-tag">
-                            <i class="ph ph-car"></i> 
-                            <span title="${aplicacaoExibir}">${aplicacaoExibir}</span>
-                        </div>
+            // --- MONTAGEM DO HTML ---
+            track.innerHTML += `
+            <a href="${linkProduto}" class="product-card">
+                <div>
+                    <div class="product-image">
+                        <img src="${p.image || p.imagem}" onerror="this.src='https://placehold.co/150'">
                     </div>
-                    <div>
-                        ${htmlPreco}
-                        <div class="btn-card-action" style="width:100%; margin-top:10px;">${textoBotao}</div> 
+                    <h3>${p.name || p.titulo}</h3>
+                    
+                    <div class="app-tag">
+                        <i class="ph ph-car"></i> 
+                        <span title="${aplicacaoFinal}">${aplicacaoFinal}</span>
                     </div>
-                </a>`;
-            });
-        }
-    } catch(e) { console.error("Erro busca:", e); }
+                </div>
+
+                <div>
+                    ${htmlPreco}
+                    <div class="btn-card-action" style="width:100%; margin-top:10px;">${textoBotao}</div> 
+                </div>
+            </a>`;
+        });
+    } catch(e) {
+        console.error("Erro na busca:", e);
+    }
 }
 
 // --- FUNÇÃO AUXILIAR: MONTA O NOME COM CONTEXTO (WHITELIST DE CARROS) ---

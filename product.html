@@ -294,47 +294,50 @@ async function carregarProduto(id) {
         if (PRODUTO_ATUAL.referencia) desc += `<strong>Ref:</strong> ${PRODUTO_ATUAL.referencia}<br>`;
         if (PRODUTO_ATUAL.fabricante) desc += `<strong>Marca:</strong> ${PRODUTO_ATUAL.fabricante}<br>`;
 
-        // --- LÓGICA DE APLICAÇÃO ---
-        if (PRODUTO_ATUAL.carros) {
-            const params = new URLSearchParams(window.location.search);
-            const termoPesquisado = (params.get('q') || params.get('search') || '').toUpperCase().trim();
-            
-            let listaCarros = PRODUTO_ATUAL.carros.split(',').map(c => c.trim());
-            let listaMotores = (PRODUTO_ATUAL.motor || "").split(',').map(m => m.trim());
-            let aplicacaoFinalHTML = "";
-
-            // Se houver termo de busca, tentamos destacar o Carro + Motor pesquisado
-            if (termoPesquisado) {
-                const indexMatchCarro = listaCarros.findIndex(carro => termoPesquisado.includes(carro.toUpperCase()));
-
-                if (indexMatchCarro !== -1) {
-                    // Remove o carro encontrado para colocá-lo no topo
-                    const carroDestaque = listaCarros.splice(indexMatchCarro, 1)[0];
+                // --- LÓGICA DE APLICAÇÃO (VERSÃO DEFINITIVA) ---
+                if (PRODUTO_ATUAL.carros) {
+                    const params = new URLSearchParams(window.location.search);
                     
-                    // Busca se algum motor da lista também está na pesquisa
-                    const motorMatch = listaMotores.find(m => m !== "" && termoPesquisado.includes(m.toUpperCase()));
-                    const motorDestaque = motorMatch ? ` ${motorMatch}` : (PRODUTO_ATUAL.motor ? ` ${PRODUTO_ATUAL.motor.split(',')[0]}` : "");
-                    const anoDestaque = PRODUTO_ATUAL.ano ? ` (${PRODUTO_ATUAL.ano})` : "";
-
-                    // Monta o Bloco Laranja
-                    const htmlDestaque = `<strong style="color: #e67e22; background: #fff4e6; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 4px;">${carroDestaque.toUpperCase()}${motorDestaque}${anoDestaque}</strong>`;
+                    // 🟢 Tenta pegar 'q' ou 'search' ou 'termo' da URL
+                    const termoCru = params.get('q') || params.get('search') || params.get('termo') || "";
+                    const termoPesquisado = termoCru.toUpperCase().trim();
                     
-                    aplicacaoFinalHTML = htmlDestaque + (listaCarros.length > 0 ? `<br><small style="color:#666;">Também serve para: ${listaCarros.join(', ')}</small>` : "");
-                } else {
-                    aplicacaoFinalHTML = PRODUTO_ATUAL.carros;
+                    let listaCarros = PRODUTO_ATUAL.carros.split(',').map(c => c.trim());
+                    let listaMotores = (PRODUTO_ATUAL.motor || "").split(',').map(m => m.trim());
+                    let aplicacaoFinalHTML = "";
+
+                    // Se houver algum termo na busca (Ex: "CIVIC")
+                    if (termoPesquisado !== "") {
+                        // Busca o carro que está DENTRO da frase pesquisada
+                        // Ex: Se pesquisou "Pastilha Civic", ele acha "Civic" na lista do banco
+                        const indexMatchCarro = listaCarros.findIndex(carro => 
+                            termoPesquisado.includes(carro.toUpperCase()) || carro.toUpperCase().includes(termoPesquisado)
+                        );
+
+                        if (indexMatchCarro !== -1) {
+                            // Remove o carro encontrado da lista para não repetir
+                            const carroDestaque = listaCarros.splice(indexMatchCarro, 1)[0];
+                            
+                            // Busca o motor
+                            const motorMatch = listaMotores.find(m => m !== "" && termoPesquisado.includes(m.toUpperCase()));
+                            const motorDestaque = motorMatch ? ` ${motorMatch}` : (PRODUTO_ATUAL.motor ? ` ${PRODUTO_ATUAL.motor.split(',')[0]}` : "");
+                            const anoDestaque = PRODUTO_ATUAL.ano ? ` (${PRODUTO_ATUAL.ano})` : "";
+
+                            // Cria o Bloco Laranja com o Match
+                            const htmlDestaque = `<strong style="color: #e67e22; background: #fff4e6; padding: 4px 8px; border-radius: 4px; display: inline-block; margin-bottom: 5px; border: 1px solid #ffcc80;">${carroDestaque.toUpperCase()}${motorDestaque}${anoDestaque}</strong>`;
+                            
+                            aplicacaoFinalHTML = htmlDestaque + (listaCarros.length > 0 ? `<br><small style="color:#666; font-size: 0.8rem;">Também serve para: ${listaCarros.join(', ')}</small>` : "");
+                        } else {
+                            // Se não deu match, mostra a lista original
+                            aplicacaoFinalHTML = PRODUTO_ATUAL.carros;
+                        }
+                    } else {
+                        // Se entrou direto no produto sem buscar nada
+                        aplicacaoFinalHTML = PRODUTO_ATUAL.carros;
+                    }
+
+                    desc += `<strong>Aplicação:</strong> <div style="margin-top:5px;">${aplicacaoFinalHTML}</div>`;
                 }
-            } else {
-                aplicacaoFinalHTML = PRODUTO_ATUAL.carros;
-            }
-
-            // Gerencia o "Ver Mais" (Limite de 100 caracteres de texto puro)
-            const textoLimpo = aplicacaoFinalHTML.replace(/<[^>]*>?/gm, '');
-            if (textoLimpo.length > 100) {
-                desc += `<strong>Aplicação:</strong> <span id="app-resumo">${aplicacaoFinalHTML}</span>`;
-            } else {
-                desc += `<strong>Aplicação:</strong> ${aplicacaoFinalHTML}<br>`;
-            }
-        }
 
         if (PRODUTO_ATUAL.motor && !desc.includes('Motor:')) desc += `<br><strong>Motor Original:</strong> ${PRODUTO_ATUAL.motor}`;
         document.getElementById('prod-desc').innerHTML = desc || "Sem descrição técnica.";

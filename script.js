@@ -794,44 +794,56 @@ async function executarBusca(q, categoria) {
             track.innerHTML = '';
             
             if (data.length === 0) {
-                track.innerHTML = '<p style="padding:20px; width:100%; text-align:center;">Nenhum produto encontrado para sua busca.</p>';
+                track.innerHTML = '<p style="padding:20px; width:100%; text-align:center;">Nenhum produto encontrado.</p>';
                 return;
             }
 
             data.forEach(p => {
-                // 1. LÓGICA DE REFINO DO CARRO
+                // --- 🟢 LÓGICA DE DESTAQUE INTELIGENTE ---
                 let carroExibir = "";
                 const listaCarrosBanco = (p.carros || '').toUpperCase();
 
                 if (termoPesquisado) {
-                    const carroEncontrado = LISTA_CARROS.find(c => 
-                        termoPesquisado.includes(c) && listaCarrosBanco.includes(c)
-                    );
-                    if (carroEncontrado) carroExibir = carroEncontrado;
+                    // 1. Criamos um array com os carros que o produto atende
+                    const carrosDoProduto = listaCarrosBanco.split(',').map(c => c.trim());
+
+                    // 2. Verificamos se algum desses carros está na pesquisa do usuário
+                    // Ex: pesquisa "Civic", lista do produto [Accord, City, Civic] -> Acha Civic
+                    const match = carrosDoProduto.find(carro => termoPesquisado.includes(carro));
+
+                    if (match) {
+                        carroExibir = match;
+                    } else {
+                        // 3. Se não achou o nome do carro, mas o usuário pesquisou um modelo específico (ex: "Pastilha Gol")
+                        // Varre a LISTA_CARROS global para ver se o que ele digitou bate com algo que o produto atende
+                        const matchGlobal = LISTA_CARROS.find(c => 
+                            termoPesquisado.includes(c) && listaCarrosBanco.includes(c)
+                        );
+                        if (matchGlobal) carroExibir = matchGlobal;
+                    }
                 }
 
+                // 4. Fallback: Se ainda não achou nada, volta para o primeiro da lista
                 if (!carroExibir && p.carros) {
                     carroExibir = p.carros.split(',')[0].trim().toUpperCase();
                 }
 
-                // 2. DEFINIÇÃO DAS VARIÁVEIS QUE ESTAVAM FALTANDO
+                // --- RESTO DA MONTAGEM DO CARD ---
                 const anoExibir = p.ano ? ` (${p.ano})` : "";
                 const termoParaLink = q ? `&q=${encodeURIComponent(q)}` : '';
                 const textoBotao = isLogado ? 'Ver Detalhes' : 'Entrar';
                 
-                // Formatação do preço (usando sua função formatarMoeda)
                 const htmlPreco = isLogado 
                     ? `<p class="price-new" style="margin-top:auto;">${formatarMoeda(parseFloat(p.price || p.preco_novo))}</p>`
-                    : `<p class="price-new" style="font-size:0.85rem; color:#777; margin-top:auto;"><i class="ph ph-lock-key"></i> Login para ver preço</p>`;
+                    : `<p class="price-new" style="font-size:0.85rem; color:#777; margin-top:auto;"><i class="ph ph-lock-key"></i> Login p/ ver</p>`;
 
-                // 3. Montamos o HTML do Card (Usando a estrutura de flexbox para alinhar)
                 track.innerHTML += `
                 <a href="product.html?id=${p.id}${termoParaLink}" class="product-card">
                     <div>
                         <div class="product-image">
                             <img src="${p.image || p.imagem}" onerror="this.src='https://placehold.co/150'">
                         </div>
-                        <h3 style="margin-bottom: 5px;">${p.name || p.titulo}</h3>
+                        <h3>${p.name || p.titulo}</h3>
                         
                         <div class="app-tag">
                             <i class="ph ph-car" style="vertical-align: middle;"></i> 
@@ -848,7 +860,6 @@ async function executarBusca(q, categoria) {
         }
     } catch(e) {
         console.error("Erro busca:", e);
-        if(track) track.innerHTML = '<p style="padding:20px; text-align:center;">Erro ao carregar produtos.</p>';
     }
 }
 

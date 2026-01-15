@@ -297,49 +297,48 @@ async function carregarProduto(id) {
                 if(PRODUTO_ATUAL.referencia) desc += `<strong>Ref:</strong> ${PRODUTO_ATUAL.referencia}<br>`;
                 if(PRODUTO_ATUAL.fabricante) desc += `<strong>Marca:</strong> ${PRODUTO_ATUAL.fabricante}<br>`;
                 
-                if(PRODUTO_ATUAL.carros) {
-                    const params = new URLSearchParams(window.location.search);
-                    const termoPesquisado = (params.get('q') || params.get('search') || '').toUpperCase();
-                    
-                    let textoApp = PRODUTO_ATUAL.carros;
-                    const listaCarrosBanco = (PRODUTO_ATUAL.carros || "").toUpperCase();
-                    const listaMotoresBanco = (PRODUTO_ATUAL.motor || "").toUpperCase();
+                // Substitua o trecho da Aplicação dentro de carregarProduto(id) no product.html
+if(PRODUTO_ATUAL.carros) {
+    const params = new URLSearchParams(window.location.search);
+    const termoPesquisado = (params.get('q') || '').toUpperCase().trim();
+    
+    let listaOriginal = PRODUTO_ATUAL.carros.split(',').map(c => c.trim());
+    let textoDestaqueHTML = "";
 
-                    // Se houver termo de busca, movemos o carro/motor encontrado para o início
-                    if (termoPesquisado) {
-                        const carrosArray = listaCarrosBanco.split(',').map(c => c.trim());
-                        const motoresArray = listaMotoresBanco.split(',').map(m => m.trim());
-                        
-                        const matchCarro = carrosArray.find(carro => termoPesquisado.includes(carro));
-                        const matchMotor = motoresArray.find(motor => termoPesquisado.includes(motor));
+    if (termoPesquisado) {
+        // Encontra o índice do carro que bate com a pesquisa
+        const indexMatch = listaOriginal.findIndex(carro => termoPesquisado.includes(carro.toUpperCase()));
 
-                        if (matchCarro) {
-                            const outrasAplicacoes = PRODUTO_ATUAL.carros.split(',')
-                                .map(c => c.trim())
-                                .filter(c => c.toUpperCase() !== matchCarro);
-                            
-                            const motorDestaque = matchMotor ? ` ${matchMotor}` : "";
-                            const anoDestaque = PRODUTO_ATUAL.ano ? ` (${PRODUTO_ATUAL.ano})` : "";
+        if (indexMatch !== -1) {
+            // Remove o carro da posição original e cria o destaque laranja
+            const carroFocado = listaOriginal.splice(indexMatch, 1)[0];
+            const motorInfo = PRODUTO_ATUAL.motor ? ` ${PRODUTO_ATUAL.motor.split(',')[0]}` : "";
+            const anoInfo = PRODUTO_ATUAL.ano ? ` (${PRODUTO_ATUAL.ano})` : "";
+            
+            textoDestaqueHTML = `<strong style="color: #e67e22; background: #fff4e6; padding: 2px 6px; border-radius: 4px;">${carroFocado.toUpperCase()}${motorInfo}${anoInfo}</strong>`;
+            
+            // Junta o destaque com o restante da lista
+            if (listaOriginal.length > 0) {
+                textoDestaqueHTML += ", " + listaOriginal.join(', ');
+            }
+        } else {
+            textoDestaqueHTML = PRODUTO_ATUAL.carros;
+        }
+    } else {
+        textoDestaqueHTML = PRODUTO_ATUAL.carros;
+    }
 
-                            // Texto em destaque (Laranja e Negrito)
-                            const destaqueHTML = `<strong style="color: #e67e22; background: #fff4e6; padding: 2px 5px; border-radius: 4px;">${matchCarro}${motorDestaque}${anoDestaque}</strong>`;
-                            
-                            textoApp = destaqueHTML + (outrasAplicacoes.length > 0 ? `, ${outrasAplicacoes.join(', ')}` : "");
-                        }
-                    }
+    // Gerencia o "Ver Mais" para descrições longas
+    const limite = 80;
+    const textoLimpo = textoDestaqueHTML.replace(/<[^>]*>?/gm, '');
 
-                    const limite = 80; 
-                    // Como agora temos HTML (<strong>), medimos o comprimento sem as tags para o "Ver Mais"
-                    const textoLimpo = textoApp.replace(/<[^>]*>?/gm, '');
-
-                    if (textoLimpo.length > limite) {
-                        desc += `<strong>Aplicação:</strong> <span id="app-completa">${textoApp}</span>`;
-                        // Nota: Removi o fatiamento simples aqui para não quebrar as tags HTML do destaque
-                        // O seu sistema de toggleAplicacao vai funcionar exibindo o bloco completo
-                    } else {
-                        desc += `<strong>Aplicação:</strong> ${textoApp}<br>`;
-                    }
-                }
+    if (textoLimpo.length > limite) {
+        desc += `<strong>Aplicação:</strong> <span id="app-resumo">${textoDestaqueHTML}</span>`;
+        // O seu toggleAplicacao() funcionará normalmente aqui
+    } else {
+        desc += `<strong>Aplicação:</strong> ${textoDestaqueHTML}<br>`;
+    }
+}
 
                 if(PRODUTO_ATUAL.motor) desc += `<strong>Motor:</strong> ${PRODUTO_ATUAL.motor}`;
                 document.getElementById('prod-desc').innerHTML = desc || "Sem descrição técnica.";

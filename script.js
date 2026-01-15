@@ -788,7 +788,7 @@ async function executarBusca(q, categoria) {
         const track = document.getElementById("search-track");
         
         const isLogado = localStorage.getItem('afiliadoLogado');
-        const termoPesquisado = (q || '').toUpperCase();
+        const termoPesquisado = (q || '').toUpperCase().trim();
 
         if(track) {
             track.innerHTML = '';
@@ -799,15 +799,14 @@ async function executarBusca(q, categoria) {
             }
 
             data.forEach(p => {
-                // --- 🟢 LÓGICA DE DESTAQUE AVANÇADO (CARRO + MOTOR) ---
                 let carroExibir = "";
                 let motorExibir = "";
                 
                 const listaCarrosBanco = (p.carros || '').toUpperCase();
                 const listaMotoresBanco = (p.motor || '').toUpperCase();
 
+                // 🟢 BUSCA O MATCH PRIORITÁRIO BASEADO NO QUE O USUÁRIO DIGITOU
                 if (termoPesquisado) {
-                    // 1. Tentar encontrar o CARRO no termo pesquisado
                     const carrosArray = listaCarrosBanco.split(',').map(c => c.trim());
                     const matchCarro = carrosArray.find(carro => termoPesquisado.includes(carro));
                     
@@ -815,35 +814,21 @@ async function executarBusca(q, categoria) {
                         carroExibir = matchCarro;
                     }
 
-                    // 2. Tentar encontrar o MOTOR no termo pesquisado
-                    // Ex: Pesquisa "Civic 1.8", banco tem motores "1.8, 2.0" -> Acha 1.8
                     const motoresArray = listaMotoresBanco.split(',').map(m => m.trim());
                     const matchMotor = motoresArray.find(m => termoPesquisado.includes(m));
-                    
-                    if (matchMotor) {
-                        motorExibir = ` ${matchMotor}`; // Espaço antes para separar do carro
-                    }
+                    if (matchMotor) motorExibir = ` ${matchMotor}`;
                 }
 
-                // 3. Fallbacks caso a pesquisa seja genérica (ex: apenas "Pastilha")
+                // Fallback: Se não achou na pesquisa, pega o primeiro do banco
                 if (!carroExibir && p.carros) {
                     carroExibir = p.carros.split(',')[0].trim().toUpperCase();
                 }
-                // Se achou o motor na pesquisa, mas não o carro (ex: "Peças 1.8")
-                // ou se não achou motor na pesquisa, pegamos o motor principal do cadastro
-                if (!motorExibir && p.motor && p.motor.length < 15) { 
-                    // Só exibe motor se a string for curta (evita textos gigantes no card)
-                    motorExibir = ` ${p.motor.split(',')[0].trim().toUpperCase()}`;
-                }
 
-                // --- 4. MONTAGEM FINAL DA STRING DE APLICAÇÃO ---
                 const anoExibir = p.ano ? ` (${p.ano})` : "";
-                const aplicacaoCompleta = `${carroExibir}${motorExibir}${anoExibir}`;
+                const aplicacaoExibir = `${carroExibir}${motorExibir}${anoExibir}`;
 
-                // --- RESTO DA MONTAGEM DO CARD ---
                 const termoParaLink = q ? `&q=${encodeURIComponent(q)}` : '';
                 const textoBotao = isLogado ? 'Ver Detalhes' : 'Entrar';
-                
                 const htmlPreco = isLogado 
                     ? `<p class="price-new" style="margin-top:auto;">${formatarMoeda(parseFloat(p.price || p.preco_novo))}</p>`
                     : `<p class="price-new" style="font-size:0.85rem; color:#777; margin-top:auto;"><i class="ph ph-lock-key"></i> Login p/ ver</p>`;
@@ -851,17 +836,13 @@ async function executarBusca(q, categoria) {
                 track.innerHTML += `
                 <a href="product.html?id=${p.id}${termoParaLink}" class="product-card">
                     <div>
-                        <div class="product-image">
-                            <img src="${p.image || p.imagem}" onerror="this.src='https://placehold.co/150'">
-                        </div>
+                        <div class="product-image"><img src="${p.image || p.imagem}" onerror="this.src='https://placehold.co/150'"></div>
                         <h3>${p.name || p.titulo}</h3>
-                        
                         <div class="app-tag">
                             <i class="ph ph-car" style="vertical-align: middle;"></i> 
-                            <span title="${aplicacaoCompleta}">${aplicacaoCompleta}</span>
+                            <span>${aplicacaoExibir}</span>
                         </div>
                     </div>
-
                     <div>
                         ${htmlPreco}
                         <div class="btn-card-action" style="width:100%; margin-top:10px;">${textoBotao}</div> 
@@ -869,9 +850,7 @@ async function executarBusca(q, categoria) {
                 </a>`;
             });
         }
-    } catch(e) {
-        console.error("Erro busca:", e);
-    }
+    } catch(e) { console.error("Erro busca:", e); }
 }
 
 // --- FUNÇÃO AUXILIAR: MONTA O NOME COM CONTEXTO (WHITELIST DE CARROS) ---

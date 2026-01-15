@@ -800,46 +800,55 @@ async function executarBusca(q, categoria) {
 
             data.forEach(p => {
                 // 1. LÓGICA DE REFINO DO CARRO
-               let carroExibir = "";
-    const listaCarrosBanco = (p.carros || '').toUpperCase();
-    const termoPesquisado = (q || '').toUpperCase();
+                let carroExibir = "";
+                const listaCarrosBanco = (p.carros || '').toUpperCase();
 
-    if (termoPesquisado) {
-        const carroEncontrado = LISTA_CARROS.find(c => 
-            termoPesquisado.includes(c) && listaCarrosBanco.includes(c)
-        );
-        if (carroEncontrado) carroExibir = carroEncontrado;
-    }
+                if (termoPesquisado) {
+                    const carroEncontrado = LISTA_CARROS.find(c => 
+                        termoPesquisado.includes(c) && listaCarrosBanco.includes(c)
+                    );
+                    if (carroEncontrado) carroExibir = carroEncontrado;
+                }
 
-    if (!carroExibir && p.carros) {
-        carroExibir = p.carros.split(',')[0].trim().toUpperCase();
-    }
+                if (!carroExibir && p.carros) {
+                    carroExibir = p.carros.split(',')[0].trim().toUpperCase();
+                }
 
-    // 2. Pegamos o Ano
-    const anoExibir = p.ano ? ` (${p.ano})` : "";
+                // 2. DEFINIÇÃO DAS VARIÁVEIS QUE ESTAVAM FALTANDO
+                const anoExibir = p.ano ? ` (${p.ano})` : "";
+                const termoParaLink = q ? `&q=${encodeURIComponent(q)}` : '';
+                const textoBotao = isLogado ? 'Ver Detalhes' : 'Entrar';
+                
+                // Formatação do preço (usando sua função formatarMoeda)
+                const htmlPreco = isLogado 
+                    ? `<p class="price-new" style="margin-top:auto;">${formatarMoeda(parseFloat(p.price || p.preco_novo))}</p>`
+                    : `<p class="price-new" style="font-size:0.85rem; color:#777; margin-top:auto;"><i class="ph ph-lock-key"></i> Login para ver preço</p>`;
 
-    // 3. Montamos o HTML do Card
-    track.innerHTML += `
-    <a href="product.html?id=${p.id}${termoParaLink}" class="product-card">
-        <div class="product-image">
-            <img src="${p.image||p.imagem}" onerror="this.src='https://placehold.co/150'">
-        </div>
-        
-        <h3 style="margin-bottom: 5px;">${p.name||p.titulo}</h3>
-        
-        <div style="color: #e67e22; font-size: 0.85rem; font-weight: bold; margin-bottom: 10px;">
-            <i class="ph ph-car" style="vertical-align: middle;"></i> 
-            <span>${carroExibir}${anoExibir}</span>
-        </div>
+                // 3. Montamos o HTML do Card (Usando a estrutura de flexbox para alinhar)
+                track.innerHTML += `
+                <a href="product.html?id=${p.id}${termoParaLink}" class="product-card">
+                    <div>
+                        <div class="product-image">
+                            <img src="${p.image || p.imagem}" onerror="this.src='https://placehold.co/150'">
+                        </div>
+                        <h3 style="margin-bottom: 5px;">${p.name || p.titulo}</h3>
+                        
+                        <div class="app-tag">
+                            <i class="ph ph-car" style="vertical-align: middle;"></i> 
+                            <span>${carroExibir}${anoExibir}</span>
+                        </div>
+                    </div>
 
-        ${htmlPreco}
-        
-        <div class="btn-card-action">${textoBotao}</div> 
-    </a>`;
+                    <div>
+                        ${htmlPreco}
+                        <div class="btn-card-action" style="width:100%; margin-top:10px;">${textoBotao}</div> 
+                    </div>
+                </a>`;
             });
         }
-    } catch(e){
+    } catch(e) {
         console.error("Erro busca:", e);
+        if(track) track.innerHTML = '<p style="padding:20px; text-align:center;">Erro ao carregar produtos.</p>';
     }
 }
 

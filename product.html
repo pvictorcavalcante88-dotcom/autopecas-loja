@@ -266,7 +266,7 @@
 
 async function carregarProduto(id) {
     try {
-        // 1. CONFIGURAÇÃO DO AFILIADO
+        // 1. DADOS DO AFILIADO
         const afData = localStorage.getItem('afiliadoLogado');
         if (afData) {
             MARGEM_ATUAL = parseFloat(localStorage.getItem('minhaMargem') || 0);
@@ -275,85 +275,66 @@ async function carregarProduto(id) {
             document.getElementById('box-sugestao').style.display = 'block';
         }
 
-        // 2. BUSCA DE DADOS
+        // 2. BUSCA O PRODUTO NO BANCO
         const res = await fetch(`${BASE_API}/products/${id}`);
-        if (!res.ok) throw new Error("Erro ao buscar");
+        if (!res.ok) throw new Error("Erro ao buscar produto");
         PRODUTO_ATUAL = await res.json();
 
-        // 3. PREENCHE DADOS BÁSICOS
+        // 3. PREENCHE DADOS VISUAIS BÁSICOS
         document.getElementById('prod-img').src = PRODUTO_ATUAL.imagem || 'https://placehold.co/400';
         document.getElementById('prod-title').textContent = PRODUTO_ATUAL.titulo;
-        document.getElementById('prod-cat').textContent = (PRODUTO_ATUAL.categoria || "Peças") + " > Ref: " + (PRODUTO_ATUAL.referencia || "---");
+        document.getElementById('prod-cat').textContent = `${PRODUTO_ATUAL.categoria || "Peças"} > Ref: ${PRODUTO_ATUAL.referencia || "---"}`;
 
-        // 4. MONTAGEM DA DESCRIÇÃO E APLICAÇÃO (MESMA LÓGICA DA BUSCA)
-        let desc = "";
-        if (PRODUTO_ATUAL.referencia) desc += `<strong>Ref:</strong> ${PRODUTO_ATUAL.referencia}<br>`;
-        if (PRODUTO_ATUAL.fabricante) desc += `<strong>Marca:</strong> ${PRODUTO_ATUAL.fabricante}<br>`;
+        // 4. MONTAGEM DA DESCRIÇÃO E APLICAÇÃO INTELIGENTE
+        const params = new URLSearchParams(window.location.search);
+        const termoPesquisado = (params.get('q') || '').toUpperCase().trim();
+        
+        let htmlDescricao = "";
+        if (PRODUTO_ATUAL.referencia) htmlDescricao += `<strong>Ref:</strong> ${PRODUTO_ATUAL.referencia}<br>`;
+        if (PRODUTO_ATUAL.fabricante) htmlDescricao += `<strong>Marca:</strong> ${PRODUTO_ATUAL.fabricante}<br>`;
 
+        // Lógica de Destaque de Aplicação
         if (PRODUTO_ATUAL.carros) {
-            const params = new URLSearchParams(window.location.search);
-            const termoPesquisado = (params.get('q') || '').toUpperCase().trim();
-            
-            // Transformamos a string do banco em um Array (Igual na busca)
-            let carrosDoProduto = PRODUTO_ATUAL.carros.split(',').map(c => c.trim());
-            let textoAplicacaoHTML = "";
+            let listaCarros = PRODUTO_ATUAL.carros.split(',').map(c => c.trim());
+            let textoAplicacao = "";
 
-            if (termoPesquisado) {
-                // Tenta encontrar qual carro da lista está na pesquisa do usuário
-                const matchIndex = carrosDoProduto.findIndex(carro => termoPesquisado.includes(carro.toUpperCase()));
+            // Verifica se o termo pesquisado (ex: CIVIC) está em algum carro da lista
+            const indexMatch = listaCarros.findIndex(carro => termoPesquisado !== "" && termoPesquisado.includes(carro.toUpperCase()));
 
-                if (matchIndex !== -1) {
-                    // Remove o carro encontrado da lista para destacá-lo
-                    const carroDestaque = carrosDoProduto.splice(matchIndex, 1)[0];
-                    const anoInfo = PRODUTO_ATUAL.ano ? ` (${PRODUTO_ATUAL.ano})` : "";
-
-                    // Cria o destaque LARANJA (Igual ao seu padrão visual)
-                    const htmlDestaque = `<strong style="color: #e67e22; background: #fff4e6; padding: 2px 6px; border-radius: 4px; border: 1px solid #ffcc80;">${carroDestaque.toUpperCase()}${anoInfo}</strong>`;
-                    
-                    // Une o destaque com o restante da lista
-                    textoAplicacaoHTML = htmlDestaque + (carrosDoProduto.length > 0 ? ", " + carrosDoProduto.join(', ') : "");
-                } else {
-                    textoAplicacaoHTML = PRODUTO_ATUAL.carros;
-                }
+            if (indexMatch !== -1) {
+                // Remove o carro da lista original e cria o destaque laranja
+                const carroDestaque = listaCarros.splice(indexMatch, 1)[0];
+                const anoInfo = PRODUTO_ATUAL.ano ? ` (${PRODUTO_ATUAL.ano})` : "";
+                
+                const destaqueHTML = `<strong style="color: #e67e22; background: #fff4e6; padding: 2px 6px; border-radius: 4px; border: 1px solid #ffcc80; display: inline-block; margin-bottom: 4px;">${carroDestaque.toUpperCase()}${anoInfo}</strong>`;
+                
+                textoAplicacao = destaqueHTML + (listaCarros.length > 0 ? ", " + listaCarros.join(', ') : "");
             } else {
-                textoAplicacaoHTML = PRODUTO_ATUAL.carros;
+                textoAplicacao = PRODUTO_ATUAL.carros;
             }
 
-            // Gerencia o "Ver Mais"
-            const limite = 80;
-            const textoLimpo = textoAplicacaoHTML.replace(/<[^>]*>?/gm, '');
-
-            if (textoLimpo.length > limite) {
-                desc += `<strong>Aplicação:</strong> <span id="app-resumo">${textoAplicacaoHTML}</span>`;
-            } else {
-                desc += `<strong>Aplicação:</strong> ${textoAplicacaoHTML}<br>`;
-            }
+            htmlDescricao += `<strong>Aplicação:</strong> ${textoAplicacao}<br>`;
         }
 
-        if (PRODUTO_ATUAL.motor) desc += `<strong>Motor:</strong> ${PRODUTO_ATUAL.motor}`;
-        document.getElementById('prod-desc').innerHTML = desc || "Sem descrição técnica.";
+        if (PRODUTO_ATUAL.motor) htmlDescricao += `<strong>Motor:</strong> ${PRODUTO_ATUAL.motor}`;
 
-        // 5. GESTÃO DE ESTOQUE
+        // Injeta tudo de uma vez no elemento de descrição
+        document.getElementById('prod-desc').innerHTML = htmlDescricao || "Sem descrição técnica.";
+
+        // 5. ATUALIZA PREÇOS E ESTOQUE
         const elEstoque = document.getElementById('prod-estoque');
-        const btnComprar = document.querySelector('.btn-buy-now');
         const estoqueAtual = parseInt(PRODUTO_ATUAL.estoque || 0);
-
+        
         if (estoqueAtual <= 0) {
-            elEstoque.innerHTML = '<span style="color:#c0392b"><i class="ph ph-x-circle"></i> Produto Esgotado</span>';
-            if (btnComprar) {
-                btnComprar.disabled = true;
-                btnComprar.style.background = "#bdc3c7";
-                btnComprar.innerHTML = "Indisponível";
-            }
+            elEstoque.innerHTML = '<span style="color:#c0392b"><i class="ph ph-x-circle"></i> Esgotado</span>';
         } else {
-            const cor = estoqueAtual < 5 ? "#e67e22" : "#27ae60";
-            elEstoque.innerHTML = `<span style="color:${cor}"><i class="ph ph-check-circle"></i> Disponível (${estoqueAtual} em estoque)</span>`;
+            elEstoque.innerHTML = `<span style="color:#27ae60"><i class="ph ph-check-circle"></i> Disponível (${estoqueAtual} em estoque)</span>`;
         }
 
         atualizarPrecoTela();
 
     } catch (e) {
-        console.error(e);
+        console.error("Erro carregarProduto:", e);
     }
 }
         // --- 3. LÓGICA DE PREÇO ---

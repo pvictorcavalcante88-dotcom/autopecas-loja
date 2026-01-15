@@ -294,26 +294,52 @@ async function carregarProduto(id) {
         if (PRODUTO_ATUAL.fabricante) htmlDescricao += `<strong>Marca:</strong> ${PRODUTO_ATUAL.fabricante}<br>`;
 
         // Lógica de Destaque de Aplicação
+        // --- LÓGICA DE APLICAÇÃO COM "VER MAIS" INTELIGENTE ---
         if (PRODUTO_ATUAL.carros) {
+            const params = new URLSearchParams(window.location.search);
+            const termoPesquisado = (params.get('q') || '').toUpperCase().trim();
+            
             let listaCarros = PRODUTO_ATUAL.carros.split(',').map(c => c.trim());
-            let textoAplicacao = "";
+            let textoFinalHTML = "";
 
-            // Verifica se o termo pesquisado (ex: CIVIC) está em algum carro da lista
-            const indexMatch = listaCarros.findIndex(carro => termoPesquisado !== "" && termoPesquisado.includes(carro.toUpperCase()));
+            // 1. Identifica o Match para manter o destaque laranja
+            const indexMatch = listaCarros.findIndex(carro => 
+                termoPesquisado !== "" && termoPesquisado.includes(carro.toUpperCase())
+            );
+
+            let destaqueHTML = "";
+            let restanteLista = [...listaCarros];
 
             if (indexMatch !== -1) {
-                // Remove o carro da lista original e cria o destaque laranja
-                const carroDestaque = listaCarros.splice(indexMatch, 1)[0];
+                const carroFocado = restanteLista.splice(indexMatch, 1)[0];
                 const anoInfo = PRODUTO_ATUAL.ano ? ` (${PRODUTO_ATUAL.ano})` : "";
                 
-                const destaqueHTML = `<strong style="color: #e67e22; background: #fff4e6; padding: 2px 6px; border-radius: 4px; border: 1px solid #ffcc80; display: inline-block; margin-bottom: 4px;">${carroDestaque.toUpperCase()}${anoInfo}</strong>`;
-                
-                textoAplicacao = destaqueHTML + (listaCarros.length > 0 ? ", " + listaCarros.join(', ') : "");
-            } else {
-                textoAplicacao = PRODUTO_ATUAL.carros;
+                // Cria o seu destaque padrão laranja
+                destaqueHTML = `<strong style="color: #e67e22; background: #fff4e6; padding: 2px 6px; border-radius: 4px; border: 1px solid #ffcc80; display: inline-block; margin-bottom: 5px;">${carroFocado.toUpperCase()}${anoInfo}</strong>`;
             }
 
-            htmlDescricao += `<strong>Aplicação:</strong> ${textoAplicacao}<br>`;
+            // 2. Monta a estrutura com o botão "Ver Mais"
+            if (restanteLista.length > 0) {
+                const textoRestante = restanteLista.join(', ');
+                
+                // Se a lista for grande (mais de 50 caracteres), ativa o botão
+                if (textoRestante.length > 50) {
+                    textoFinalHTML = `
+                        ${destaqueHTML} 
+                        <span id="app-restante" style="display: none; color: #666;">, ${textoRestante}</span>
+                        <span id="btn-ver-mais-app" onclick="toggleMaisCarros()" style="color: #3498db; cursor: pointer; font-weight: bold; font-size: 0.85rem; margin-left: 5px;">
+                            ... ver mais
+                        </span>
+                    `;
+                } else {
+                    textoFinalHTML = destaqueHTML + (destaqueHTML ? ", " : "") + textoRestante;
+                }
+            } else {
+                textoFinalHTML = destaqueHTML;
+            }
+
+            // Injeta o HTML final
+            htmlDescricao += `<div style="margin-top: 10px;"><strong>Aplicação:</strong> ${textoFinalHTML}</div>`;
         }
 
         if (PRODUTO_ATUAL.motor) htmlDescricao += `<strong>Motor:</strong> ${PRODUTO_ATUAL.motor}`;
@@ -570,6 +596,21 @@ async function carregarProduto(id) {
                 spanOculto.style.display = 'none'; // Esconde de novo
                 btn.innerHTML = ' ... ver mais';
                 btn.style.color = '#3498db'; // Volta a ser azul
+            }
+        }
+
+        function toggleMaisCarros() {
+            const spanRestante = document.getElementById('app-restante');
+            const btn = document.getElementById('btn-ver-mais-app');
+
+            if (spanRestante.style.display === 'none') {
+                spanRestante.style.display = 'inline';
+                btn.innerText = ' (ver menos)';
+                btn.style.color = '#e74c3c'; // Muda para vermelho ao abrir
+            } else {
+                spanRestante.style.display = 'none';
+                btn.innerText = '... ver mais';
+                btn.style.color = '#3498db'; // Volta para azul ao fechar
             }
         }
     </script>

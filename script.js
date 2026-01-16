@@ -133,10 +133,7 @@ document.addEventListener("DOMContentLoaded", async function() {
 
 
 // ==============================================================
-// 🛒 CARRINHO FINAL (COM BOTÃO ESVAZIAR NOS DOIS MODOS)
-// ==============================================================
-// ==============================================================
-// 🛒 CARRINHO FINAL (COM CORREÇÃO DO "UP" + FUNÇÕES ORIGINAIS)
+// 🛒 CARRINHO BLINDADO (ARRAY CHECK)
 // ==============================================================
 async function carregarPaginaCarrinho() {
     if (!localStorage.getItem('afiliadoLogado')) {
@@ -154,8 +151,6 @@ async function carregarPaginaCarrinho() {
     const rowLucro = document.getElementById('row-afiliado-lucro');
     const valorLucro = document.getElementById('afiliado-lucro-valor');
     const divAcoes = document.getElementById('afiliado-cart-actions');
-
-    // Elementos do detalhamento
     const elGanhoBruto = document.getElementById('cart-ganho-bruto');
     const elTaxasEstimadas = document.getElementById('cart-taxas-estimadas');
 
@@ -172,44 +167,56 @@ async function carregarPaginaCarrinho() {
 
     const isAfiliado = !!localStorage.getItem('afiliadoLogado');
 
-    // 1. CARRINHO VAZIO
     if (cart.length === 0) {
         if(cartItemsContainer) cartItemsContainer.innerHTML = '<tr><td colspan="6" align="center" style="padding:20px;">Seu carrinho está vazio.</td></tr>';
         if(cartMobileContainer) cartMobileContainer.innerHTML = '<div style="text-align:center; padding:20px;">Carrinho vazio.</div>';
-        
         if (cartTotalElement) cartTotalElement.innerText = 'R$ 0,00';
         if (cartSubtotalElement) cartSubtotalElement.innerText = 'R$ 0,00';
         if (rowLucro) rowLucro.style.display = 'none';
         return;
     }
 
-    // 2. LOOP DOS ITENS
     for (const item of cart) {
         try {
             const response = await fetch(`${API_URL}/products/${item.id}`);
             if (!response.ok) continue;
             const p = await response.json();
 
-            // 🟢 INTEGRAÇÃO DA LÓGICA DO "UP" AQUI DENTRO
+            // ====================================================
+            // 🟢 CORREÇÃO DEFINITIVA DO "UP"
+            // ====================================================
             let carroDisplay = "";
+            let listaOficialArray = [];
+
             if (p.carros) {
-                const termoPesquisaItem = (item.termoPesquisa || '').toUpperCase().trim();
-                const listaCarrosBanco = p.carros.toUpperCase();
+                // 1. Transforma a string do banco em um ARRAY LIMPO
+                // Ex: "PICKUP, SAVEIRO" vira ["PICKUP", "SAVEIRO"]
+                listaOficialArray = p.carros.toUpperCase().split(',').map(c => c.trim());
                 
-                // Regex para palavra exata (evita interrUPtor)
+                const termoPesquisaItem = (item.termoPesquisa || '').toUpperCase().trim();
+                
+                // 2. Busca o match EXATO no Array
+                // Agora "PICKUP" não vai mais disparar o match para "UP"
                 const carroMatch = LISTA_CARROS.find(c => {
                     const regex = new RegExp(`\\b${c}\\b`, 'i');
-                    return regex.test(termoPesquisaItem) && listaCarrosBanco.includes(c);
+                    // O segredo está aqui: listaOficialArray.includes(c)
+                    return regex.test(termoPesquisaItem) && listaOficialArray.includes(c);
                 });
 
                 if (carroMatch) {
                     carroDisplay = carroMatch;
                 } else {
-                    // Fallback: Primeiro da lista
-                    carroDisplay = p.carros.split(',')[0].trim().toUpperCase();
+                    // Fallback: Pega o primeiro item do array (Ex: ACCORD)
+                    if (listaOficialArray.length > 0) {
+                        carroDisplay = listaOficialArray[0];
+                    } else {
+                        carroDisplay = "UNIVERSAL";
+                    }
                 }
+            } else {
+                carroDisplay = "UNIVERSAL";
             }
-            // --------------------------------------------------
+            // ====================================================
 
             const nomeExibir = montarNomeCompleto(item, p);
             const precoBase = parseFloat(p.price || p.preco_novo);
@@ -225,7 +232,7 @@ async function carregarPaginaCarrinho() {
             totalGanhoBruto += math.lucroBruto * item.quantidade;
             totalTaxas += math.taxasEstimadas * item.quantidade;
 
-            // --- VERSÃO DESKTOP ---
+            // DESKTOP HTML
             if (cartItemsContainer) {
                 const htmlMargemPC = isAfiliado ? `
                     <div style="margin-top:5px; font-size:0.85rem; color:#e67e22; display:flex; flex-direction:column; gap:2px;">
@@ -244,7 +251,7 @@ async function carregarPaginaCarrinho() {
                     <td><img src="${p.image||p.imagem}" width="60" style="vertical-align:middle; border-radius:4px;" onerror="this.src='https://placehold.co/100'"></td>
                     <td>
                         <strong>${nomeExibir}</strong> 
-                        <br><small style="color:#e67e22; font-weight:bold;">Aplicação: ${carroDisplay}</small>
+                        <br><span style="color:#e67e22; font-weight:bold; font-size:0.9rem;">Aplicação: ${carroDisplay}</span>
                         ${htmlMargemPC}
                     </td>
                     <td>${formatarMoeda(math.precoFinal)}</td>
@@ -261,7 +268,7 @@ async function carregarPaginaCarrinho() {
                 cartItemsContainer.appendChild(row);
             }
 
-            // --- VERSÃO MOBILE ---
+            // MOBILE HTML
             if (cartMobileContainer) {
                 const htmlMargemMobile = isAfiliado ? `
                     <div class="mobile-lucro-box" style="background:#f9f9f9; padding:8px; border-radius:5px; margin:10px 0;">
@@ -285,7 +292,7 @@ async function carregarPaginaCarrinho() {
                         <img src="${p.image||p.imagem}" class="mobile-cart-img" style="width:60px; height:60px; object-fit:contain;" onerror="this.src='https://placehold.co/100?text=S/Img'">
                         <div style="flex:1;">
                             <div class="mobile-cart-title" style="font-weight:bold; font-size:0.95rem;">${nomeExibir}</div>
-                            <div style="color:#e67e22; font-size:0.8rem; font-weight:bold; margin-bottom:5px;">Aplic: ${carroDisplay}</div>
+                            <div style="color:#e67e22; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Aplic: ${carroDisplay}</div>
                             <div style="color:#777; font-size:0.85rem;">${formatarMoeda(math.precoFinal)} unit.</div>
                         </div>
                     </div>
@@ -310,38 +317,34 @@ async function carregarPaginaCarrinho() {
 
         } catch (e) { console.error(e); }
     }
-    
-    // 3. BOTÃO ESVAZIAR (REINSERIDO)
+
+    // BOTÃO LIMPAR
     if (cartItemsContainer && cart.length > 0) {
         const rowLimpar = document.createElement('tr');
         rowLimpar.innerHTML = `<td colspan="6" style="text-align: right; padding-top: 15px;"><button onclick="limparCarrinho()" style="background:none; border:1px solid #e74c3c; color:#e74c3c; padding:8px 15px; border-radius:4px; cursor:pointer; font-size:0.9rem; display:inline-flex; align-items:center; gap:5px;"><i class="ph ph-trash"></i> Esvaziar Carrinho</button></td>`;
         cartItemsContainer.appendChild(rowLimpar);
     }
-    // Adicionar botão esvaziar no mobile também se quiser
     if (cartMobileContainer && cart.length > 0) {
          const btnLimparMobile = document.createElement('div');
          btnLimparMobile.innerHTML = `<button onclick="limparCarrinho()" style="width:100%; margin:20px 0; background:none; border:1px solid #e74c3c; color:#e74c3c; padding:10px; border-radius:4px;">Esvaziar Carrinho</button>`;
          cartMobileContainer.appendChild(btnLimparMobile);
     }
 
-    // 4. ATUALIZA TOTAIS
+    // TOTAIS
     if (cartTotalElement) cartTotalElement.innerText = formatarMoeda(totalVenda);
     if (cartSubtotalElement) cartSubtotalElement.innerText = formatarMoeda(totalVenda);
 
     if (isAfiliado && rowLucro) {
-        rowLucro.style.display = 'flex'; 
-        
+        rowLucro.style.display = 'flex';
         if (elGanhoBruto) elGanhoBruto.innerText = formatarMoeda(totalGanhoBruto);
         if (elTaxasEstimadas) elTaxasEstimadas.innerText = formatarMoeda(totalTaxas);
         if (valorLucro) valorLucro.innerText = formatarMoeda(totalLucroLiquido);
     }
 
-    // 5. BOTÃO FINALIZAR (REINSERIDO)
     if (divAcoes && isAfiliado && cart.length > 0) {
         divAcoes.innerHTML = `<button onclick="window.location.href='checkout.html'" class="btn-place-order" style="width:100%; margin-top:15px; background:#34495e; color:white; padding:15px; font-size:1.1rem;"><i class="ph ph-whatsapp-logo"></i> Finalizar / Gerar Link</button>`;
     }
 
-    // 6. INFO PARCELAS
     const infoParcela = document.getElementById('info-parcela');
     if (infoParcela && numParcelas > 1) {
         const valorParcela = totalVenda / numParcelas;
@@ -350,7 +353,6 @@ async function carregarPaginaCarrinho() {
         infoParcela.innerText = "";
     }
 }
-
 // --- FUNÇÃO NOVA: LIMPAR TUDO ---
 function limparCarrinho() {
     if(confirm("Tem certeza que deseja esvaziar todo o carrinho?")) {

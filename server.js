@@ -506,26 +506,100 @@ app.get('/afiliado/buscar-cliente/:doc', authenticateToken, async (req, res) => 
 // =================================================================
 
 // DASHBOARD ADMIN
+// =================================================================
+// 📊 DASHBOARD ADMIN (COM FILTROS DE DATA E LUCRO)
+// =================================================================
 app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
+    // 1. Segurança: Só admin pode ver
     if (!req.user || req.user.role !== 'admin') return res.sendStatus(403);
-    try {
-        const totalPedidos = await prisma.pedido.count();
-        const produtos = await prisma.produto.count();
-        const somaVendas = await prisma.pedido.aggregate({ _sum: { valorTotal: true } });
-        
-        let estoqueBaixo = 0;
-        try { estoqueBaixo = await prisma.produto.count({ where: { estoque: { lte: 5 } } }); } catch (err) {}
 
-        const ultimosPedidos = await prisma.pedido.findMany({ take: 5, orderBy: { createdAt: 'desc' } });
+    try {
+        const { periodo } = req.query; // Recebe: 'hoje', '7dias', '30dias', 'mes_atual', 'total'
+
+        // 2. Configuração do Filtro de Data
+        let filtroData = {}; 
+        const agora = new Date();
+        let dataInicio = new Date();
+        dataInicio.setHours(0, 0, 0, 0); // Zera hora para pegar o dia todo
+
+        if (periodo && periodo !== 'total') {
+            if (periodo === 'hoje') {
+                // dataInicio já é hoje 00:00
+            } else if (periodo === '7dias') {
+                dataInicio.setDate(agora.getDate() - 7);
+            } else if (periodo === '30dias') {
+                dataInicio.setDate(agora.getDate() - 30);
+            } else if (periodo === 'mes_atual') {
+                dataInicio.setDate(1); // Dia 1 do mês atual
+            }
+
+            // Aplica o filtro no Prisma
+            filtroData = {
+                createdAt: {
+                    gte: dataInicio,
+                    lte: new Date()
+                }
+            };
+        }
+
+        // 3. Executa Consultas em Paralelo (Mais rápido)
+        const [agregadoFinanceiro, totalPedidosPeriodo, produtos, estoqueBaixo, ultimosPedidos] = await prisma.$transaction([
+            
+            // A. Soma Faturamento e Comissões (Só conta pedidos Aprovados/Entregues)
+            prisma.pedido.aggregate({
+                _sum: {
+                    valorTotal: true,
+                    comissaoGerada: true
+                },
+                where: {
+                    ...filtroData, // Respeita o filtro de tempo
+                    status: { in: ['APROVADO', 'ENTREGUE'] } // Só soma dinheiro real
+                }
+            }),
+
+            // B. Contagem de Pedidos no Período (Todos os status para ver volume)
+            prisma.pedido.count({
+                where: { ...filtroData }
+            }),
+
+            // C. Total de Produtos Cadastrados (Não depende de data)
+            prisma.produto.count(),
+
+            // D. Produtos com Estoque Baixo (Não depende de data)
+            prisma.produto.count({ where: { estoque: { lte: 5 } } }),
+
+            // E. Lista dos Últimos Pedidos (Respeita o filtro de tempo)
+            prisma.pedido.findMany({
+                where: { ...filtroData },
+                take: 10,
+                orderBy: { createdAt: 'desc' },
+                include: { afiliado: true }
+            })
+        ]);
+
+        // 4. Cálculos Finais
+        const faturamento = agregadoFinanceiro._sum.valorTotal || 0;
+        const comissoesPagas = agregadoFinanceiro._sum.comissaoGerada || 0;
+
+        // CÁLCULO DO LUCRO LÍQUIDO DO ADMIN
+        // Lucro = Faturamento - O que pagou para os afiliados
+        // (Nota: Se quiser descontar impostos aqui, basta subtrair a % configurada)
+        const lucroLiquido = faturamento - comissoesPagas;
 
         res.json({
-            faturamento: somaVendas._sum.valorTotal || 0,
-            totalPedidos,
+            faturamento,
+            lucroLiquido,      // Vai para o Card Verde
+            comissoesTotais: comissoesPagas, // Vai para o Card Vermelho
+            totalPedidos: totalPedidosPeriodo,
             produtos,
             estoqueBaixo,
             ultimosPedidos
         });
-    } catch (e) { res.status(500).json({ erro: e.message }); }
+
+    } catch (e) {
+        console.error("Erro Dashboard Admin:", e);
+        res.status(500).json({ erro: e.message });
+    }
 });
 
 // LISTAR PEDIDOS

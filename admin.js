@@ -75,64 +75,62 @@ document.addEventListener("DOMContentLoaded", () => {
 // ======================================================
 // 📊 FUNÇÃO: CARREGAR DASHBOARD (VERSÃO BLINDADA)
 // ======================================================
+// ======================================================
+// 📊 FUNÇÃO: CARREGAR DASHBOARD (COM FILTRO E LUCRO)
+// ======================================================
 async function carregarDashboard() {
     const token = localStorage.getItem('adminToken');
     if (!token) return;
 
+    // 1. Pega o valor do filtro de tempo (ex: 'hoje', '30dias')
+    const filtroSelect = document.getElementById('filtro-tempo-dashboard');
+    const periodo = filtroSelect ? filtroSelect.value : 'total';
+
     try {
-        // Chama a rota que conta tudo no banco de dados
-        const res = await fetch(`${API_URL}/admin/dashboard-stats`, {
+        // Envia o período na URL para o Backend filtrar
+        const res = await fetch(`${API_URL}/admin/dashboard-stats?periodo=${periodo}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
         if (!res.ok) throw new Error("Falha ao buscar dados do Dashboard");
 
         const dados = await res.json();
-        console.log("Dados do Dashboard recebidos:", dados); // Olhe no F12 para ver os números reais
+        console.log("Dados Dashboard:", dados);
 
-        // --- 1. PREENCHE OS CARDS (ESTRATÉGIA DUPLA) ---
-        // Tenta achar pelo ID correto OU pela posição do Card na tela
-        
-        // Faturamento (1º Card)
-        const elFat = document.getElementById('faturamento-total') || 
-                      document.getElementById('total-vendas') || 
-                      document.querySelector('.card:nth-child(1) h2'); 
-                      // ^ Procura o h2 dentro do primeiro card
+        // --- PREENCHIMENTO DOS CARDS ---
+
+        // 1. Faturamento
+        const elFat = document.getElementById('faturamento-total');
         if(elFat) elFat.innerText = formatarMoeda(dados.faturamento);
+
+        // 2. Lucro Líquido (NOVO)
+        // Se o backend ainda não mandar 'lucroLiquido', calculamos aqui provisoriamente:
+        // Lucro = Faturamento - Comissões
+        const lucroReal = dados.lucroLiquido !== undefined ? dados.lucroLiquido : (dados.faturamento - (dados.comissoesTotais || 0));
         
-        // Total de Pedidos (2º Card)
-        const elPed = document.getElementById('total-pedidos') || 
-                      document.querySelector('.card:nth-child(2) h2');
+        const elLucro = document.getElementById('lucro-liquido-total');
+        if(elLucro) elLucro.innerText = formatarMoeda(lucroReal);
+
+        // 3. Total de Pedidos
+        const elPed = document.getElementById('total-pedidos');
         if(elPed) elPed.innerText = dados.totalPedidos;
 
-        // Total de Produtos (3º Card)
-        const elProd = document.getElementById('total-produtos') || 
-                      document.querySelector('.card:nth-child(3) h2');
-        if(elProd) elProd.innerText = dados.produtos;
+        // 4. Comissões (Custo)
+        const elComis = document.getElementById('total-comissoes-pagas');
+        if(elComis) elComis.innerText = formatarMoeda(dados.comissoesTotais || 0);
 
-        // Estoque Baixo (4º Card)
-        const elEst = document.getElementById('estoque-baixo') || 
-                      document.querySelector('.card:nth-child(4) h2');
-        if(elEst) elEst.innerText = dados.estoqueBaixo;
-
-
-        // --- 2. PREENCHE A TABELA DE ÚLTIMOS PEDIDOS ---
-        const tabela = document.querySelector('.recent-orders table tbody') || document.querySelector('table tbody');
-        
-        if (tabela) {
-            tabela.innerHTML = ''; // Limpa antes de preencher
-            
-            if(!dados.ultimosPedidos || dados.ultimosPedidos.length === 0) {
-                tabela.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#999;">Nenhum pedido recente.</td></tr>';
+        // --- PREENCHE TABELA DE PEDIDOS RECENTES ---
+        // (Mantive sua lógica original aqui)
+        const tabela = document.querySelector('table tbody');
+        if (tabela && dados.ultimosPedidos) {
+            tabela.innerHTML = '';
+            if(dados.ultimosPedidos.length === 0) {
+                tabela.innerHTML = '<tr><td colspan="5" align="center">Sem vendas neste período.</td></tr>';
             } else {
                 dados.ultimosPedidos.forEach(p => {
                     const statusClass = p.status ? p.status.toLowerCase() : 'pendente';
-                    
-                    // Verifica se veio de afiliado
                     let clienteHtml = `<strong>${p.clienteNome || 'Cliente'}</strong>`;
-                    if(p.afiliado) {
-                        clienteHtml += `<br><small style="color:#e67e22">Via: ${p.afiliado.nome}</small>`;
-                    }
+                    if(p.afiliado) clienteHtml += `<br><small style="color:#e67e22">Via: ${p.afiliado.nome}</small>`;
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = `

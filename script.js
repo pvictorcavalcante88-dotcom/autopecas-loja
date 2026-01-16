@@ -135,166 +135,219 @@ document.addEventListener("DOMContentLoaded", async function() {
 // ==============================================================
 // 🛒 CARRINHO FINAL (COM BOTÃO ESVAZIAR NOS DOIS MODOS)
 // ==============================================================
-function carregarPaginaCarrinho() {
-    const cartItemsDesktop = document.getElementById('cart-items-desktop');
-    const cartItemsMobile = document.getElementById('cart-items-mobile');
-    
-    // Se não estiver na página do carrinho, para a execução
-    if (!cartItemsDesktop && !cartItemsMobile) return;
-
-    let carrinho = JSON.parse(localStorage.getItem('nossoCarrinho') || '[]');
-    
-    // Elementos de totais
-    const elSubtotal = document.getElementById('cart-subtotal');
-    const elTotal = document.getElementById('cart-total');
-    const elGanhoBruto = document.getElementById('cart-ganho-bruto');
-    const elTaxas = document.getElementById('cart-taxas-estimadas');
-    const elLiquido = document.getElementById('afiliado-lucro-valor');
-    const rowAfiliado = document.getElementById('row-afiliado-lucro');
-
-    // Limpa a tela antes de recriar
-    if(cartItemsDesktop) cartItemsDesktop.innerHTML = '';
-    if(cartItemsMobile) cartItemsMobile.innerHTML = '';
-
-    if (carrinho.length === 0) {
-        const msgVazio = '<tr><td colspan="6" style="text-align:center; padding:30px;">Seu carrinho está vazio.</td></tr>';
-        if(cartItemsDesktop) cartItemsDesktop.innerHTML = msgVazio;
-        if(cartItemsMobile) cartItemsMobile.innerHTML = '<p style="text-align:center; padding:30px;">Seu carrinho está vazio.</p>';
-        
-        // Zera valores
-        if(elSubtotal) elSubtotal.innerText = "R$ 0,00";
-        if(elTotal) elTotal.innerText = "R$ 0,00";
-        if(rowAfiliado) rowAfiliado.style.display = 'none';
+// ==============================================================
+// 🛒 CARRINHO FINAL (COM CORREÇÃO DO "UP" + FUNÇÕES ORIGINAIS)
+// ==============================================================
+async function carregarPaginaCarrinho() {
+    if (!localStorage.getItem('afiliadoLogado')) {
+        alert("Você precisa fazer login para acessar o carrinho.");
+        window.location.href = "login.html";
         return;
     }
 
-    // --- CÁLCULOS TOTAIS ---
-    let totalPedido = 0;
-    let totalLucroBruto = 0;
+    const numParcelas = parseInt(document.getElementById('simular-parcelas')?.value || 1);
+    const cartItemsContainer = document.getElementById('cart-items-desktop');
+    const cartMobileContainer = document.getElementById('cart-items-mobile');
     
-    // Pega as parcelas da simulação (padrão 1 se não tiver selecionado)
-    const selectParcelas = document.getElementById('simular-parcelas');
-    const numParcelas = parseInt(selectParcelas ? selectParcelas.value : 1);
+    const cartTotalElement = document.getElementById('cart-total');
+    const cartSubtotalElement = document.getElementById('cart-subtotal');
+    const rowLucro = document.getElementById('row-afiliado-lucro');
+    const valorLucro = document.getElementById('afiliado-lucro-valor');
+    const divAcoes = document.getElementById('afiliado-cart-actions');
 
-    carrinho.forEach((item, index) => {
-        // Lógica de Preço (Margem do Afiliado)
-        const margemItem = parseFloat(item.customMargin || 0);
-        const precoBase = parseFloat(item.preco);
+    // Elementos do detalhamento
+    const elGanhoBruto = document.getElementById('cart-ganho-bruto');
+    const elTaxasEstimadas = document.getElementById('cart-taxas-estimadas');
+
+    let cart = getCarrinho();
+    
+    if (cartItemsContainer) cartItemsContainer.innerHTML = ''; 
+    if (cartMobileContainer) cartMobileContainer.innerHTML = '';
+    if (divAcoes) divAcoes.innerHTML = '';
+    
+    let totalVenda = 0;
+    let totalLucroLiquido = 0; 
+    let totalGanhoBruto = 0;   
+    let totalTaxas = 0;        
+
+    const isAfiliado = !!localStorage.getItem('afiliadoLogado');
+
+    // 1. CARRINHO VAZIO
+    if (cart.length === 0) {
+        if(cartItemsContainer) cartItemsContainer.innerHTML = '<tr><td colspan="6" align="center" style="padding:20px;">Seu carrinho está vazio.</td></tr>';
+        if(cartMobileContainer) cartMobileContainer.innerHTML = '<div style="text-align:center; padding:20px;">Carrinho vazio.</div>';
         
-        // Chama a calculadora centralizada (aquela que corrigimos antes)
-        const math = calcularSimulacaoLiquida(precoBase, margemItem, numParcelas);
-
-        const subtotalItem = math.precoFinal * item.quantidade;
-        
-        totalPedido += subtotalItem;
-        totalLucroBruto += (math.lucroBruto * item.quantidade);
-
-        // --- 🟢 AQUI ESTÁ A CORREÇÃO DO "UP" NO CARRINHO ---
-        let carroDisplay = "";
-        const termoPesquisaItem = (item.termoPesquisa || '').toUpperCase().trim();
-        const listaCarrosItem = (item.listaCarros || '').toUpperCase();
-        
-        // 1. Tenta achar o carro usando a TRAVA \b (Palavra exata)
-        // Isso impede que "interruptor" mostre "UP"
-        const carroMatch = LISTA_CARROS.find(c => {
-            const regex = new RegExp(`\\b${c}\\b`, 'i');
-            return regex.test(termoPesquisaItem) && listaCarrosItem.includes(c);
-        });
-
-        if (carroMatch) {
-            carroDisplay = carroMatch;
-        } else {
-            // 2. Fallback: Se não achou (ou era busca genérica), pega o PRIMEIRO da lista
-            // Garante que não fique vazio e nem mostre UP errado
-            const arrayLista = item.listaCarros ? item.listaCarros.split(',') : [];
-            if(arrayLista.length > 0) {
-                carroDisplay = arrayLista[0].trim().toUpperCase();
-            } else {
-                carroDisplay = "UNIVERSAL"; // Caso extremo sem lista
-            }
-        }
-        // --------------------------------------------------------
-
-        // Renderiza Desktop
-        if(cartItemsDesktop) {
-            cartItemsDesktop.innerHTML += `
-            <tr>
-                <td><img src="${item.imagem}" width="50" style="border-radius:4px;"></td>
-                <td>
-                    ${item.tituloOriginal}
-                    <br><small style="color:#e67e22; font-weight:bold;">Aplicação: ${carroDisplay}</small>
-                </td>
-                <td>${formatarMoeda(math.precoFinal)}</td>
-                <td>
-                    <div class="qty-control-cart">
-                        <button onclick="alterarQtdCarrinho(${index}, -1)">-</button>
-                        <input type="text" value="${item.quantidade}" readonly>
-                        <button onclick="alterarQtdCarrinho(${index}, 1)">+</button>
-                    </div>
-                </td>
-                <td style="font-weight:bold;">${formatarMoeda(subtotalItem)}</td>
-                <td>
-                    <button onclick="removerItemCarrinho(${index})" style="color:red; border:none; background:none; cursor:pointer;">
-                        <i class="ph ph-trash"></i>
-                    </button>
-                </td>
-            </tr>`;
-        }
-
-        // Renderiza Mobile
-        if(cartItemsMobile) {
-            cartItemsMobile.innerHTML += `
-            <div class="cart-item-mobile">
-                <img src="${item.imagem}">
-                <div class="cart-item-info">
-                    <h4>${item.tituloOriginal}</h4>
-                    <p style="color:#e67e22; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">
-                        <i class="ph ph-car"></i> ${carroDisplay}
-                    </p>
-                    <div class="cart-price-row">
-                        <span class="price">${formatarMoeda(math.precoFinal)}</span>
-                        <div class="qty-control-cart">
-                            <button onclick="alterarQtdCarrinho(${index}, -1)">-</button>
-                            <span>${item.quantidade}</span>
-                            <button onclick="alterarQtdCarrinho(${index}, 1)">+</button>
-                        </div>
-                    </div>
-                    <button class="btn-remove-mobile" onclick="removerItemCarrinho(${index})">Remover</button>
-                </div>
-            </div>`;
-        }
-    });
-
-    // --- ATUALIZA TOTAIS NA TELA ---
-    if(elSubtotal) elSubtotal.innerText = formatarMoeda(totalPedido);
-    if(elTotal) elTotal.innerText = formatarMoeda(totalPedido);
-
-    // Lógica de Exibição do Painel do Afiliado
-    const afLogado = localStorage.getItem('afiliadoLogado');
-    if (afLogado && rowAfiliado) {
-        rowAfiliado.style.display = 'flex';
-        
-        // Cálculo das taxas totais (30% sobre o lucro bruto)
-        const FATOR_TAXAS = 0.30;
-        const totalTaxas = totalLucroBruto * FATOR_TAXAS;
-        const totalLiquido = totalLucroBruto - totalTaxas;
-
-        if(elGanhoBruto) elGanhoBruto.innerText = formatarMoeda(totalLucroBruto);
-        if(elTaxas) elTaxas.innerText = formatarMoeda(totalTaxas);
-        if(elLiquido) elLiquido.innerText = formatarMoeda(totalLiquido);
-    } else if (rowAfiliado) {
-        rowAfiliado.style.display = 'none';
+        if (cartTotalElement) cartTotalElement.innerText = 'R$ 0,00';
+        if (cartSubtotalElement) cartSubtotalElement.innerText = 'R$ 0,00';
+        if (rowLucro) rowLucro.style.display = 'none';
+        return;
     }
 
-    // Atualiza texto da parcela no resumo
+    // 2. LOOP DOS ITENS
+    for (const item of cart) {
+        try {
+            const response = await fetch(`${API_URL}/products/${item.id}`);
+            if (!response.ok) continue;
+            const p = await response.json();
+
+            // 🟢 INTEGRAÇÃO DA LÓGICA DO "UP" AQUI DENTRO
+            let carroDisplay = "";
+            if (p.carros) {
+                const termoPesquisaItem = (item.termoPesquisa || '').toUpperCase().trim();
+                const listaCarrosBanco = p.carros.toUpperCase();
+                
+                // Regex para palavra exata (evita interrUPtor)
+                const carroMatch = LISTA_CARROS.find(c => {
+                    const regex = new RegExp(`\\b${c}\\b`, 'i');
+                    return regex.test(termoPesquisaItem) && listaCarrosBanco.includes(c);
+                });
+
+                if (carroMatch) {
+                    carroDisplay = carroMatch;
+                } else {
+                    // Fallback: Primeiro da lista
+                    carroDisplay = p.carros.split(',')[0].trim().toUpperCase();
+                }
+            }
+            // --------------------------------------------------
+
+            const nomeExibir = montarNomeCompleto(item, p);
+            const precoBase = parseFloat(p.price || p.preco_novo);
+            let margemAplicada = (item.customMargin !== undefined) ? item.customMargin : ((FATOR_GLOBAL - 1) * 100);
+            
+            const math = calcularSimulacaoLiquida(precoBase, margemAplicada, numParcelas);
+
+            const subtotalItem = math.precoFinal * item.quantidade;
+            const lucroLiquidoItemTotal = math.lucroLiquido * item.quantidade;
+            
+            totalVenda += subtotalItem;
+            totalLucroLiquido += lucroLiquidoItemTotal;
+            totalGanhoBruto += math.lucroBruto * item.quantidade;
+            totalTaxas += math.taxasEstimadas * item.quantidade;
+
+            // --- VERSÃO DESKTOP ---
+            if (cartItemsContainer) {
+                const htmlMargemPC = isAfiliado ? `
+                    <div style="margin-top:5px; font-size:0.85rem; color:#e67e22; display:flex; flex-direction:column; gap:2px;">
+                        <div>
+                            Margem: <input type="number" value="${margemAplicada}" 
+                            style="width:50px; text-align:center; border:1px solid #ddd; border-radius:3px;" 
+                            onchange="atualizarMargemCarrinho(${item.id}, this.value)"> %
+                        </div>
+                        <div style="font-size:0.75rem; color:#27ae60; font-weight:bold;">
+                            Líq: ${formatarMoeda(math.lucroLiquido)} <span style="color:#aaa; font-weight:normal;">/un</span>
+                        </div>
+                    </div>` : '';
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><img src="${p.image||p.imagem}" width="60" style="vertical-align:middle; border-radius:4px;" onerror="this.src='https://placehold.co/100'"></td>
+                    <td>
+                        <strong>${nomeExibir}</strong> 
+                        <br><small style="color:#e67e22; font-weight:bold;">Aplicação: ${carroDisplay}</small>
+                        ${htmlMargemPC}
+                    </td>
+                    <td>${formatarMoeda(math.precoFinal)}</td>
+                    <td>
+                        <div style="display:flex; gap:5px; align-items:center;">
+                            <button onclick="alterarQuantidade(${item.id}, -1)" style="padding:2px 8px;">-</button> 
+                            <span>${item.quantidade}</span> 
+                            <button onclick="alterarQuantidade(${item.id}, 1)" style="padding:2px 8px;">+</button>
+                        </div>
+                    </td>
+                    <td style="font-weight:bold;">${formatarMoeda(subtotalItem)}</td>
+                    <td><button onclick="removerItem(${item.id})" style="color:#c0392b; border:none; background:none; cursor:pointer; font-size:1.2rem;">&times;</button></td>
+                `;
+                cartItemsContainer.appendChild(row);
+            }
+
+            // --- VERSÃO MOBILE ---
+            if (cartMobileContainer) {
+                const htmlMargemMobile = isAfiliado ? `
+                    <div class="mobile-lucro-box" style="background:#f9f9f9; padding:8px; border-radius:5px; margin:10px 0;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                            <strong>Margem:</strong>
+                            <div>
+                                <input type="number" value="${margemAplicada}" 
+                                    style="width:50px; padding:5px; border:1px solid #ddd; text-align:center;"
+                                    onchange="atualizarMargemCarrinho(${item.id}, this.value)"> %
+                            </div>
+                        </div>
+                        <div style="text-align:right; font-size:0.9rem; color:#27ae60;">
+                            Líq: <strong>${formatarMoeda(math.lucroLiquido)}</strong> /un
+                        </div>
+                    </div>` : '';
+
+                const card = document.createElement('div');
+                card.className = 'mobile-cart-card';
+                card.innerHTML = `
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <img src="${p.image||p.imagem}" class="mobile-cart-img" style="width:60px; height:60px; object-fit:contain;" onerror="this.src='https://placehold.co/100?text=S/Img'">
+                        <div style="flex:1;">
+                            <div class="mobile-cart-title" style="font-weight:bold; font-size:0.95rem;">${nomeExibir}</div>
+                            <div style="color:#e67e22; font-size:0.8rem; font-weight:bold; margin-bottom:5px;">Aplic: ${carroDisplay}</div>
+                            <div style="color:#777; font-size:0.85rem;">${formatarMoeda(math.precoFinal)} unit.</div>
+                        </div>
+                    </div>
+                    ${htmlMargemMobile}
+                    <div class="mobile-cart-details" style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+                        <div class="mobile-qty-box">
+                            <button onclick="alterarQuantidade(${item.id}, -1)">-</button>
+                            <strong style="margin:0 10px;">${item.quantidade}</strong>
+                            <button onclick="alterarQuantidade(${item.id}, 1)">+</button>
+                        </div>
+                        <div style="font-size:1.1rem; color:#2c3e50; font-weight:800;">
+                            ${formatarMoeda(subtotalItem)}
+                        </div>
+                    </div>
+                    <button class="mobile-remove-btn" onclick="removerItem(${item.id})" style="width:100%; margin-top:10px; background:none; border:1px solid #fab1a0; color:#e17055; padding:8px; border-radius:4px;">
+                        Remover
+                    </button>
+                    <hr style="margin-top:15px; border:0; border-top:1px solid #eee;">
+                `;
+                cartMobileContainer.appendChild(card);
+            }
+
+        } catch (e) { console.error(e); }
+    }
+    
+    // 3. BOTÃO ESVAZIAR (REINSERIDO)
+    if (cartItemsContainer && cart.length > 0) {
+        const rowLimpar = document.createElement('tr');
+        rowLimpar.innerHTML = `<td colspan="6" style="text-align: right; padding-top: 15px;"><button onclick="limparCarrinho()" style="background:none; border:1px solid #e74c3c; color:#e74c3c; padding:8px 15px; border-radius:4px; cursor:pointer; font-size:0.9rem; display:inline-flex; align-items:center; gap:5px;"><i class="ph ph-trash"></i> Esvaziar Carrinho</button></td>`;
+        cartItemsContainer.appendChild(rowLimpar);
+    }
+    // Adicionar botão esvaziar no mobile também se quiser
+    if (cartMobileContainer && cart.length > 0) {
+         const btnLimparMobile = document.createElement('div');
+         btnLimparMobile.innerHTML = `<button onclick="limparCarrinho()" style="width:100%; margin:20px 0; background:none; border:1px solid #e74c3c; color:#e74c3c; padding:10px; border-radius:4px;">Esvaziar Carrinho</button>`;
+         cartMobileContainer.appendChild(btnLimparMobile);
+    }
+
+    // 4. ATUALIZA TOTAIS
+    if (cartTotalElement) cartTotalElement.innerText = formatarMoeda(totalVenda);
+    if (cartSubtotalElement) cartSubtotalElement.innerText = formatarMoeda(totalVenda);
+
+    if (isAfiliado && rowLucro) {
+        rowLucro.style.display = 'flex'; 
+        
+        if (elGanhoBruto) elGanhoBruto.innerText = formatarMoeda(totalGanhoBruto);
+        if (elTaxasEstimadas) elTaxasEstimadas.innerText = formatarMoeda(totalTaxas);
+        if (valorLucro) valorLucro.innerText = formatarMoeda(totalLucroLiquido);
+    }
+
+    // 5. BOTÃO FINALIZAR (REINSERIDO)
+    if (divAcoes && isAfiliado && cart.length > 0) {
+        divAcoes.innerHTML = `<button onclick="window.location.href='checkout.html'" class="btn-place-order" style="width:100%; margin-top:15px; background:#34495e; color:white; padding:15px; font-size:1.1rem;"><i class="ph ph-whatsapp-logo"></i> Finalizar / Gerar Link</button>`;
+    }
+
+    // 6. INFO PARCELAS
     const infoParcela = document.getElementById('info-parcela');
-    if (infoParcela) {
-        if(numParcelas > 1) {
-            const valorParcela = totalPedido / numParcelas;
-            infoParcela.innerText = `${numParcelas}x de ${formatarMoeda(valorParcela)}`;
-        } else {
-            infoParcela.innerText = `À Vista: ${formatarMoeda(totalPedido)}`;
-        }
+    if (infoParcela && numParcelas > 1) {
+        const valorParcela = totalVenda / numParcelas;
+        infoParcela.innerText = `${numParcelas}x de ${formatarMoeda(valorParcela)}`;
+    } else if (infoParcela) {
+        infoParcela.innerText = "";
     }
 }
 

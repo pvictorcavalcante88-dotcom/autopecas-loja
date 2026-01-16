@@ -806,23 +806,24 @@ async function executarBusca(q, categoria) {
 
             // 🟢 LÓGICA DE DESTAQUE COM WHITELIST
             if (termoPesquisado) {
-                // Procuramos um carro que:
-                // 1. Esteja na sua LISTA_CARROS oficial
-                // 2. Esteja presente na lista de aplicação do produto (p.carros)
-                // 3. Tenha sido digitado pelo usuário (termoPesquisado)
-                const matchFiel = LISTA_CARROS.find(carro => 
-                    termoPesquisado.includes(carro) && listaCarrosBanco.includes(carro)
-                );
+                // 🟢 BUSCA O MATCH COM PALAVRA INTEIRA (Bloqueia "interrUPtor")
+                const matchFiel = LISTA_CARROS.find(carro => {
+                    // Cria uma regra para procurar a palavra exata com espaços ou bordas ao redor
+                    const regex = new RegExp(`\\b${carro}\\b`, 'i'); 
+                    return regex.test(termoPesquisado) && listaCarrosBanco.includes(carro);
+                });
 
                 if (matchFiel) {
                     carroExibir = matchFiel;
                 }
             }
 
-            // 🟢 FALLBACK SEGURO: Se não houve match na busca, 
-            // usa o primeiro carro da lista de cadastro do produto
+
+
+            // 🟢 FALLBACK: Se foi uma busca genérica como "interruptor", 
+            // ele OBRIGATORIAMENTE pega o primeiro do banco (Ex: Accord)
             if (!carroExibir && arrayCarrosBanco.length > 0) {
-                carroExibir = arrayCarrosBanco[0];
+                carroExibir = arrayCarrosBanco[0]; 
             }
 
             const anoExibir = p.ano ? ` (${p.ano})` : "";

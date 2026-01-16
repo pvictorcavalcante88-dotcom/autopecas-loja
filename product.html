@@ -295,51 +295,35 @@ async function carregarProduto(id) {
 
         // Lógica de Destaque de Aplicação
         // --- LÓGICA DE APLICAÇÃO COM "VER MAIS" INTELIGENTE ---
+        // Dentro da função carregarProduto(id)...
         if (PRODUTO_ATUAL.carros) {
             const params = new URLSearchParams(window.location.search);
             const termoPesquisado = (params.get('q') || '').toUpperCase().trim();
             
-            let listaCarros = PRODUTO_ATUAL.carros.split(',').map(c => c.trim());
-            let textoFinalHTML = "";
+            let listaOriginal = PRODUTO_ATUAL.carros.split(',').map(c => c.trim());
+            let aplicacaoFinalHTML = "";
 
-            // 1. Identifica o Match para manter o destaque laranja
-            const indexMatch = listaCarros.findIndex(carro => 
-                termoPesquisado !== "" && termoPesquisado.includes(carro.toUpperCase())
+            // 🟢 SÓ DESTACA SE O CARRO ESTIVER NA WHITELIST E NA BUSCA
+            const carroParaDestacar = LISTA_CARROS.find(carro => 
+                termoPesquisado.includes(carro) && PRODUTO_ATUAL.carros.toUpperCase().includes(carro)
             );
 
-            let destaqueHTML = "";
-            let restanteLista = [...listaCarros];
+            if (carroParaDestacar) {
+                // Encontra a posição dele na lista original (independente de maiúscula/minúscula)
+                const idx = listaOriginal.findIndex(c => c.toUpperCase() === carroParaDestacar);
+                if (idx !== -1) listaOriginal.splice(idx, 1); // Remove para não repetir
 
-            if (indexMatch !== -1) {
-                const carroFocado = restanteLista.splice(indexMatch, 1)[0];
                 const anoInfo = PRODUTO_ATUAL.ano ? ` (${PRODUTO_ATUAL.ano})` : "";
+                const destaque = `<strong style="color: #e67e22; background: #fff4e6; padding: 2px 6px; border-radius: 4px; border: 1px solid #ffcc80; display: inline-block; margin-bottom: 5px;">${carroParaDestacar}${anoInfo}</strong>`;
                 
-                // Cria o seu destaque padrão laranja
-                destaqueHTML = `<strong style="color: #e67e22; background: #fff4e6; padding: 2px 6px; border-radius: 4px; border: 1px solid #ffcc80; display: inline-block; margin-bottom: 5px;">${carroFocado.toUpperCase()}${anoInfo}</strong>`;
-            }
-
-            // 2. Monta a estrutura com o botão "Ver Mais"
-            if (restanteLista.length > 0) {
-                const textoRestante = restanteLista.join(', ');
-                
-                // Se a lista for grande (mais de 50 caracteres), ativa o botão
-                if (textoRestante.length > 50) {
-                    textoFinalHTML = `
-                        ${destaqueHTML} 
-                        <span id="app-restante" style="display: none; color: #666;">, ${textoRestante}</span>
-                        <span id="btn-ver-mais-app" onclick="toggleMaisCarros()" style="color: #3498db; cursor: pointer; font-weight: bold; font-size: 0.85rem; margin-left: 5px;">
-                            ... ver mais
-                        </span>
-                    `;
-                } else {
-                    textoFinalHTML = destaqueHTML + (destaqueHTML ? ", " : "") + textoRestante;
-                }
+                aplicacaoFinalHTML = destaque + (listaOriginal.length > 0 ? `<br><small style="color:#666;">Também serve para: ${listaOriginal.join(', ')}</small>` : "");
             } else {
-                textoFinalHTML = destaqueHTML;
+                // Se a busca for "interruptor", cai aqui e mostra o padrão do banco
+                aplicacaoFinalHTML = PRODUTO_ATUAL.carros;
             }
-
-            // Injeta o HTML final
-            htmlDescricao += `<div style="margin-top: 10px;"><strong>Aplicação:</strong> ${textoFinalHTML}</div>`;
+            
+            // Injeta no seu elemento de descrição
+            htmlDescricao += `<div style="margin-top: 10px;"><strong>Aplicação:</strong> ${aplicacaoFinalHTML}</div>`;
         }
 
         if (PRODUTO_ATUAL.motor) htmlDescricao += `<strong>Motor:</strong> ${PRODUTO_ATUAL.motor}`;

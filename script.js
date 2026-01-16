@@ -788,79 +788,69 @@ async function executarBusca(q, categoria) {
         const track = document.getElementById("search-track");
         
         const isLogado = localStorage.getItem('afiliadoLogado');
-        const termoPesquisado = (q || '').toUpperCase();
+        const termoPesquisado = (q || '').toUpperCase().trim();
 
-        if(track) {
-            track.innerHTML = '';
-            
-            if (data.length === 0) {
-                track.innerHTML = '<p style="padding:20px; width:100%; text-align:center;">Nenhum produto encontrado.</p>';
-                return;
+        if(!track) return;
+        track.innerHTML = '';
+        
+        if (data.length === 0) {
+            track.innerHTML = '<p style="padding:20px; width:100%; text-align:center;">Nenhum produto encontrado.</p>';
+            return;
+        }
+
+        data.forEach(p => {
+            let carroExibir = "";
+            const listaCarrosBanco = (p.carros || '').toUpperCase();
+            // Transforma a string do banco em array para pegar o primeiro se precisar
+            const arrayCarrosBanco = listaCarrosBanco.split(',').map(c => c.trim()).filter(c => c !== "");
+
+            // 🟢 LÓGICA DE DESTAQUE COM WHITELIST
+            if (termoPesquisado) {
+                // Procuramos um carro que:
+                // 1. Esteja na sua LISTA_CARROS oficial
+                // 2. Esteja presente na lista de aplicação do produto (p.carros)
+                // 3. Tenha sido digitado pelo usuário (termoPesquisado)
+                const matchFiel = LISTA_CARROS.find(carro => 
+                    termoPesquisado.includes(carro) && listaCarrosBanco.includes(carro)
+                );
+
+                if (matchFiel) {
+                    carroExibir = matchFiel;
+                }
             }
 
-            data.forEach(p => {
-                // --- 🟢 LÓGICA DE DESTAQUE INTELIGENTE ---
-                let carroExibir = "";
-                const listaCarrosBanco = (p.carros || '').toUpperCase();
+            // 🟢 FALLBACK SEGURO: Se não houve match na busca, 
+            // usa o primeiro carro da lista de cadastro do produto
+            if (!carroExibir && arrayCarrosBanco.length > 0) {
+                carroExibir = arrayCarrosBanco[0];
+            }
 
-                if (termoPesquisado) {
-                    // 1. Criamos um array com os carros que o produto atende
-                    const carrosDoProduto = listaCarrosBanco.split(',').map(c => c.trim());
+            const anoExibir = p.ano ? ` (${p.ano})` : "";
+            const aplicacaoFinal = `${carroExibir}${anoExibir}`;
 
-                    // 2. Verificamos se algum desses carros está na pesquisa do usuário
-                    // Ex: pesquisa "Civic", lista do produto [Accord, City, Civic] -> Acha Civic
-                    const match = carrosDoProduto.find(carro => termoPesquisado.includes(carro));
+            // Restante da montagem do card (Links e HTML) mantém o padrão...
+            const linkProduto = `product.html?id=${p.id}${q ? '&q=' + encodeURIComponent(q) : ''}`;
+            const textoBotao = isLogado ? 'Ver Detalhes' : 'Entrar';
+            const htmlPreco = isLogado 
+                ? `<p class="price-new" style="margin-top:auto;">${formatarMoeda(parseFloat(p.price || p.preco_novo))}</p>`
+                : `<p class="price-new" style="font-size:0.85rem; color:#777; margin-top:auto;"><i class="ph ph-lock-key"></i> Login p/ ver</p>`;
 
-                    if (match) {
-                        carroExibir = match;
-                    } else {
-                        // 3. Se não achou o nome do carro, mas o usuário pesquisou um modelo específico (ex: "Pastilha Gol")
-                        // Varre a LISTA_CARROS global para ver se o que ele digitou bate com algo que o produto atende
-                        const matchGlobal = LISTA_CARROS.find(c => 
-                            termoPesquisado.includes(c) && listaCarrosBanco.includes(c)
-                        );
-                        if (matchGlobal) carroExibir = matchGlobal;
-                    }
-                }
-
-                // 4. Fallback: Se ainda não achou nada, volta para o primeiro da lista
-                if (!carroExibir && p.carros) {
-                    carroExibir = p.carros.split(',')[0].trim().toUpperCase();
-                }
-
-                // --- RESTO DA MONTAGEM DO CARD ---
-                const anoExibir = p.ano ? ` (${p.ano})` : "";
-                const termoParaLink = q ? `&q=${encodeURIComponent(q)}` : '';
-                const textoBotao = isLogado ? 'Ver Detalhes' : 'Entrar';
-                
-                const htmlPreco = isLogado 
-                    ? `<p class="price-new" style="margin-top:auto;">${formatarMoeda(parseFloat(p.price || p.preco_novo))}</p>`
-                    : `<p class="price-new" style="font-size:0.85rem; color:#777; margin-top:auto;"><i class="ph ph-lock-key"></i> Login p/ ver</p>`;
-
-                track.innerHTML += `
-                <a href="product.html?id=${p.id}${termoParaLink}" class="product-card">
-                    <div>
-                        <div class="product-image">
-                            <img src="${p.image || p.imagem}" onerror="this.src='https://placehold.co/150'">
-                        </div>
-                        <h3>${p.name || p.titulo}</h3>
-                        
-                        <div class="app-tag">
-                            <i class="ph ph-car" style="vertical-align: middle;"></i> 
-                            <span>${carroExibir}${anoExibir}</span>
-                        </div>
+            track.innerHTML += `
+            <a href="${linkProduto}" class="product-card">
+                <div>
+                    <div class="product-image"><img src="${p.image || p.imagem}" onerror="this.src='https://placehold.co/150'"></div>
+                    <h3>${p.name || p.titulo}</h3>
+                    <div class="app-tag">
+                        <i class="ph ph-car"></i> <span>${aplicacaoFinal}</span>
                     </div>
-
-                    <div>
-                        ${htmlPreco}
-                        <div class="btn-card-action" style="width:100%; margin-top:10px;">${textoBotao}</div> 
-                    </div>
-                </a>`;
-            });
-        }
-    } catch(e) {
-        console.error("Erro busca:", e);
-    }
+                </div>
+                <div>
+                    ${htmlPreco}
+                    <div class="btn-card-action" style="width:100%; margin-top:10px;">${textoBotao}</div> 
+                </div>
+            </a>`;
+        });
+    } catch(e) { console.error("Erro busca:", e); }
 }
 
 // --- FUNÇÃO AUXILIAR: MONTA O NOME COM CONTEXTO (WHITELIST DE CARROS) ---

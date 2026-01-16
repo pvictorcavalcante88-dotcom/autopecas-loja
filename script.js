@@ -133,7 +133,7 @@ document.addEventListener("DOMContentLoaded", async function() {
 
 
 // ==============================================================
-// 🛒 CARRINHO BLINDADO (ARRAY CHECK)
+// 🛒 CARRINHO FINAL (TÍTULO CORRIGIDO)
 // ==============================================================
 async function carregarPaginaCarrinho() {
     if (!localStorage.getItem('afiliadoLogado')) {
@@ -183,30 +183,26 @@ async function carregarPaginaCarrinho() {
             const p = await response.json();
 
             // ====================================================
-            // 🟢 CORREÇÃO DEFINITIVA DO "UP"
+            // 🟢 LÓGICA BLINDADA DO CARRO
             // ====================================================
             let carroDisplay = "";
             let listaOficialArray = [];
 
             if (p.carros) {
-                // 1. Transforma a string do banco em um ARRAY LIMPO
-                // Ex: "PICKUP, SAVEIRO" vira ["PICKUP", "SAVEIRO"]
+                // 1. Limpa a lista do banco
                 listaOficialArray = p.carros.toUpperCase().split(',').map(c => c.trim());
-                
                 const termoPesquisaItem = (item.termoPesquisa || '').toUpperCase().trim();
                 
-                // 2. Busca o match EXATO no Array
-                // Agora "PICKUP" não vai mais disparar o match para "UP"
+                // 2. Busca exata (Regex \b evita UP dentro de interruptor)
                 const carroMatch = LISTA_CARROS.find(c => {
                     const regex = new RegExp(`\\b${c}\\b`, 'i');
-                    // O segredo está aqui: listaOficialArray.includes(c)
                     return regex.test(termoPesquisaItem) && listaOficialArray.includes(c);
                 });
 
                 if (carroMatch) {
                     carroDisplay = carroMatch;
                 } else {
-                    // Fallback: Pega o primeiro item do array (Ex: ACCORD)
+                    // 3. Fallback: Se não achou, pega o PRIMEIRO da lista
                     if (listaOficialArray.length > 0) {
                         carroDisplay = listaOficialArray[0];
                     } else {
@@ -218,7 +214,14 @@ async function carregarPaginaCarrinho() {
             }
             // ====================================================
 
-            const nomeExibir = montarNomeCompleto(item, p);
+            // 🔴 CORREÇÃO DO TÍTULO: 
+            // Em vez de usar montarNomeCompleto(item, p), montamos aqui usando o carroDisplay correto
+            // Isso força o título a ser "Interruptor... : ACCORD" em vez de "... : UP"
+            const tituloBase = p.name || p.titulo;
+            const nomeExibir = (carroDisplay !== "UNIVERSAL") 
+                ? `${tituloBase} : ${carroDisplay}` 
+                : tituloBase;
+
             const precoBase = parseFloat(p.price || p.preco_novo);
             let margemAplicada = (item.customMargin !== undefined) ? item.customMargin : ((FATOR_GLOBAL - 1) * 100);
             
@@ -251,7 +254,6 @@ async function carregarPaginaCarrinho() {
                     <td><img src="${p.image||p.imagem}" width="60" style="vertical-align:middle; border-radius:4px;" onerror="this.src='https://placehold.co/100'"></td>
                     <td>
                         <strong>${nomeExibir}</strong> 
-                        <br><span style="color:#e67e22; font-weight:bold; font-size:0.9rem;">Aplicação: ${carroDisplay}</span>
                         ${htmlMargemPC}
                     </td>
                     <td>${formatarMoeda(math.precoFinal)}</td>
@@ -292,7 +294,6 @@ async function carregarPaginaCarrinho() {
                         <img src="${p.image||p.imagem}" class="mobile-cart-img" style="width:60px; height:60px; object-fit:contain;" onerror="this.src='https://placehold.co/100?text=S/Img'">
                         <div style="flex:1;">
                             <div class="mobile-cart-title" style="font-weight:bold; font-size:0.95rem;">${nomeExibir}</div>
-                            <div style="color:#e67e22; font-size:0.85rem; font-weight:bold; margin-bottom:5px;">Aplic: ${carroDisplay}</div>
                             <div style="color:#777; font-size:0.85rem;">${formatarMoeda(math.precoFinal)} unit.</div>
                         </div>
                     </div>
@@ -317,8 +318,8 @@ async function carregarPaginaCarrinho() {
 
         } catch (e) { console.error(e); }
     }
-
-    // BOTÃO LIMPAR
+    
+    // BOTÕES DE AÇÃO FINAIS
     if (cartItemsContainer && cart.length > 0) {
         const rowLimpar = document.createElement('tr');
         rowLimpar.innerHTML = `<td colspan="6" style="text-align: right; padding-top: 15px;"><button onclick="limparCarrinho()" style="background:none; border:1px solid #e74c3c; color:#e74c3c; padding:8px 15px; border-radius:4px; cursor:pointer; font-size:0.9rem; display:inline-flex; align-items:center; gap:5px;"><i class="ph ph-trash"></i> Esvaziar Carrinho</button></td>`;
@@ -330,7 +331,6 @@ async function carregarPaginaCarrinho() {
          cartMobileContainer.appendChild(btnLimparMobile);
     }
 
-    // TOTAIS
     if (cartTotalElement) cartTotalElement.innerText = formatarMoeda(totalVenda);
     if (cartSubtotalElement) cartSubtotalElement.innerText = formatarMoeda(totalVenda);
 

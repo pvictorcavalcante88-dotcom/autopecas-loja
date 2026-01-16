@@ -149,72 +149,89 @@
         </aside>
 
         <main class="main-content">
-            <header>
-                <h1>Visão Geral</h1>
-                <p>Bem-vindo ao painel de controle.</p>
-            </header>
+            
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+                <header>
+                    <h1>Visão Geral</h1>
+                    <p>Bem-vindo ao painel de controle.</p>
+                </header>
+
+                <div style="display: flex; align-items: center; gap: 10px; background: white; padding: 8px 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                    <i class="ph ph-calendar-blank" style="color: #666;"></i>
+                    <select id="filtro-tempo-dashboard" onchange="carregarDashboard()" style="border: none; background: transparent; font-weight: bold; color: #2c3e50; cursor: pointer; font-family: inherit;">
+                        <option value="total">Todo o Período</option>
+                        <option value="hoje">Hoje</option>
+                        <option value="7dias">Últimos 7 dias</option>
+                        <option value="30dias">Últimos 30 dias</option>
+                        <option value="mes_atual">Este Mês</option>
+                    </select>
+                </div>
+            </div>
 
             <section class="dashboard-grid">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h2 style="margin:0; color:#2c3e50;">Visão Geral</h2>
-                    
-                    <div style="display: flex; align-items: center; gap: 10px; background: white; padding: 5px 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-                        <i class="ph ph-calendar-blank" style="color: #666;"></i>
-                        <select id="filtro-tempo-dashboard" onchange="carregarDashboard()" style="border: none; background: transparent; font-weight: bold; color: #2c3e50; cursor: pointer;">
-                            <option value="total">Todo o Período</option>
-                            <option value="hoje">Hoje</option>
-                            <option value="7dias">Últimos 7 dias</option>
-                            <option value="30dias">Últimos 30 dias</option>
-                            <option value="mes_atual">Este Mês</option>
-                        </select>
+                
+                <div class="stat-card">
+                    <div style="display:flex; justify-content:space-between;">
+                        <div>
+                            <h3>Faturamento Total</h3>
+                            <div class="value" id="faturamento-total">R$ 0,00</div>
+                        </div>
+                        <i class="ph ph-currency-dollar" style="color: var(--blue);"></i>
                     </div>
                 </div>
 
-                <div class="stats-grid">
-                    <div class="card money">
-                        <h3><i class="ph ph-currency-dollar"></i> Faturamento Total</h3>
-                        <div class="value" id="faturamento-total">R$ 0,00</div>
-                        <small style="color: #95a5a6; font-size: 0.8rem;">Valor total das vendas</small>
-                    </div>
-
-                    <div class="card money" style="border-left: 4px solid #27ae60;">
-                        <h3><i class="ph ph-trend-up"></i> Lucro Líquido</h3>
-                        <div class="value" id="lucro-liquido-total" style="color: #27ae60;">R$ 0,00</div>
-                        <small style="color: #95a5a6; font-size: 0.8rem;">Após comissões e taxas</small>
-                    </div>
-
-                    <div class="card">
-                        <h3><i class="ph ph-shopping-bag"></i> Pedidos</h3>
-                        <div class="value" id="total-pedidos">0</div>
-                        <small style="color: #95a5a6; font-size: 0.8rem;">Vendas realizadas</small>
-                    </div>
-
-                    <div class="card" style="border-left: 4px solid #e74c3c;">
-                        <h3><i class="ph ph-users"></i> Comissões Afiliados</h3>
-                        <div class="value" id="total-comissoes-pagas" style="color: #c0392b;">R$ 0,00</div>
-                        <small style="color: #95a5a6; font-size: 0.8rem;">Custo com parceiros</small>
+                <div class="stat-card" style="border-left: 4px solid #27ae60;">
+                    <div style="display:flex; justify-content:space-between;">
+                        <div>
+                            <h3 style="color:#27ae60;">Lucro Líquido</h3>
+                            <div class="value" id="lucro-liquido-total" style="color: #27ae60;">R$ 0,00</div>
+                        </div>
+                        <i class="ph ph-trend-up" style="color: #27ae60;"></i>
                     </div>
                 </div>
+
+                <div class="stat-card">
+                    <div style="display:flex; justify-content:space-between;">
+                        <div>
+                            <h3>Total Pedidos</h3>
+                            <div class="value" id="total-pedidos">0</div>
+                        </div>
+                        <i class="ph ph-shopping-bag" style="color: var(--blue);"></i>
+                    </div>
+                </div>
+
+                <div class="stat-card" style="border-left: 4px solid #e74c3c;">
+                    <div style="display:flex; justify-content:space-between;">
+                        <div>
+                            <h3 style="color:#c0392b;">Comissões Pagas</h3>
+                            <div class="value" id="total-comissoes-pagas" style="color: #c0392b;">R$ 0,00</div>
+                        </div>
+                        <i class="ph ph-users" style="color: #c0392b;"></i>
+                    </div>
+                </div>
+
             </section>
 
-            <div class="card">
+            <div class="card" style="margin-top: 30px;">
                 <h3>Últimos Pedidos</h3>
                 <div class="table-responsive">
-                    <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+                    <table>
                         <thead>
                             <tr>
                                 <th>ID</th>
                                 <th>Cliente</th>
                                 <th>Valor</th>
                                 <th>Data</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
                         <tbody id="ultimos-pedidos-list">
-                            <tr><td colspan="4">Carregando...</td></tr>
+                            <tr><td colspan="5">Carregando...</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
+
         </main>
     </div>
 

@@ -515,29 +515,27 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
     try {
         const { periodo } = req.query;
 
-        // 1. SUAS CONFIGURAÇÕES FINANCEIRAS
+        // SUAS TAXAS
         const CONFIG_FINANCEIRA = {
-            impostoGoverno: 0.06,        // 6% (Simples Nacional)
-            taxaAsaasPix: 0.99,          // R$ 0,99 fixo por Pix
-            taxaAsaasCartaoPct: 0.055,   // 5.5% (Crédito)
-            taxaAsaasCartaoFixo: 0.49    // R$ 0,49 fixo
+            impostoGoverno: 0.06,      
+            taxaAsaasPix: 0.99,          
+            taxaAsaasCartaoPct: 0.055,   
+            taxaAsaasCartaoFixo: 0.49    
         };
 
-        // 2. Filtro de Data
+        // 1. Filtro de Data
         let filtroData = {}; 
         const dataInicio = new Date();
         dataInicio.setHours(0, 0, 0, 0);
 
         if (periodo && periodo !== 'total') {
-            if (periodo === 'hoje') { /* já está definido */ }
-            else if (periodo === '7dias') dataInicio.setDate(dataInicio.getDate() - 7);
+            if (periodo === '7dias') dataInicio.setDate(dataInicio.getDate() - 7);
             else if (periodo === '30dias') dataInicio.setDate(dataInicio.getDate() - 30);
             else if (periodo === 'mes_atual') dataInicio.setDate(1);
-            
             filtroData = { createdAt: { gte: dataInicio, lte: new Date() } };
         }
 
-        // 3. Busca os Pedidos que geraram receita (Aprovados/Entregues)
+        // 2. Busca Pedidos (INCLUINDO O NOVO CAMPO metodoPagamento)
         const pedidosReais = await prisma.pedido.findMany({
             where: {
                 ...filtroData,
@@ -547,84 +545,68 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
                 id: true,
                 valorTotal: true,
                 comissaoGerada: true,
-                itens: true, 
-                // Se você tiver um campo 'metodoPagamento', adicione aqui: metodoPagamento: true
+                itens: true,
+                metodoPagamento: true, // <--- IMPORTANTE LER ISSO AGORA
                 createdAt: true
             }
         });
 
-        // 4. Busca Preço de Custo dos Produtos (Para calcular CMV)
+        // 3. Busca Custos dos Produtos
         const produtosDB = await prisma.produto.findMany({
             select: { id: true, preco_custo: true, preco_novo: true }
         });
         
-        // Mapa para consulta rápida: ID -> CUSTO
         const mapaCustos = {};
         produtosDB.forEach(p => {
-            // Tenta pegar o custo. Se for zero/nulo, estima 60% do valor de venda para não quebrar o cálculo
             let custo = parseFloat(p.preco_custo);
             if (!custo || isNaN(custo)) custo = parseFloat(p.preco_novo) * 0.60; 
             mapaCustos[p.id] = custo;
         });
 
-        // =========================================================
-        // 🧮 CÁLCULO FINANCEIRO DETALHADO
-        // =========================================================
+        // 4. CÁLCULO
         let faturamentoTotal = 0;
-        let custoMercadoriaTotal = 0; // CMV
+        let custoMercadoriaTotal = 0;
         let impostosTotal = 0;
         let taxasAsaasTotal = 0;
         let comissoesTotal = 0;
 
         for (const pedido of pedidosReais) {
             const valorVenda = parseFloat(pedido.valorTotal || 0);
-            
-            // A. Faturamento Bruto
             faturamentoTotal += valorVenda;
-
-            // B. Comissões Pagas aos Afiliados
             comissoesTotal += parseFloat(pedido.comissaoGerada || 0);
-
-            // C. Impostos (Simples Nacional 6%)
             impostosTotal += (valorVenda * CONFIG_FINANCEIRA.impostoGoverno);
 
-            // D. Taxa Asaas (Detecta se é Cartão ou Pix)
-            // Lógica: Se não tiver campo de método, assumimos PIX (mais comum e barato)
-            // Se você salvar 'CARTAO' no pedido, o cálculo muda automaticamente.
+            // --- CÁLCULO DA TAXA BASEADO NO MÉTODO ---
             let custoGateway = 0;
-            // Exemplo de verificação futura: if (pedido.metodoPagamento === 'CARTAO') ...
-            const isCartao = false; // Mude para true se tiver como identificar o cartão no banco
+            const metodo = pedido.metodoPagamento ? pedido.metodoPagamento.toUpperCase() : 'PIX';
 
-            if (isCartao) {
+            if (metodo.includes('CARTAO') || metodo.includes('CREDIT')) {
+                // Cálculo de Cartão: 5.5% + 0.49
                 custoGateway = (valorVenda * CONFIG_FINANCEIRA.taxaAsaasCartaoPct) + CONFIG_FINANCEIRA.taxaAsaasCartaoFixo;
             } else {
+                // Cálculo de Pix: 0.99
                 custoGateway = CONFIG_FINANCEIRA.taxaAsaasPix;
             }
             taxasAsaasTotal += custoGateway;
+            // -----------------------------------------
 
-            // E. Custo da Mercadoria Vendida (CMV)
-            let custoPedido = 0;
+            // Custo da Mercadoria (CMV)
             try {
                 const listaItens = typeof pedido.itens === 'string' ? JSON.parse(pedido.itens) : pedido.itens;
-                
                 if (Array.isArray(listaItens)) {
                     listaItens.forEach(item => {
                         const idProd = parseInt(item.id);
                         const qtd = parseInt(item.qtd);
                         const custoUnitario = mapaCustos[idProd] || 0; 
-                        custoPedido += (custoUnitario * qtd);
+                        custoMercadoriaTotal += (custoUnitario * qtd);
                     });
                 }
-            } catch (err) { console.error(`Erro custo pedido ${pedido.id}`, err); }
-            
-            custoMercadoriaTotal += custoPedido;
+            } catch (err) {}
         }
 
-        // F. Lucro Líquido Real
-        const custosVariaveis = custoMercadoriaTotal + impostosTotal + taxasAsaasTotal + comissoesTotal;
-        const lucroLiquidoReal = faturamentoTotal - custosVariaveis;
+        const lucroLiquidoReal = faturamentoTotal - (custoMercadoriaTotal + impostosTotal + taxasAsaasTotal + comissoesTotal);
 
-        // --- DADOS ESTATÍSTICOS GERAIS ---
+        // Outros dados para os cards
         const totalPedidosCount = await prisma.pedido.count({ where: { ...filtroData } });
         const produtosCount = await prisma.produto.count();
         const estoqueBaixoCount = await prisma.produto.count({ where: { estoque: { lte: 5 } } });
@@ -635,12 +617,9 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
             include: { afiliado: true }
         });
 
-        // Debug no Terminal
-        console.log(`📊 DRE (${periodo || 'total'}): Fat: ${faturamentoTotal.toFixed(2)} | Custo Prod: ${custoMercadoriaTotal.toFixed(2)} | Imposto: ${impostosTotal.toFixed(2)} | Taxas: ${taxasAsaasTotal.toFixed(2)} | Comissao: ${comissoesTotal.toFixed(2)} | = Líquido: ${lucroLiquidoReal.toFixed(2)}`);
-
         res.json({
             faturamento: faturamentoTotal,
-            lucroLiquido: lucroLiquidoReal, // Agora desconta TUDO (Imposto, Taxa, Custo, Comissão)
+            lucroLiquido: lucroLiquidoReal,
             comissoesTotais: comissoesTotal,
             totalPedidos: totalPedidosCount,
             produtos: produtosCount,
@@ -649,7 +628,7 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
         });
 
     } catch (e) {
-        console.error("Erro Dashboard Admin:", e);
+        console.error("Erro Dashboard:", e);
         res.status(500).json({ erro: e.message });
     }
 });
@@ -1133,6 +1112,7 @@ app.post('/api/checkout/pix', async (req, res) => {
         const valorImposto = valorTotalVenda * CONFIG_FINANCEIRA.impostoGoverno;
         custoTaxasTotal += valorImposto;
 
+        // Define o método limpo (PIX ou CARTAO)
         const metodoPuro = metodoPagamento ? metodoPagamento.toUpperCase().trim() : 'PIX';
 
         if (metodoPuro === 'CARTAO') {
@@ -1157,7 +1137,7 @@ app.post('/api/checkout/pix', async (req, res) => {
         }
         if (comissaoLiquidaAfiliado < 0) comissaoLiquidaAfiliado = 0;
 
-        // 5. GERAÇÃO DA COBRANÇA (MUDANÇA AQUI PARA CORRIGIR O PIX) 🚀
+        // 5. GERAÇÃO DA COBRANÇA
         let dadosAsaas;
         
         if (metodoPuro === 'CARTAO') {
@@ -1178,7 +1158,7 @@ app.post('/api/checkout/pix', async (req, res) => {
             );
         }
 
-        // --- LOG DE AUDITORIA CORRIGIDO ---
+        // --- LOG DE AUDITORIA ---
         const pctTaxaSobreLoja = lucroBrutoLoja > 0 ? (parteTaxaLoja / lucroBrutoLoja) * 100 : 0;
         const pctTaxaSobreAfiliado = lucroBrutoAfiliado > 0 ? (parteTaxaAfiliado / lucroBrutoAfiliado) * 100 : 0;
         const margemLiquidaLoja = valorTotalVenda > 0 ? (lucroLiquidoLoja / valorTotalVenda) * 100 : 0;
@@ -1205,6 +1185,7 @@ app.post('/api/checkout/pix', async (req, res) => {
         ============================================================
         `);
 
+        // 🟢 SALVA O PEDIDO COM O MÉTODO DE PAGAMENTO CORRETO
         const novoPedido = await prisma.pedido.create({
             data: {
                 clienteNome: cliente.nome,
@@ -1217,7 +1198,10 @@ app.post('/api/checkout/pix', async (req, res) => {
                 status: 'AGUARDANDO_PAGAMENTO',
                 asaasId: dadosAsaas.id, 
                 afiliadoId: idFinalAfiliado, 
-                comissaoGerada: comissaoLiquidaAfiliado 
+                comissaoGerada: comissaoLiquidaAfiliado,
+                
+                // AQUI ESTÁ A CORREÇÃO:
+                metodoPagamento: metodoPuro // Salva "PIX" ou "CARTAO"
             }
         });
 
@@ -1226,10 +1210,10 @@ app.post('/api/checkout/pix', async (req, res) => {
             sucesso: true,
             pedidoId: novoPedido.id,
             pix: {
-                payload: dadosAsaas.payload,           // Agora preenchido se for PIX
-                encodedImage: dadosAsaas.encodedImage  // Agora preenchido se for PIX
+                payload: dadosAsaas.payload,           
+                encodedImage: dadosAsaas.encodedImage  
             }, 
-            linkPagamento: dadosAsaas.invoiceUrl       // URL do checkout Asaas
+            linkPagamento: dadosAsaas.invoiceUrl       
         });
 
     } catch (e) {

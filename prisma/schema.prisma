@@ -89,6 +89,7 @@ model Pedido {
   status          String   @default("PENDENTE")
 
   asaasId         String?
+  metodoPagamento String?   // Vai salvar "PIX", "CARTAO", "BOLETO", etc.
 
   createdAt       DateTime @default(now())
 }

@@ -7,6 +7,32 @@ const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
 
+// server.js
+
+const cors = require('cors'); // Certifique-se de importar
+
+// Lista de sites permitidos
+const allowedOrigins = [
+    'https://seusite.com.br',                  // Sua Loja Oficial (se tiver domínio)
+    'https://nome-do-seu-projeto.onrender.com', // Sua Loja no Render
+    'https://nimble-bublanina-1395f3.netlify.app',  // <--- O NOVO LINK DO SEU ADMIN (Coloque o link do Netlify aqui)
+    'http://127.0.0.1:5500',                   // Para seus testes locais (Live Server)
+    'http://localhost:3000'
+];
+
+app.use(cors({
+    origin: function (origin, callback) {
+        // Permite requisições sem origem (como Postman ou Apps Mobile) ou se estiver na lista
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Bloqueado pelo CORS: Origem não permitida.'));
+        }
+    }
+}));
+
+// ... resto do código do servidor ...
+
 // ==============================================================
 // 📊 CONFIGURAÇÃO DE TAXAS E IMPOSTOS (ATUALIZADO)
 // ==============================================================

@@ -1,18 +1,12 @@
 require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
 const jwt = require('jsonwebtoken');
 const path = require('path'); 
 const multer = require('multer');
 const fs = require('fs');
-
-// server.js
-
-// ==============================================================
-// 1. IMPORTAÇÕES (No topo do arquivo)
-// ==============================================================
-// ... outros requires (express, prisma, etc) ...
-const cors = require('cors'); // <--- AQUI SÓ PODE TER UMA VEZ
+const app = express();
 
 
 // ==============================================================
@@ -52,7 +46,6 @@ const CONFIG_FINANCEIRA = {
 const { criarCobrancaPixDireto, criarLinkPagamento } = require('./services/asaasService');
 
 const prisma = new PrismaClient();
-const app = express();
 app.use(express.json());
 
 // =================================================================

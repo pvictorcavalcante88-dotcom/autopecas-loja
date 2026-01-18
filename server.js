@@ -1,6 +1,5 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
 const jwt = require('jsonwebtoken');
 const path = require('path'); 
@@ -9,29 +8,36 @@ const fs = require('fs');
 
 // server.js
 
-const cors = require('cors'); // Certifique-se de importar
+// ==============================================================
+// 1. IMPORTAÇÕES (No topo do arquivo)
+// ==============================================================
+// ... outros requires (express, prisma, etc) ...
+const cors = require('cors'); // <--- AQUI SÓ PODE TER UMA VEZ
 
-// Lista de sites permitidos
+
+// ==============================================================
+// 2. CONFIGURAÇÃO DO CORS (Logo abaixo das importações)
+// ==============================================================
 const allowedOrigins = [
-    'https://seusite.com.br',                  // Sua Loja Oficial (se tiver domínio)
-    'https://nome-do-seu-projeto.onrender.com', // Sua Loja no Render
-    'https://nimble-bublanina-1395f3.netlify.app',  // <--- O NOVO LINK DO SEU ADMIN (Coloque o link do Netlify aqui)
-    'http://127.0.0.1:5500',                   // Para seus testes locais (Live Server)
-    'http://localhost:3000'
+    'https://autopecas-loja.onrender.com',       // Sua Loja (Render)
+    'https://nimble-bublanina-1395f3.netlify.app', // <--- SEU NOVO ADMIN (Netlify)
+    'http://localhost:3000',                     // Teste Local
+    'http://127.0.0.1:5500'                      // Teste Local (Live Server)
 ];
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Permite requisições sem origem (como Postman ou Apps Mobile) ou se estiver na lista
+        // Permite requisições sem origem (mobile/postman) ou se estiver na lista
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
+            console.log("Bloqueado pelo CORS:", origin); // Log para ajudar a debugar
             callback(new Error('Bloqueado pelo CORS: Origem não permitida.'));
         }
     }
 }));
 
-// ... resto do código do servidor ...
+// ... resto do código (rotas, app.listen, etc) ...
 
 // ==============================================================
 // 📊 CONFIGURAÇÃO DE TAXAS E IMPOSTOS (ATUALIZADO)
@@ -47,8 +53,6 @@ const { criarCobrancaPixDireto, criarLinkPagamento } = require('./services/asaas
 
 const prisma = new PrismaClient();
 const app = express();
-
-app.use(cors());
 app.use(express.json());
 
 // =================================================================

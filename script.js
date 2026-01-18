@@ -1285,8 +1285,13 @@ document.addEventListener('DOMContentLoaded', () => {
 function realizarBusca() {
     const inputSearch = document.getElementById('search-input');
     if (!inputSearch) return;
+
     const termo = inputSearch.value.trim();
-    if(termo) window.location.href = `index.html?search=${encodeURIComponent(termo)}`;
+    
+    // 🟢 MUDANÇA: Manda para busca.html em vez de index.html
+    if (termo) {
+        window.location.href = `busca.html?q=${encodeURIComponent(termo)}`;
+    }
 }
 
 // Renomeei para evitar conflito com a função simples do carrinho

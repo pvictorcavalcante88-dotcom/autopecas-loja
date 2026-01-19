@@ -566,7 +566,7 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
         const pedidosReais = await prisma.pedido.findMany({
             where: {
                 ...filtroData,
-                status: { in: ['APROVADO', 'ENTREGUE'] } 
+                status: { in: ['APROVADO', 'ENTREGUE', 'DEVOLUCAO_PARCIAL'] } 
             },
             select: {
                 id: true,

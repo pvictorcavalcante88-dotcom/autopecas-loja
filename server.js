@@ -172,20 +172,24 @@ app.get('/search', async (req, res) => {
         let whereClause = {};
         let condicoesAnd = [];
 
-        if (categoria) condicoesAnd.push({ categoria: { contains: categoria } });
+        if (categoria) {
+            condicoesAnd.push({ 
+                categoria: { contains: categoria, mode: 'insensitive' } 
+            });
+        }
 
         if (q) {
             const termos = q.trim().split(/\s+/);
             termos.forEach(termo => {
                 condicoesAnd.push({
                     OR: [
-                        { titulo: { contains: termo } },
-                        { referencia: { contains: termo } },
-                        { carros: { contains: termo } },
-                        { pesquisa: { contains: termo } },
-                        { fabricante: { contains: termo } },
-                        { categoria: { contains: termo } },
-                        { tags: { contains: termo } }
+                        { titulo: { contains: termo, mode: 'insensitive' } },
+                        { referencia: { contains: termo, mode: 'insensitive' } },
+                        { carros: { contains: termo, mode: 'insensitive' } },
+                        { pesquisa: { contains: termo, mode: 'insensitive' } },
+                        { fabricante: { contains: termo, mode: 'insensitive' } },
+                        { categoria: { contains: termo, mode: 'insensitive' } },
+                        { tags: { contains: termo, mode: 'insensitive' } }
                     ]
                 });
             });
@@ -198,7 +202,10 @@ app.get('/search', async (req, res) => {
             take: 50
         });
         res.json(produtos);
-    } catch (error) { res.json([]); }
+    } catch (error) { 
+        console.error("Erro busca:", error);
+        res.json([]); 
+    }
 });
 
 app.get('/products/:id', async (req, res) => {

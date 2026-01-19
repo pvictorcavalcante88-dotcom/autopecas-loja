@@ -544,7 +544,7 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
 
         // SUAS TAXAS
         const CONFIG_FINANCEIRA = {
-            impostoGoverno: 0.06,      
+            impostoGoverno: 0.06,       
             taxaAsaasPix: 0.99,          
             taxaAsaasCartaoPct: 0.055,   
             taxaAsaasCartaoFixo: 0.49    
@@ -555,14 +555,20 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
         const dataInicio = new Date();
         dataInicio.setHours(0, 0, 0, 0);
 
+        // Define a data de corte baseada na seleção
         if (periodo && periodo !== 'total') {
             if (periodo === '7dias') dataInicio.setDate(dataInicio.getDate() - 7);
             else if (periodo === '30dias') dataInicio.setDate(dataInicio.getDate() - 30);
-            else if (periodo === 'mes_atual') dataInicio.setDate(1);
+            else if (periodo === 'mes_atual') dataInicio.setDate(1); // Dia 1 do mês atual
+            
+            // Aplica o filtro
             filtroData = { createdAt: { gte: dataInicio, lte: new Date() } };
+        } else {
+            // Se for 'total', zera a dataInicio para pegar saques desde sempre
+            dataInicio.setFullYear(2000); 
         }
 
-        // 2. Busca Pedidos (INCLUINDO O NOVO CAMPO metodoPagamento)
+        // 2. Busca Pedidos
         const pedidosReais = await prisma.pedido.findMany({
             where: {
                 ...filtroData,
@@ -573,7 +579,7 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
                 valorTotal: true,
                 comissaoGerada: true,
                 itens: true,
-                metodoPagamento: true, // <--- IMPORTANTE LER ISSO AGORA
+                metodoPagamento: true,
                 createdAt: true
             }
         });
@@ -590,34 +596,31 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
             mapaCustos[p.id] = custo;
         });
 
-        // 4. CÁLCULO
+        // 4. CÁLCULO FINANCEIRO DETALHADO
         let faturamentoTotal = 0;
         let custoMercadoriaTotal = 0;
         let impostosTotal = 0;
         let taxasAsaasTotal = 0;
-        let comissoesTotal = 0;
+        let comissoesGeradasTotal = 0; // Isso é o que foi PROMETIDO aos afiliados
 
         for (const pedido of pedidosReais) {
             const valorVenda = parseFloat(pedido.valorTotal || 0);
             faturamentoTotal += valorVenda;
-            comissoesTotal += parseFloat(pedido.comissaoGerada || 0);
+            comissoesGeradasTotal += parseFloat(pedido.comissaoGerada || 0);
             impostosTotal += (valorVenda * CONFIG_FINANCEIRA.impostoGoverno);
 
-            // --- CÁLCULO DA TAXA BASEADO NO MÉTODO ---
+            // --- Taxas Asaas ---
             let custoGateway = 0;
             const metodo = pedido.metodoPagamento ? pedido.metodoPagamento.toUpperCase() : 'PIX';
 
             if (metodo.includes('CARTAO') || metodo.includes('CREDIT')) {
-                // Cálculo de Cartão: 5.5% + 0.49
                 custoGateway = (valorVenda * CONFIG_FINANCEIRA.taxaAsaasCartaoPct) + CONFIG_FINANCEIRA.taxaAsaasCartaoFixo;
             } else {
-                // Cálculo de Pix: 0.99
                 custoGateway = CONFIG_FINANCEIRA.taxaAsaasPix;
             }
             taxasAsaasTotal += custoGateway;
-            // -----------------------------------------
 
-            // Custo da Mercadoria (CMV)
+            // --- Custo da Mercadoria (CMV) ---
             try {
                 const listaItens = typeof pedido.itens === 'string' ? JSON.parse(pedido.itens) : pedido.itens;
                 if (Array.isArray(listaItens)) {
@@ -631,9 +634,28 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
             } catch (err) {}
         }
 
-        const lucroLiquidoReal = faturamentoTotal - (custoMercadoriaTotal + impostosTotal + taxasAsaasTotal + comissoesTotal);
+        // 🟢 5. NOVO: BUSCA O QUE FOI REALMENTE PAGO (SAQUES)
+        // Atenção: Verifique se o nome da tabela no seu schema.prisma é 'saque' ou 'Saque'
+        const saquesMetrics = await prisma.saque.aggregate({
+            _sum: { valor: true },
+            where: {
+                status: 'PAGO',
+                // Usa a mesma data de corte dos pedidos para manter coerência
+                dataSolicitacao: { gte: dataInicio } 
+            }
+        });
+        const comissoesPagasReal = saquesMetrics._sum.valor || 0;
 
-        // Outros dados para os cards
+
+        // 6. CÁLCULO DO LUCRO LÍQUIDO
+        // Opção A: Faturamento - Custos - COMISSÃO QUE FOI GERADA (Competência)
+        // Opção B: Faturamento - Custos - COMISSÃO QUE FOI PAGA (Caixa)
+        
+        // Vou manter a Opção A (Gerada) pois faz mais sentido para saber se a VENDA deu lucro.
+        // Mas vou enviar o 'comissoesPagasReal' para você mostrar no Card do Dashboard.
+        const lucroLiquidoReal = faturamentoTotal - (custoMercadoriaTotal + impostosTotal + taxasAsaasTotal + comissoesGeradasTotal);
+
+        // Outros dados
         const totalPedidosCount = await prisma.pedido.count({ where: { ...filtroData } });
         const produtosCount = await prisma.produto.count();
         const estoqueBaixoCount = await prisma.produto.count({ where: { estoque: { lte: 5 } } });
@@ -647,7 +669,14 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
         res.json({
             faturamento: faturamentoTotal,
             lucroLiquido: lucroLiquidoReal,
-            comissoesTotais: comissoesTotal,
+            
+            // 🟢 AGORA VOCÊ TEM AS DUAS MÉTRICAS:
+            comissoesGeradas: comissoesGeradasTotal, // Dívida criada pelas vendas do período
+            comissoesPagas: comissoesPagasReal,      // Dinheiro que saiu do caixa no período (Saques)
+            
+            // Mantendo compatibilidade com seu frontend atual:
+            comissoesTotais: comissoesPagasReal, // Coloquei PAGAS aqui para o Card mostrar o que saiu do bolso
+
             totalPedidos: totalPedidosCount,
             produtos: produtosCount,
             estoqueBaixo: estoqueBaixoCount,

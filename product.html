@@ -280,6 +280,11 @@ async function carregarProduto(id) {
         if (!res.ok) throw new Error("Erro ao buscar produto");
         PRODUTO_ATUAL = await res.json();
 
+        // 🟢 ADICIONE ESTA LINHA AQUI:
+        if (PRODUTO_ATUAL.listaRelacionados) {
+            renderizarRelacionados(PRODUTO_ATUAL.listaRelacionados);
+        }
+
         // 3. PREENCHE DADOS VISUAIS BÁSICOS
         document.getElementById('prod-img').src = PRODUTO_ATUAL.imagem || 'https://placehold.co/400';
         document.getElementById('prod-title').textContent = PRODUTO_ATUAL.titulo;
@@ -358,6 +363,34 @@ async function carregarProduto(id) {
     } catch (e) {
         console.error("Erro carregarProduto:", e);
     }
+}
+
+function renderizarRelacionados(lista) {
+    const section = document.getElementById('related-section');
+    const grid = document.getElementById('related-grid');
+
+    if (!lista || lista.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block'; // Mostra a div de relacionados
+    grid.innerHTML = ''; // Limpa a grade antes de preencher
+
+    lista.forEach(p => {
+        const preco = parseFloat(p.preco_novo || 0).toLocaleString('pt-BR', {
+            style: 'currency', 
+            currency: 'BRL'
+        });
+
+        grid.innerHTML += `
+            <a href="product.html?id=${p.id}" class="product-card" style="text-decoration: none; color: inherit; border: 1px solid #eee; padding: 10px; border-radius: 8px; text-align: center; background: #fff; transition: transform 0.2s;">
+                <img src="${p.imagem || p.image}" style="width: 100%; height: 120px; object-fit: contain; margin-bottom: 10px;" onerror="this.src='https://placehold.co/150'">
+                <h4 style="font-size: 0.85rem; margin-bottom: 5px; height: 35px; overflow: hidden; color: #2c3e50;">${p.titulo || p.name}</h4>
+                <p style="color: #27ae60; font-weight: bold; font-size: 1rem;">${preco}</p>
+            </a>
+        `;
+    });
 }
         // --- 3. LÓGICA DE PREÇO ---
         // --- 3. LÓGICA DE PREÇO (ATUALIZADA COM CÁLCULO DE TAXAS) ---

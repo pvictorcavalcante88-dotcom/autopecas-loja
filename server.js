@@ -544,7 +544,7 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
 
         // SUAS TAXAS
         const CONFIG_FINANCEIRA = {
-            impostoGoverno: 0.06,       
+            impostoGoverno: 0.06,      
             taxaAsaasPix: 0.99,          
             taxaAsaasCartaoPct: 0.055,   
             taxaAsaasCartaoFixo: 0.49    
@@ -555,17 +555,14 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
         const dataInicio = new Date();
         dataInicio.setHours(0, 0, 0, 0);
 
-        // Ajuste para pegar saques desde sempre se for total, ou respeitar o filtro
         if (periodo && periodo !== 'total') {
             if (periodo === '7dias') dataInicio.setDate(dataInicio.getDate() - 7);
             else if (periodo === '30dias') dataInicio.setDate(dataInicio.getDate() - 30);
             else if (periodo === 'mes_atual') dataInicio.setDate(1);
             filtroData = { createdAt: { gte: dataInicio, lte: new Date() } };
-        } else {
-            dataInicio.setFullYear(2000); // Pega tudo se for total
         }
 
-        // 2. Busca Pedidos 
+        // 2. Busca Pedidos (INCLUINDO O NOVO CAMPO metodoPagamento)
         const pedidosReais = await prisma.pedido.findMany({
             where: {
                 ...filtroData,
@@ -576,7 +573,7 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
                 valorTotal: true,
                 comissaoGerada: true,
                 itens: true,
-                metodoPagamento: true,
+                metodoPagamento: true, // <--- IMPORTANTE LER ISSO AGORA
                 createdAt: true
             }
         });
@@ -593,30 +590,17 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
             mapaCustos[p.id] = custo;
         });
 
-        // 🟢 3.5. NOVO: BUSCA OS SAQUES PAGOS (Dinheiro que saiu de verdade)
-        // Isso vai substituir a comissão gerada no cálculo do lucro
-        const saquesPagos = await prisma.saque.aggregate({
-            _sum: { valor: true },
-            where: {
-                status: 'PAGO',
-                // Usa dataSolicitacao ou createdAt, dependendo do seu banco. 
-                // Assumi dataSolicitacao para manter coerência com o filtro.
-                dataSolicitacao: { gte: dataInicio } 
-            }
-        });
-        const totalComissaoPagaReal = saquesPagos._sum.valor || 0;
-
         // 4. CÁLCULO
         let faturamentoTotal = 0;
         let custoMercadoriaTotal = 0;
         let impostosTotal = 0;
         let taxasAsaasTotal = 0;
-        let comissoesGeradasTotal = 0; // Mantemos essa variável apenas para visualização, não para o lucro
+        let comissoesTotal = 0;
 
         for (const pedido of pedidosReais) {
             const valorVenda = parseFloat(pedido.valorTotal || 0);
             faturamentoTotal += valorVenda;
-            comissoesGeradasTotal += parseFloat(pedido.comissaoGerada || 0);
+            comissoesTotal += parseFloat(pedido.comissaoGerada || 0);
             impostosTotal += (valorVenda * CONFIG_FINANCEIRA.impostoGoverno);
 
             // --- CÁLCULO DA TAXA BASEADO NO MÉTODO ---
@@ -624,8 +608,10 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
             const metodo = pedido.metodoPagamento ? pedido.metodoPagamento.toUpperCase() : 'PIX';
 
             if (metodo.includes('CARTAO') || metodo.includes('CREDIT')) {
+                // Cálculo de Cartão: 5.5% + 0.49
                 custoGateway = (valorVenda * CONFIG_FINANCEIRA.taxaAsaasCartaoPct) + CONFIG_FINANCEIRA.taxaAsaasCartaoFixo;
             } else {
+                // Cálculo de Pix: 0.99
                 custoGateway = CONFIG_FINANCEIRA.taxaAsaasPix;
             }
             taxasAsaasTotal += custoGateway;
@@ -645,10 +631,7 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
             } catch (err) {}
         }
 
-        // 🟢 CÁLCULO DO LUCRO AJUSTADO
-        // Faturamento - (Custos Produtos + Impostos + Taxas + SAQUES PAGOS)
-        // Note que troquei 'comissoesGeradasTotal' por 'totalComissaoPagaReal'
-        const lucroLiquidoReal = faturamentoTotal - (custoMercadoriaTotal + impostosTotal + taxasAsaasTotal + totalComissaoPagaReal);
+        const lucroLiquidoReal = faturamentoTotal - (custoMercadoriaTotal + impostosTotal + taxasAsaasTotal + comissoesTotal);
 
         // Outros dados para os cards
         const totalPedidosCount = await prisma.pedido.count({ where: { ...filtroData } });
@@ -664,12 +647,7 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
         res.json({
             faturamento: faturamentoTotal,
             lucroLiquido: lucroLiquidoReal,
-            
-            // Aqui você decide:
-            // Se quiser mostrar no card amarelo o que SAIU DO BOLSO, use totalComissaoPagaReal.
-            // Se quiser mostrar a DÍVIDA criada, use comissoesGeradasTotal.
-            comissoesTotais: totalComissaoPagaReal, 
-
+            comissoesTotais: comissoesTotal,
             totalPedidos: totalPedidosCount,
             produtos: produtosCount,
             estoqueBaixo: estoqueBaixoCount,

@@ -30,6 +30,28 @@
             margin-bottom: 20px;
         }
 
+        /* Efeito de Sombra e Elevação nos Cards de Relacionados */
+        #related-grid .product-card {
+            transition: all 0.3s ease; /* Suaviza a animação */
+            border: 1px solid #eee;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        #related-grid .product-card:hover {
+            transform: translateY(-5px); /* Eleva o card levemente */
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1); /* Sombra mais profunda */
+            border-color: #3498db; /* Muda a cor da borda para o seu azul padrão */
+        }
+
+        /* Ajuste para as imagens dos relacionados */
+        #related-grid .product-card img {
+            transition: transform 0.3s ease;
+        }
+
+        #related-grid .product-card:hover img {
+            transform: scale(1.05); /* Zoom sutil na imagem do produto */
+        }
+
         /* =========================================
            📱 MOBILE (CELULAR) - O AJUSTE IMPORTANTE
            ========================================= */

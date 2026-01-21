@@ -872,6 +872,42 @@ app.delete('/admin/produtos/:id', authenticateToken, async (req, res) => {
         res.json({success: true});
     } catch(e) { res.status(500).json({erro: e.message}); }
 });
+// Rota para LISTAR produtos no Admin com PAGINAÇÃO
+app.get('/admin/produtos', authenticateToken, async (req, res) => {
+    // 1. Segurança: Só Admin entra
+    if(!req.user || req.user.role !== 'admin') return res.sendStatus(403);
+
+    try {
+        // 2. Configura a Paginação
+        const pagina = parseInt(req.query.page) || 1; // Se não informar, é a página 1
+        const limite = 50; // 50 produtos por página
+        const pular = (pagina - 1) * limite; // Quantos produtos pular no banco
+
+        // 3. Busca no Banco (Total + Lista da Página)
+        const [total, produtos] = await prisma.$transaction([
+            prisma.produto.count(), // Conta quantos existem no total
+            prisma.produto.findMany({
+                take: limite,
+                skip: pular,
+                orderBy: { id: 'desc' } // Mostra os recém-criados primeiro (topo da lista)
+            })
+        ]);
+
+        const totalPaginas = Math.ceil(total / limite);
+
+        // 4. Devolve os dados organizados
+        res.json({
+            data: produtos,
+            total: total,
+            paginaAtual: pagina,
+            totalPaginas: totalPaginas
+        });
+
+    } catch (e) {
+        console.error("Erro lista admin:", e);
+        res.status(500).json({erro: e.message});
+    }
+});
 
 // ADMIN MENSAGENS E SUGESTÕES
 app.post('/admin/mensagens', authenticateToken, upload.single('arquivo'), async (req, res) => {

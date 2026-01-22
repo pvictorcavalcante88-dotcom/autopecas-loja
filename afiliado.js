@@ -564,34 +564,23 @@ function prepararEdicao(cliente) {
 }
 
 async function salvarPerfilCompleto() {
-    const novaSenha = document.getElementById('perfil-senha').value;
-    const confirmaSenha = document.getElementById('perfil-confirma-senha').value;
+    const btn = document.querySelector('#form-perfil button');
+    const textoOriginal = btn.innerText;
+    btn.innerText = "Salvando...";
+    btn.disabled = true;
 
-    if (novaSenha && novaSenha !== confirmaSenha) {
-        return alert("❌ As senhas não conferem!");
-    }
-
-    // Monta o objeto com os dados
-    const dadosAtualizados = {
+    // Pega os valores
+    const dadosForm = {
         nome: document.getElementById('perfil-nome').value,
         cpf: document.getElementById('perfil-cpf').value,
         telefone: document.getElementById('perfil-telefone').value,
         endereco: document.getElementById('perfil-endereco').value,
         chavePix: document.getElementById('perfil-pix').value,
-        
-        // Dados bancários (Opcionais se tiver PIX, mas bons de ter)
         banco: document.getElementById('perfil-banco').value,
         agencia: document.getElementById('perfil-agencia').value,
         conta: document.getElementById('perfil-conta').value,
-        
-        senha: novaSenha || undefined
+        senha: document.getElementById('perfil-senha').value
     };
-
-    // 🟢 VALIDAÇÃO: FOTO NÃO ESTÁ AQUI
-    // Obrigamos apenas o necessário para achar a pessoa e pagar
-    if(!dadosAtualizados.nome || !dadosAtualizados.cpf || !dadosAtualizados.endereco || !dadosAtualizados.chavePix || !dadosAtualizados.telefone) {
-        return alert("⚠️ Campos Obrigatórios:\n- Nome\n- CPF\n- Telefone\n- Endereço\n- Chave PIX\n\nPor favor, preencha para garantir seu recebimento.");
-    }
 
     try {
         const res = await fetch(`${API_URL}/afiliado/perfil-completo`, {
@@ -600,18 +589,33 @@ async function salvarPerfilCompleto() {
                 'Content-Type': 'application/json', 
                 'Authorization': `Bearer ${AFILIADO_TOKEN}` 
             },
-            body: JSON.stringify(dadosAtualizados)
+            body: JSON.stringify(dadosForm)
         });
 
         if(res.ok) {
-            alert("✅ Perfil atualizado com sucesso!");
-            carregarDashboardCompleto(); // Atualiza a tela
+            alert("✅ Salvo com sucesso!");
+            
+            // 🟢 TRUQUE: Atualiza a variável global IMEDIATAMENTE com o que você digitou
+            // Isso evita que o dado suma antes do banco atualizar
+            if (!window.DADOS_AFILIADO) window.DADOS_AFILIADO = {};
+            
+            // Mescla os dados novos com os antigos na memória do navegador
+            Object.assign(window.DADOS_AFILIADO, dadosForm);
+            
+            // Limpa o campo de senha por segurança
+            document.getElementById('perfil-senha').value = '';
+            document.getElementById('perfil-confirma-senha').value = '';
+
         } else {
-            const err = await res.json();
-            alert("Erro: " + (err.erro || "Falha ao salvar."));
+            const erro = await res.json();
+            alert("Erro ao salvar: " + (erro.erro || "Tente novamente."));
         }
     } catch(e) {
-        alert("Erro de conexão ao salvar perfil.");
+        console.error(e);
+        alert("Erro de conexão.");
+    } finally {
+        btn.innerText = textoOriginal;
+        btn.disabled = false;
     }
 }
 

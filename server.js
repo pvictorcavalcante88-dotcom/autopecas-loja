@@ -90,14 +90,36 @@ const upload = multer({ storage: storage });
 // =================================================================
 app.post('/login', async (req, res) => {
     const { email, senha } = req.body;
-    console.log("Login Admin:", email);
 
-    if ((email === "admin@autopecas.com" && senha === "admin123") || 
-        (email === "admin" && senha === "admin")) {
-        const token = jwt.sign({ role: 'admin' }, SECRET_KEY, { expiresIn: '12h' });
-        return res.json({ token });
+    try {
+        // 1. Busca o admin no PostgreSQL
+        const admin = await prisma.admin.findUnique({ where: { email } });
+
+        if (!admin) {
+            return res.status(401).json({ erro: "Credenciais inválidas" });
+        }
+
+        // 2. Compara a senha digitada com a senha (hash) do banco
+        // Se você não quiser usar bcrypt agora, pode usar (senha === admin.senha)
+        // mas o ideal é: const match = await bcrypt.compare(senha, admin.senha);
+        const senhaValida = await bcrypt.compare(senha, admin.senha);
+
+        if (senhaValida) {
+            // 3. Gera o token com o ID do admin para segurança
+            const token = jwt.sign(
+                { id: admin.id, role: 'admin' }, 
+                SECRET_KEY, 
+                { expiresIn: '12h' }
+            );
+            return res.json({ token });
+        }
+
+        res.status(401).json({ erro: "Credenciais inválidas" });
+
+    } catch (e) {
+        console.error("Erro no Login:", e);
+        res.status(500).json({ erro: "Erro interno no servidor" });
     }
-    res.status(401).json({ erro: "Credenciais inválidas" });
 });
 
 app.post('/afiliado/login', async (req, res) => {

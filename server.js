@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const path = require('path'); 
 const multer = require('multer');
@@ -90,35 +91,28 @@ const upload = multer({ storage: storage });
 // =================================================================
 app.post('/login', async (req, res) => {
     const { email, senha } = req.body;
-
     try {
-        // 1. Busca o admin no PostgreSQL
+        // Busca o admin no banco PostgreSQL que aparece no seu print
         const admin = await prisma.admin.findUnique({ where: { email } });
 
         if (!admin) {
             return res.status(401).json({ erro: "Credenciais inválidas" });
         }
 
-        // 2. Compara a senha digitada com a senha (hash) do banco
-        // Se você não quiser usar bcrypt agora, pode usar (senha === admin.senha)
-        // mas o ideal é: const match = await bcrypt.compare(senha, admin.senha);
+        // Se estiver usando senhas seguras (recomendado):
         const senhaValida = await bcrypt.compare(senha, admin.senha);
+        
+        // Se ainda estiver testando com senha em texto puro:
+        // const senhaValida = (senha === admin.senha);
 
         if (senhaValida) {
-            // 3. Gera o token com o ID do admin para segurança
-            const token = jwt.sign(
-                { id: admin.id, role: 'admin' }, 
-                SECRET_KEY, 
-                { expiresIn: '12h' }
-            );
+            const token = jwt.sign({ id: admin.id, role: 'admin' }, SECRET_KEY, { expiresIn: '12h' });
             return res.json({ token });
         }
-
         res.status(401).json({ erro: "Credenciais inválidas" });
-
     } catch (e) {
-        console.error("Erro no Login:", e);
-        res.status(500).json({ erro: "Erro interno no servidor" });
+        console.error(e);
+        res.status(500).json({ erro: "Erro interno no servidor" }); // É aqui que gera o erro do seu print
     }
 });
 

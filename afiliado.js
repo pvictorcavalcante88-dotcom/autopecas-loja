@@ -386,10 +386,19 @@ async function carregarMeusSaques() {
 }
 
 async function solicitarSaque() {
+    // ---------------------------------------------------------
     // 1. VERIFICAÇÃO DE SEGURANÇA (PERFIL)
-    const d = window.DADOS_AFILIADO; // Pega os dados carregados no dashboard
+    // ---------------------------------------------------------
     
-    // 🟢 AQUI ESTÁ O SEGREDO: Não verificamos 'd.foto'
+    // Verifica se os dados já carregaram
+    if (!window.DADOS_AFILIADO) {
+        alert("Aguarde, carregando informações do usuário...");
+        return;
+    }
+
+    const d = window.DADOS_AFILIADO; 
+    
+    // Verifica se os campos obrigatórios estão vazios
     const perfilIncompleto = !d.cpf || !d.chavePix || !d.endereco || !d.telefone;
 
     if (perfilIncompleto) {
@@ -397,21 +406,61 @@ async function solicitarSaque() {
         
         if (confirmacao) {
             mudarAba('perfil'); // Leva ele para a aba de perfil
-            // Rola a tela até o campo CPF e dá foco
+            
+            // Rola a tela até o formulário e destaca o CPF
             setTimeout(() => {
-                document.getElementById('perfil-cpf').scrollIntoView({ behavior: 'smooth', block: 'center' });
-                document.getElementById('perfil-cpf').focus();
-                document.getElementById('perfil-cpf').style.border = "2px solid red"; // Destaca visualmente
+                const form = document.getElementById('form-perfil');
+                const cpfInput = document.getElementById('perfil-cpf');
+                
+                if(form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                
+                if(cpfInput) {
+                    cpfInput.focus();
+                    cpfInput.style.border = "2px solid red"; 
+                    // Remove o vermelho quando o usuário clicar
+                    cpfInput.onfocus = () => cpfInput.style.border = "1px solid #ddd";
+                }
             }, 500);
         }
-        return; // BLOQUEIA O SAQUE
+        return; // ⛔ PARA TUDO AQUI. O saque não acontece.
     }
 
-    // 2. SE PASSOU NA VERIFICAÇÃO, SEGUE O SAQUE NORMAL
-    if(!confirm("Confirmar solicitação de saque do saldo total?")) return;
+    // ---------------------------------------------------------
+    // 2. SE O PERFIL ESTIVER COMPLETO, FAZ O SAQUE (Seu código original)
+    // ---------------------------------------------------------
+    if(!confirm("Deseja solicitar o saque de todo o saldo disponível?")) return;
     
-    // ... restante do código de fetch do saque ...
-    // (Copiar do código anterior)
+    const btn = document.getElementById('btn-saque'); 
+    const textoOriginal = btn ? btn.innerText : "Solicitar Saque";
+
+    if(btn) {
+        btn.innerText = "Processando...";
+        btn.disabled = true; // Evita clique duplo
+    }
+
+    try {
+        const res = await fetch(`${API_URL}/afiliado/saque`, {
+            method: 'POST', 
+            headers: { 'Authorization': `Bearer ${AFILIADO_TOKEN}` }
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok) {
+            alert("✅ Solicitação Enviada! Valor: R$ " + parseFloat(data.valor).toFixed(2));
+            carregarDashboardCompleto(); // Atualiza o saldo na tela
+        } else {
+            alert("Atenção: " + (data.erro || "Falha ao solicitar."));
+        }
+    } catch (e) { 
+        alert("Erro de conexão."); 
+        console.error(e);
+    } finally { 
+        if(btn) {
+            btn.innerText = textoOriginal;
+            btn.disabled = false;
+        }
+    }
 }
 
 async function salvarDadosBancarios() {

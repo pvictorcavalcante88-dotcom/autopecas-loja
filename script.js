@@ -872,6 +872,9 @@ async function executarBusca(q, categoria) {
                 <div>
                     <div class="product-image"><img src="${p.image || p.imagem}" onerror="this.src='https://placehold.co/150'"></div>
                     <h3>${p.name || p.titulo}</h3>
+                    <small style="color: #7f8c8d; font-size: 0.85rem; display: block; margin-top: -5px; margin-bottom: 8px;">
+                        Ref: ${p.referencia}
+                    </small>
                     <div class="app-tag">
                         <i class="ph ph-car"></i> <span>${aplicacaoFinal}</span>
                     </div>

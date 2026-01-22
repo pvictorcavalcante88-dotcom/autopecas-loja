@@ -419,6 +419,42 @@ app.put('/afiliado/perfil', authenticateToken, async (req, res) => {
     } catch(e) { res.status(500).json({ erro: "Erro ao atualizar perfil" }); }
 });
 
+app.put('/afiliado/perfil-completo', authenticateToken, async (req, res) => {
+    const { id } = req.user; // Pega o ID do token
+    const { nome, cpf, telefone, endereco, chavePix, banco, agencia, conta, senha } = req.body;
+
+    // Validação Backend: Apenas o essencial para pagar é obrigatório
+    if (!nome || !cpf || !telefone || !endereco || !chavePix) {
+        return res.status(400).json({ erro: "Preencha os campos obrigatórios (Nome, CPF, Telefone, Endereço, Pix)." });
+    }
+
+    try {
+        const dadosAtualizar = {
+            nome, cpf, telefone, endereco, chavePix, banco, agencia, conta
+            // Note que NÃO coloquei 'foto' aqui ainda (explico abaixo)
+        };
+
+        // Só atualiza a senha se o usuário digitou algo
+        if (senha && senha.trim() !== "") {
+            dadosAtualizar.password = await bcrypt.hash(senha, 10);
+        }
+
+        const afiliadoAtualizado = await prisma.afiliado.update({
+            where: { id: id },
+            data: dadosAtualizar
+        });
+
+        // Remove a senha antes de devolver pro front
+        const { password, ...dadosSeguros } = afiliadoAtualizado;
+        
+        res.json({ mensagem: "Perfil atualizado!", afiliado: dadosSeguros });
+
+    } catch (error) {
+        console.error("Erro perfil:", error);
+        res.status(500).json({ erro: "Erro ao atualizar perfil." });
+    }
+});
+
 // 5. NOTIFICAÇÕES E MENSAGENS
 app.get('/afiliado/notificacoes', authenticateToken, async (req, res) => {
     try {

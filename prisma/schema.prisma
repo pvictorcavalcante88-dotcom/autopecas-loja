@@ -30,6 +30,9 @@ model Afiliado {
   banco     String?  // Ex: Nubank
   agencia   String?
   conta     String?
+  cpf     String?
+  endereco     String?
+  foto     String?
 
   
   pedidos   Pedido[] 

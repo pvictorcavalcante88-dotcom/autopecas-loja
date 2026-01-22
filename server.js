@@ -270,14 +270,25 @@ app.get('/afiliado/dashboard', authenticateToken, async (req, res) => {
         if (!afiliado) return res.status(404).json({ erro: "Afiliado não encontrado" });
 
         res.json({
+            // Dados Básicos
             nome: afiliado.nome,
             codigo: afiliado.codigo, 
             saldo: afiliado.saldo,
+            
+            // Dados Bancários
             chavePix: afiliado.chavePix,
             banco: afiliado.banco,
             agencia: afiliado.agencia,
             conta: afiliado.conta,
-            vendas: afiliado.pedidos // O SITE NOVO ESPERA 'vendas'
+            
+            // 🟢 O QUE ESTAVA FALTANDO (ADICIONE ISSO):
+            cpf: afiliado.cpf,
+            endereco: afiliado.endereco,
+            telefone: afiliado.telefone, 
+            email: afiliado.email, // Se tiver email no banco
+            
+            // Vendas
+            vendas: afiliado.pedidos 
         });
 
     } catch (e) {
@@ -285,7 +296,6 @@ app.get('/afiliado/dashboard', authenticateToken, async (req, res) => {
         res.status(500).json({ erro: "Erro ao buscar dados" });
     }
 });
-
 // ============================================================
 // ROTA CORRIGIDA PARA SALVAR ORÇAMENTOS
 // ============================================================

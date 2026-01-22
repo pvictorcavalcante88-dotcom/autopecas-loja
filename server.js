@@ -925,6 +925,30 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
     }
 });
 
+// Rota para pegar detalhes de UM pedido específico
+app.get('/admin/orders/:id', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+
+    try {
+        const id = parseInt(req.params.id);
+        const pedido = await prisma.pedido.findUnique({
+            where: { id: id },
+            include: {
+                afiliado: { // Traz os dados do afiliado ligado à venda
+                    select: { nome: true, telefone: true, codigo: true }
+                }
+            }
+        });
+
+        if (!pedido) return res.status(404).json({ erro: "Pedido não encontrado" });
+
+        res.json(pedido);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ erro: "Erro ao buscar detalhes" });
+    }
+});
+
 // ============================================================
 // 💰 ROTA: SOMATÓRIA TOTAL DE COMISSÕES (SALDOS DOS AFILIADOS)
 // ============================================================

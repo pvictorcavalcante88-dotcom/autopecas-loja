@@ -611,20 +611,16 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
     try {
         const { periodo, inicio, fim } = req.query;
 
-        // ============================================================
-        // CONFIGURAÇÕES FINANCEIRAS
-        // ============================================================
+        // === CONFIG FINANCEIRA ===
         const CONFIG_FINANCEIRA = {
-            impostoGoverno: 0.06,      // 6%
-            taxaAsaasPix: 0.99,        // R$ 0.99
-            taxaAsaasBoleto: 1.99,     // R$ 1.99
-            taxaAsaasCartaoPct: 0.055, // 5.5%
-            taxaAsaasCartaoFixo: 0.49  // R$ 0.49
+            impostoGoverno: 0.06,
+            taxaAsaasPix: 0.99,
+            taxaAsaasBoleto: 1.99,
+            taxaAsaasCartaoPct: 0.055,
+            taxaAsaasCartaoFixo: 0.49
         };
 
-        // ============================================================
-        // 1. FILTRO DE DATA (PEDIDOS)
-        // ============================================================
+        // === 1. FILTRO DE DATA ===
         let whereData = {}; 
         const hoje = new Date();
 
@@ -656,56 +652,45 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
             whereData = { createdAt: { gte: start, lte: end } };
         }
 
-        // ============================================================
-        // 2. FILTRO DE DATA (SAQUES / DRE) - A CORREÇÃO ESTÁ AQUI
-        // ============================================================
-        // Criamos o objeto de filtro separadamente para garantir que funciona
+        // === 2. FILTRO DE SAQUES (CORREÇÃO DO BUG) ===
+        // Montamos o objeto dinamicamente para não enviar 'undefined'
         let whereSaque = { status: 'PAGO' };
-        
-        // Só aplica filtro de data no saque se houver filtro de data nos pedidos
         if (whereData.createdAt) {
             whereSaque.dataPagamento = whereData.createdAt;
         }
-        // Se whereData.createdAt for undefined (Todo o Período), 
-        // o whereSaque fica apenas { status: 'PAGO' }, buscando TUDO corretamente.
 
-        // ============================================================
-        // 3. BUSCAS NO BANCO
-        // ============================================================
-        const [pedidosReais, produtosDB, saquesPagosAgg, totalPedidosCount, estoqueBaixoCount, produtosCount] = await Promise.all([
-            // A. Pedidos
+        // === 3. BUSCAS ===
+        const [pedidosReais, produtosDB, saquesPagosAgg, saldoPendenteAgg, totalPedidosCount, estoqueBaixoCount, produtosCount] = await Promise.all([
+            // A. Pedidos (Gerados)
             prisma.pedido.findMany({
                 where: {
                     ...whereData,
                     status: { in: ['APROVADO', 'ENTREGUE', 'ENVIADO', 'DEVOLUCAO_PARCIAL'] }
                 },
-                select: {
-                    id: true,
-                    valorTotal: true,
-                    comissaoGerada: true,
-                    itens: true,
-                    metodoPagamento: true,
-                    createdAt: true
-                }
+                select: { id: true, valorTotal: true, comissaoGerada: true, itens: true, metodoPagamento: true, createdAt: true }
             }),
             // B. Custos
-            prisma.produto.findMany({
-                select: { id: true, preco_custo: true, preco_novo: true }
-            }),
-            // C. Saques Pagos (Agora usando a variável whereSaque corrigida)
+            prisma.produto.findMany({ select: { id: true, preco_custo: true, preco_novo: true } }),
+            
+            // C. Saques Pagos (Fluxo de Caixa)
             prisma.saque.aggregate({
                 _sum: { valor: true },
-                where: whereSaque // <--- AQUI MUDOU
+                where: whereSaque // Filtro corrigido
             }),
-            // D. Contadores
+
+            // D. Saldo Pendente (O que falta pagar - Geral)
+            // Nota: Isso pega o saldo ATUAL de todos, independente de data, pois é dívida acumulada
+            prisma.afiliado.aggregate({
+                _sum: { saldo: true }
+            }),
+
+            // E. Contadores
             prisma.pedido.count({ where: { ...whereData, status: { in: ['APROVADO', 'ENTREGUE', 'ENVIADO'] } } }),
             prisma.produto.count({ where: { estoque: { lte: 5 } } }),
             prisma.produto.count()
         ]);
 
-        // ============================================================
-        // 4. CÁLCULOS FINANCEIROS
-        // ============================================================
+        // === 4. CÁLCULOS ===
         const mapaCustos = {};
         produtosDB.forEach(p => {
             let custo = parseFloat(p.preco_custo);
@@ -725,10 +710,8 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
             comissoesGeradasTotal += parseFloat(pedido.comissaoGerada || 0);
             impostosTotal += (valorVenda * CONFIG_FINANCEIRA.impostoGoverno);
 
-            // Taxas Gateway
             let custoGateway = 0;
             const metodo = pedido.metodoPagamento ? pedido.metodoPagamento.toUpperCase() : 'PIX';
-
             if (metodo.includes('CARTAO') || metodo.includes('CREDIT')) {
                 custoGateway = (valorVenda * CONFIG_FINANCEIRA.taxaAsaasCartaoPct) + CONFIG_FINANCEIRA.taxaAsaasCartaoFixo;
             } else if (metodo.includes('BOLETO')) {
@@ -738,7 +721,6 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
             }
             taxasAsaasTotal += custoGateway;
 
-            // CMV
             try {
                 const listaItens = typeof pedido.itens === 'string' ? JSON.parse(pedido.itens) : pedido.itens;
                 if (Array.isArray(listaItens)) {
@@ -752,14 +734,9 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
             } catch (err) {}
         }
 
-        // DRE: Lucro Líquido Real = Faturamento - (CMV + Imposto + Taxa + Comissão Gerada)
-        // OBS: Usamos 'Comissão Gerada' para saber o lucro da venda em si (Competência)
-        // 'Comissão Paga' é fluxo de caixa.
         const lucroLiquidoReal = faturamentoTotal - (custoMercadoriaTotal + impostosTotal + taxasAsaasTotal + comissoesGeradasTotal);
 
-        // ============================================================
-        // 5. ÚLTIMOS PEDIDOS
-        // ============================================================
+        // === 5. ULTIMOS PEDIDOS ===
         const ultimosPedidos = await prisma.pedido.findMany({
             take: 10,
             orderBy: { createdAt: 'desc' },
@@ -771,11 +748,11 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
             faturamento: faturamentoTotal,
             lucroLiquido: lucroLiquidoReal,
             
-            // Aqui está o valor que você queria ver no DRE:
-            comissoesPagas: saquesPagosAgg._sum.valor || 0, // <--- Agora não zera mais no 'Total'
-            
-            comissoesGeradas: comissoesGeradasTotal, // Quanto você ficou devendo para afiliados nesse período
-            
+            // OS TRÊS DADOS DE COMISSÃO:
+            comissoesPagas: saquesPagosAgg._sum.valor || 0, // O que saiu da conta (DRE Fluxo)
+            comissoesGeradas: comissoesGeradasTotal,       // O custo gerado (DRE Competência)
+            comissoesPendentes: saldoPendenteAgg._sum.saldo || 0, // Dívida atual (O que falta pagar)
+
             totalPedidos: totalPedidosCount,
             produtos: produtosCount,
             estoqueBaixo: estoqueBaixoCount,
@@ -787,7 +764,6 @@ app.get('/admin/dashboard-stats', authenticateToken, async (req, res) => {
         res.status(500).json({ erro: e.message });
     }
 });
-
 // LISTAR PEDIDOS
 app.get('/admin/pedidos', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);

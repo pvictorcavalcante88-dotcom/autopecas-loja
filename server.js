@@ -1590,21 +1590,22 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
 
-        // TRAVA DE SEGURANÇA: Se não tiver SKU/Referência, o Tiny rejeita
-        if (!produto.referencia) {
-            return res.status(400).json({ erro: "Produto sem Referência (SKU). Preencha antes de enviar." });
+        // 1. VALIDAÇÃO PRÉVIA: O Tiny REJEITA se não tiver SKU (Referência)
+        if (!produto.referencia || produto.referencia.trim() === '') {
+            return res.status(400).json({ erro: "O produto NÃO tem Referência (SKU). O Tiny exige este campo." });
         }
 
-        // Monta o JSON
         const dadosTiny = {
             produto: {
-                codigo: produto.referencia,
-                nome: produto.titulo,
+                codigo: produto.referencia, // <--- Se isso for repetido ou vazio, dá Erro 3
+                nome: String(produto.titulo).substring(0, 100), // Tiny limita tamanho as vezes
                 preco: parseFloat(produto.preco_novo),
                 preco_custo: parseFloat(produto.preco_custo || 0),
                 unidade: "UN",
                 situacao: "A",
-                categoria: produto.categoria || "Geral" // Garante que não vá vazio
+                tipo: "P", // P = Produto
+                origem: "0", // 0 = Nacional
+                categoria: produto.categoria || ""
             }
         };
 
@@ -1613,30 +1614,46 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         params.append('produto', JSON.stringify(dadosTiny));
         params.append('formato', 'json');
 
+        console.log("Enviando para Tiny:", JSON.stringify(dadosTiny)); // Log para debug no Render
+
         const response = await axios.post('https://api.tiny.com.br/api2/produto.incluir.php', params);
-        
-        // ==========================================================
-        // O PULO DO GATO: SALVAR O ID DO TINY NO SEU BANCO
-        // ==========================================================
         const retorno = response.data.retorno;
 
-        if (retorno.status === 'OK') {
-            // O Tiny devolve o ID dentro de um array 'registros'
-            // Estrutura: retorno.registros[0].registro.id
+        // =========================================================
+        // A CORREÇÃO ESTÁ AQUI:
+        // Verifica se status é OK E se o processamento NÃO é 3 (Erro)
+        // =========================================================
+        if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
+            
             const idTiny = retorno.registros[0]?.registro?.id;
-
+            
             if (idTiny) {
                 await prisma.produto.update({
                     where: { id: id },
-                    data: { tinyId: String(idTiny) } // Salva o ID lá
+                    data: { tinyId: String(idTiny) }
                 });
             }
+            res.json(response.data); // Sucesso Real
+
+        } else {
+            // DEU ERRO (Status 3)
+            console.error("Erro Tiny Retorno:", JSON.stringify(retorno));
+            
+            // Tenta pegar a mensagem de erro detalhada
+            let msgErro = "Erro de validação no Tiny (Status 3).";
+            if (retorno.erros && retorno.erros.length > 0) {
+                msgErro = retorno.erros[0].erro;
+            }
+
+            // Retorna status 400 para o Frontend saber que deu erro
+            res.status(400).json({ 
+                erro: msgErro,
+                detalhes: retorno
+            });
         }
-        
-        res.json(response.data);
 
     } catch (e) {
-        console.error("Erro Tiny:", e);
+        console.error("Erro Axios/Server:", e);
         res.status(500).json({ erro: e.message });
     }
 });

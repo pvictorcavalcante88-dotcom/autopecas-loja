@@ -1591,25 +1591,27 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
         if (!produto.referencia) return res.status(400).json({ erro: "Produto sem Referência (SKU)." });
 
-        // --- MELHORIA 1: NCM ---
-        // Se você não tiver campo NCM no banco, usamos um genérico de Autopeças (8708.99.90 - Outras partes)
-        // O ideal é criar um campo 'ncm' no seu model Produto depois.
-        const ncmPadrao = "87089990"; 
-        const cestPadrao = "0199900";
+        // --- VALORES PADRÃO PARA AUTOPEÇAS ---
+        const ncmPadrao = "87089990"; // Peças e Acessórios
+        const cestPadrao = "0199900"; // Substituição Tributária (Autopeças)
 
         const dadosTiny = {
             produto: {
-                codigo: produto.referencia,
+                codigo: String(produto.referencia),
                 nome: String(produto.titulo).substring(0, 100),
-                preco: parseFloat(produto.preco_novo),
-                preco_custo: parseFloat(produto.preco_custo || 0),
+                preco: parseFloat(produto.preco_novo).toFixed(2),
+                preco_custo: parseFloat(produto.preco_custo || 0).toFixed(2),
                 unidade: "UN",
                 situacao: "A",
                 tipo: "P",
                 origem: "0", 
-                ncm: produto.ncm || ncmPadrao, // <--- ADICIONADO NCM
-                cest: String(cestPadrao), // <--- ADICIONAMOS AQUI O CEST OBRIGATÓRIO
-                categoria: produto.categoria || ""
+                ncm: String(produto.ncm || ncmPadrao), 
+                cest: String(cestPadrao), 
+                
+                // ✅ O CAMPO QUE FALTAVA (SPED)
+                tipo_item_sped: "00", // 00 = Mercadoria para Revenda
+                
+                categoria: String(produto.categoria || "")
             }
         };
 
@@ -1618,17 +1620,16 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         params.append('produto', JSON.stringify(dadosTiny));
         params.append('formato', 'json');
 
-        console.log("Enviando Payload:", JSON.stringify(dadosTiny));
+        console.log("Enviando com SPED:", JSON.stringify(dadosTiny));
 
         const response = await axios.post('https://api.tiny.com.br/api2/produto.incluir.php', params);
         const retorno = response.data.retorno;
 
-        console.log("Resposta Tiny Completa:", JSON.stringify(retorno)); // <--- LOG PARA DEBUG
+        console.log("Resposta Tiny:", JSON.stringify(retorno));
 
-        // O status_processamento 3 é erro. O 1 ou 2 (parcial) costuma ser sucesso.
+        // Se status OK e processamento != 3, deu sucesso!
         if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
             
-            // Tenta pegar o ID de várias formas (às vezes vem em registros, às vezes direto)
             const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
 
             if (idTiny) {
@@ -1640,28 +1641,18 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             res.json(response.data);
 
         } else {
-            // --- TRATAMENTO DE ERRO DETALHADO ---
+            // Tratamento de Erro (Mantivemos a lógica para te avisar o motivo)
             let msgErro = "Erro de validação no Tiny.";
             
-            // Caso 1: Erro dentro de 'registros'
-            if (retorno.registros && retorno.registros.length > 0 && retorno.registros[0].registro.erros) {
+            if (retorno.registros?.[0]?.registro?.erros) {
                 msgErro = retorno.registros[0].registro.erros[0].erro;
-            } 
-            // Caso 2: Erro na raiz 'erros'
-            else if (retorno.erros && retorno.erros.length > 0) {
+            } else if (retorno.erros?.length > 0) {
                 msgErro = retorno.erros[0].erro;
-            }
-            // Caso 3: Duplicidade comum (Status 3 sem msg clara muitas vezes é duplicidade)
-            else if (retorno.status_processamento === '3') {
-                msgErro = "Erro 3: Provável duplicidade de SKU ou falta de NCM. Verifique a lixeira do Tiny.";
+            } else if (retorno.status_processamento === '3') {
+                msgErro = "Erro 3: Verifique se o SKU já existe na lixeira ou se falta algum dado fiscal.";
             }
 
-            console.error("Erro detectado:", msgErro);
-            
-            res.status(400).json({ 
-                erro: msgErro,
-                debug: retorno
-            });
+            res.status(400).json({ erro: msgErro, debug: retorno });
         }
 
     } catch (e) {

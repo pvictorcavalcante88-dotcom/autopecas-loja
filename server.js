@@ -1595,6 +1595,7 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         // Se você não tiver campo NCM no banco, usamos um genérico de Autopeças (8708.99.90 - Outras partes)
         // O ideal é criar um campo 'ncm' no seu model Produto depois.
         const ncmPadrao = "87089990"; 
+        const cestPadrao = "0199900";
 
         const dadosTiny = {
             produto: {
@@ -1607,6 +1608,7 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
                 tipo: "P",
                 origem: "0", 
                 ncm: produto.ncm || ncmPadrao, // <--- ADICIONADO NCM
+                cest: String(cestPadrao), // <--- ADICIONAMOS AQUI O CEST OBRIGATÓRIO
                 categoria: produto.categoria || ""
             }
         };

@@ -1589,16 +1589,21 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
 
-        // Monta o JSON para o Tiny
+        // TRAVA DE SEGURANÇA: Se não tiver SKU/Referência, o Tiny rejeita
+        if (!produto.referencia) {
+            return res.status(400).json({ erro: "Produto sem Referência (SKU). Preencha antes de enviar." });
+        }
+
+        // Monta o JSON
         const dadosTiny = {
             produto: {
-                codigo: produto.referencia, // SKU que o Tiny vai usar
+                codigo: produto.referencia,
                 nome: produto.titulo,
                 preco: parseFloat(produto.preco_novo),
                 preco_custo: parseFloat(produto.preco_custo || 0),
                 unidade: "UN",
-                situacao: "A", // Ativo
-                categoria: produto.categoria // Ex: Curva A
+                situacao: "A",
+                categoria: produto.categoria || "Geral" // Garante que não vá vazio
             }
         };
 
@@ -1609,8 +1614,28 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         const response = await axios.post('https://api.tiny.com.br/api2/produto.incluir.php', params);
         
+        // ==========================================================
+        // O PULO DO GATO: SALVAR O ID DO TINY NO SEU BANCO
+        // ==========================================================
+        const retorno = response.data.retorno;
+
+        if (retorno.status === 'OK') {
+            // O Tiny devolve o ID dentro de um array 'registros'
+            // Estrutura: retorno.registros[0].registro.id
+            const idTiny = retorno.registros[0]?.registro?.id;
+
+            if (idTiny) {
+                await prisma.produto.update({
+                    where: { id: id },
+                    data: { tinyId: String(idTiny) } // Salva o ID lá
+                });
+            }
+        }
+        
         res.json(response.data);
+
     } catch (e) {
+        console.error("Erro Tiny:", e);
         res.status(500).json({ erro: e.message });
     }
 });

@@ -68,6 +68,9 @@ model Produto {
   tags        String?
   sugestoes   Sugestao[]
 
+  tinyId          String?  // O ID do produto no Tiny (para baixar estoque corretamente)
+  sku             String?  // O Código único (Ex: VELA-NGK-123) - ESSENCIAL PARA O TINY
+
 
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
@@ -93,6 +96,12 @@ model Pedido {
 
   asaasId         String?
   metodoPagamento String?   // Vai salvar "PIX", "CARTAO", "BOLETO", etc.
+
+  // CAMPOS DE INTEGRAÇÃO TINY
+  tinyId          String?  // O ID do pedido lá dentro do Tiny
+  numeroNota      String?  // O número da NF quando for emitida
+  linkNota        String?  // O link do PDF da nota para mostrar pro cliente
+  statusTiny      String?  // Ex: "Aberto", "Faturado", "Enviado"
 
   createdAt       DateTime @default(now())
 }

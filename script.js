@@ -808,6 +808,8 @@ function setupGlobalSearch() {
 }
 function fazerPesquisa(t, c) { window.location.href = `busca.html?q=${encodeURIComponent(t)}&categoria=${encodeURIComponent(c)}`; }
 function setupSearchPage() { const params = new URLSearchParams(window.location.search); if(params.get('q') || params.get('categoria')) executarBusca(params.get('q'), params.get('categoria')); }
+// Substitua sua função executarBusca por esta:
+
 async function executarBusca(q, categoria) {
     try {
         let url = `${API_URL}/search?`;
@@ -818,7 +820,7 @@ async function executarBusca(q, categoria) {
         const data = await res.json();
         const track = document.getElementById("search-track");
         
-        const isLogado = localStorage.getItem('afiliadoLogado');
+        const afiliadoLogado = JSON.parse(localStorage.getItem('afiliadoLogado'));
         const termoPesquisado = (q || '').toUpperCase().trim();
 
         if(!track) return;
@@ -829,59 +831,78 @@ async function executarBusca(q, categoria) {
             return;
         }
 
+        // Definição das margens por curva (mesma lógica do servidor)
+        const margensPorCurva = {
+            'CURVA A': 0.20,
+            'CURVA B': 0.25,
+            'CURVA C': 0.30
+        };
+
         data.forEach(p => {
+            // 1. Identifica a curva do produto (vem do banco/Tiny)
+            const curvaRef = (p.categoria || 'CURVA A').toUpperCase();
+            const margemLoja = margensPorCurva[curvaRef] || 0.20;
+
+            // 2. Lógica de Preço para o Afiliado
+            let precoBase = parseFloat(p.price || p.preco_novo);
+            let precoExibir = precoBase;
+
+            if (afiliadoLogado) {
+                // Se o afiliado está logado, mostramos o preço com a margem da loja
+                // O afiliado depois aplica a dele no carrinho
+                precoExibir = precoBase * (1 + margemLoja);
+            }
+
+            // 3. Lógica de Estoque (vinda do Tiny via Sincronização)
+            const temEstoque = p.estoque > 0;
+            const badgeEstoque = temEstoque 
+                ? `<span style="color:#27ae60; font-size:0.75rem;"><i class="ph ph-check-circle"></i> Em estoque</span>`
+                : `<span style="color:#e74c3c; font-size:0.75rem;"><i class="ph ph-warning-circle"></i> Esgotado</span>`;
+
+            // 4. Lógica de Aplicação (Whitelist)
             let carroExibir = "";
-            const listaCarrosBanco = (p.carros || '').toUpperCase();
-            // Transforma a string do banco em array para pegar o primeiro se precisar
-            const arrayCarrosBanco = listaCarrosBanco.split(',').map(c => c.trim()).filter(c => c !== "");
-
-            // 🟢 LÓGICA DE DESTAQUE COM WHITELIST
+            const arrayCarrosBanco = (p.carros || '').toUpperCase().split(',').map(c => c.trim()).filter(c => c !== "");
+            
             if (termoPesquisado) {
-                // 🟢 BUSCA O MATCH COM PALAVRA INTEIRA (Bloqueia "interrUPtor")
                 const matchFiel = LISTA_CARROS.find(carro => {
-                    // Cria uma regra para procurar a palavra exata com espaços ou bordas ao redor
                     const regex = new RegExp(`\\b${carro}\\b`, 'i'); 
-                    return regex.test(termoPesquisado) && listaCarrosBanco.includes(carro);
+                    return regex.test(termoPesquisado) && p.carros.toUpperCase().includes(carro);
                 });
-
-                if (matchFiel) {
-                    carroExibir = matchFiel;
-                }
+                if (matchFiel) carroExibir = matchFiel;
             }
+            if (!carroExibir && arrayCarrosBanco.length > 0) carroExibir = arrayCarrosBanco[0];
 
+            const aplicacaoFinal = carroExibir ? `${carroExibir}${p.ano ? ' ('+p.ano+')' : ''}` : "UNIVERSAL";
 
-
-            // 🟢 FALLBACK: Se foi uma busca genérica como "interruptor", 
-            // ele OBRIGATORIAMENTE pega o primeiro do banco (Ex: Accord)
-            if (!carroExibir && arrayCarrosBanco.length > 0) {
-                carroExibir = arrayCarrosBanco[0]; 
-            }
-
-            const anoExibir = p.ano ? ` (${p.ano})` : "";
-            const aplicacaoFinal = `${carroExibir}${anoExibir}`;
-
-            // Restante da montagem do card (Links e HTML) mantém o padrão...
+            // 5. Renderização do Card
             const linkProduto = `product.html?id=${p.id}${q ? '&q=' + encodeURIComponent(q) : ''}`;
-            const textoBotao = isLogado ? 'Ver Detalhes' : 'Entrar';
-            const htmlPreco = isLogado 
-                ? `<p class="price-new" style="margin-top:auto;">${formatarMoeda(parseFloat(p.price || p.preco_novo))}</p>`
-                : `<p class="price-new" style="font-size:0.85rem; color:#777; margin-top:auto;"><i class="ph ph-lock-key"></i> Login p/ ver</p>`;
-
+            
             track.innerHTML += `
-            <a href="${linkProduto}" class="product-card">
+            <a href="${linkProduto}" class="product-card" style="opacity: ${temEstoque ? '1' : '0.6'}">
                 <div>
-                    <div class="product-image"><img src="${p.image || p.imagem}" onerror="this.src='https://placehold.co/150'"></div>
+                    <div class="product-image">
+                        <img src="${p.image || p.imagem}" onerror="this.src='https://placehold.co/150'">
+                        <div style="position:absolute; top:5px; right:5px; background:rgba(255,255,255,0.8); padding:2px 5px; border-radius:3px; font-size:0.65rem; font-weight:bold;">
+                            ${curvaRef}
+                        </div>
+                    </div>
                     <h3>${p.name || p.titulo}</h3>
-                    <small style="color: #7f8c8d; font-size: 0.85rem; display: block; margin-top: -5px; margin-bottom: 8px;">
-                        Ref: ${p.referencia || p.codigo || p.id || 'Sem Ref'}
-                    </small>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <small style="color: #7f8c8d; font-size: 0.75rem;">Ref: ${p.referencia || p.id}</small>
+                        ${badgeEstoque}
+                    </div>
                     <div class="app-tag">
                         <i class="ph ph-car"></i> <span>${aplicacaoFinal}</span>
                     </div>
                 </div>
                 <div>
-                    ${htmlPreco}
-                    <div class="btn-card-action" style="width:100%; margin-top:10px;">${textoBotao}</div> 
+                    ${afiliadoLogado ? 
+                        `<p class="price-new" style="margin-top:auto;">${formatarMoeda(precoExibir)}</p>` : 
+                        `<p class="price-new" style="font-size:0.85rem; color:#777; margin-top:auto;"><i class="ph ph-lock-key"></i> Login p/ ver</p>`
+                    }
+                    <div class="btn-card-action" style="width:100%; margin-top:10px; background: ${temEstoque ? '#34495e' : '#bdc3c7'}">
+                        ${temEstoque ? 'Ver Detalhes' : 'Indisponível'}
+                    </div> 
                 </div>
             </a>`;
         });

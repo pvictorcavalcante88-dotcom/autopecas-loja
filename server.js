@@ -4,6 +4,7 @@ const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { enviarPedidoParaTiny } = require('./services/tinyService');
 const path = require('path'); 
 const multer = require('multer');
 const fs = require('fs');
@@ -1463,6 +1464,7 @@ app.post('/api/webhook/asaas', async (req, res) => {
                 where: { id: pedido.id },
                 data: { status: 'APROVADO' }
             });
+            await enviarPedidoParaTiny(pedido);
 
             // B. Libera Comissão do Afiliado (se tiver)
             if (pedido.afiliadoId && pedido.comissaoGerada > 0) {
@@ -1538,6 +1540,42 @@ app.get('/afiliado/estatisticas', authenticateToken, async (req, res) => {
     } catch (e) {
         console.error("Erro nas estatísticas:", e);
         res.status(500).json({ erro: "Erro ao carregar dados do período." });
+    }
+});
+
+// Adicione o axios no topo: const axios = require('axios');
+
+app.get('/admin/sincronizar-tiny/:referencia', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    
+    const { referencia } = req.params;
+    const TOKEN = process.env.TINY_TOKEN;
+
+    try {
+        const url = `https://api.tiny.com.br/api2/produto.obter.php?token=${TOKEN}&formato=json&codigo=${referencia}`;
+        const response = await axios.get(url);
+
+        if (response.data.retorno.status === 'OK') {
+            const prodTiny = response.data.retorno.produto;
+
+            // Atualiza o seu banco de dados com os dados novos do Tiny
+            const produtoAtualizado = await prisma.produto.update({
+                where: { referencia: referencia }, // Certifique-se que 'referencia' é UNIQUE no prisma
+                data: {
+                    preco_custo: parseFloat(prodTiny.preco_custo),
+                    estoque: parseInt(prodTiny.quantidade_estoque),
+                    // Você pode sincronizar o preço de venda também se quiser
+                    // preco_novo: parseFloat(prodTiny.preco) 
+                }
+            });
+
+            res.json({ mensagem: "Sincronizado com sucesso!", produto: produtoAtualizado });
+        } else {
+            res.status(404).json({ erro: "Produto não encontrado no Tiny" });
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ erro: "Erro ao conectar com Tiny" });
     }
 });
 

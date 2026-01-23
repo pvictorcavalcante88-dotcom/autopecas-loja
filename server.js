@@ -1611,7 +1611,8 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
                 // ✅ O CAMPO QUE FALTAVA (SPED)
                 tipo_item_sped: "00", // 00 = Mercadoria para Revenda
                 
-                categoria: String(produto.categoria || "")
+                categoria: String(produto.categoria || ""),
+                gtin: produto.ean || ""
             }
         };
 

@@ -4,6 +4,7 @@ const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const axios = require('axios');
 const { enviarPedidoParaTiny } = require('./services/tinyService');
 const path = require('path'); 
 const multer = require('multer');

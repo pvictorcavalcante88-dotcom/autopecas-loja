@@ -1589,22 +1589,24 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         const produto = await prisma.produto.findUnique({ where: { id } });
 
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
+        if (!produto.referencia) return res.status(400).json({ erro: "Produto sem Referência (SKU)." });
 
-        // 1. VALIDAÇÃO PRÉVIA: O Tiny REJEITA se não tiver SKU (Referência)
-        if (!produto.referencia || produto.referencia.trim() === '') {
-            return res.status(400).json({ erro: "O produto NÃO tem Referência (SKU). O Tiny exige este campo." });
-        }
+        // --- MELHORIA 1: NCM ---
+        // Se você não tiver campo NCM no banco, usamos um genérico de Autopeças (8708.99.90 - Outras partes)
+        // O ideal é criar um campo 'ncm' no seu model Produto depois.
+        const ncmPadrao = "87089990"; 
 
         const dadosTiny = {
             produto: {
-                codigo: produto.referencia, // <--- Se isso for repetido ou vazio, dá Erro 3
-                nome: String(produto.titulo).substring(0, 100), // Tiny limita tamanho as vezes
+                codigo: produto.referencia,
+                nome: String(produto.titulo).substring(0, 100),
                 preco: parseFloat(produto.preco_novo),
                 preco_custo: parseFloat(produto.preco_custo || 0),
                 unidade: "UN",
                 situacao: "A",
-                tipo: "P", // P = Produto
-                origem: "0", // 0 = Nacional
+                tipo: "P",
+                origem: "0", 
+                ncm: produto.ncm || ncmPadrao, // <--- ADICIONADO NCM
                 categoria: produto.categoria || ""
             }
         };
@@ -1614,46 +1616,54 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         params.append('produto', JSON.stringify(dadosTiny));
         params.append('formato', 'json');
 
-        console.log("Enviando para Tiny:", JSON.stringify(dadosTiny)); // Log para debug no Render
+        console.log("Enviando Payload:", JSON.stringify(dadosTiny));
 
         const response = await axios.post('https://api.tiny.com.br/api2/produto.incluir.php', params);
         const retorno = response.data.retorno;
 
-        // =========================================================
-        // A CORREÇÃO ESTÁ AQUI:
-        // Verifica se status é OK E se o processamento NÃO é 3 (Erro)
-        // =========================================================
+        console.log("Resposta Tiny Completa:", JSON.stringify(retorno)); // <--- LOG PARA DEBUG
+
+        // O status_processamento 3 é erro. O 1 ou 2 (parcial) costuma ser sucesso.
         if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
             
-            const idTiny = retorno.registros[0]?.registro?.id;
-            
+            // Tenta pegar o ID de várias formas (às vezes vem em registros, às vezes direto)
+            const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
+
             if (idTiny) {
                 await prisma.produto.update({
                     where: { id: id },
                     data: { tinyId: String(idTiny) }
                 });
             }
-            res.json(response.data); // Sucesso Real
+            res.json(response.data);
 
         } else {
-            // DEU ERRO (Status 3)
-            console.error("Erro Tiny Retorno:", JSON.stringify(retorno));
+            // --- TRATAMENTO DE ERRO DETALHADO ---
+            let msgErro = "Erro de validação no Tiny.";
             
-            // Tenta pegar a mensagem de erro detalhada
-            let msgErro = "Erro de validação no Tiny (Status 3).";
-            if (retorno.erros && retorno.erros.length > 0) {
+            // Caso 1: Erro dentro de 'registros'
+            if (retorno.registros && retorno.registros.length > 0 && retorno.registros[0].registro.erros) {
+                msgErro = retorno.registros[0].registro.erros[0].erro;
+            } 
+            // Caso 2: Erro na raiz 'erros'
+            else if (retorno.erros && retorno.erros.length > 0) {
                 msgErro = retorno.erros[0].erro;
             }
+            // Caso 3: Duplicidade comum (Status 3 sem msg clara muitas vezes é duplicidade)
+            else if (retorno.status_processamento === '3') {
+                msgErro = "Erro 3: Provável duplicidade de SKU ou falta de NCM. Verifique a lixeira do Tiny.";
+            }
 
-            // Retorna status 400 para o Frontend saber que deu erro
+            console.error("Erro detectado:", msgErro);
+            
             res.status(400).json({ 
                 erro: msgErro,
-                detalhes: retorno
+                debug: retorno
             });
         }
 
     } catch (e) {
-        console.error("Erro Axios/Server:", e);
+        console.error("Erro Server:", e);
         res.status(500).json({ erro: e.message });
     }
 });

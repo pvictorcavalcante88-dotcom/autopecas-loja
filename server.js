@@ -1579,6 +1579,42 @@ app.get('/admin/sincronizar-tiny/:referencia', authenticateToken, async (req, re
     }
 });
 
+// Rota para enviar um produto do seu banco para o Tiny
+app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+
+    try {
+        const id = parseInt(req.params.id);
+        const produto = await prisma.produto.findUnique({ where: { id } });
+
+        if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
+
+        // Monta o JSON para o Tiny
+        const dadosTiny = {
+            produto: {
+                codigo: produto.referencia, // SKU que o Tiny vai usar
+                nome: produto.titulo,
+                preco: parseFloat(produto.preco_novo),
+                preco_custo: parseFloat(produto.preco_custo || 0),
+                unidade: "UN",
+                situacao: "A", // Ativo
+                categoria: produto.categoria // Ex: Curva A
+            }
+        };
+
+        const params = new URLSearchParams();
+        params.append('token', process.env.TINY_TOKEN);
+        params.append('produto', JSON.stringify(dadosTiny));
+        params.append('formato', 'json');
+
+        const response = await axios.post('https://api.tiny.com.br/api2/produto.incluir.php', params);
+        
+        res.json(response.data);
+    } catch (e) {
+        res.status(500).json({ erro: e.message });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);

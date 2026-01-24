@@ -1621,25 +1621,32 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         };
 
 
-        const postData = new URLSearchParams();
-        postData.append('token', process.env.TINY_TOKEN);
-        postData.append('formato', 'json');
-        postData.append('produto', JSON.stringify(dadosTiny));
+// ... (seu código de configuração do dadosTiny continua igual) ...
 
-        console.log("📤 Enviando para o Tiny...");
+        // ====================================================================
+        // 🚀 SOLUÇÃO DEFINITIVA: ENVIO VIA URL (Query String)
+        // Isso elimina qualquer problema de compatibilidade do axios/body
+        // ====================================================================
 
-        const response = await axios.post(
-            'https://api.tiny.com.br/api2/produto.incluir.php', 
-            postData.toString(), // <--- O segredo está aqui!
-            {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
-            }
-        );
+        const params = new URLSearchParams();
+        params.append('token', process.env.TINY_TOKEN);
+        params.append('formato', 'json');
+        params.append('produto', JSON.stringify(dadosTiny));
+
+        console.log("📤 Enviando via URL Direta...");
+
+        // A MÁGICA: Colocamos os dados direto no link
+        const linkTiny = `https://api.tiny.com.br/api2/produto.incluir.php?${params.toString()}`;
+
+        // Enviamos um POST com a URL cheia e corpo vazio
+        const response = await axios.post(linkTiny);
+
+        // ====================================================================
+
         const retorno = response.data.retorno;
-
         console.log("Resposta Tiny:", JSON.stringify(retorno));
+
+        // ... (resto do código igual) ...
 
         // Se status OK e processamento != 3, deu sucesso!
         if (retorno.status === 'OK' && retorno.status_processamento !== '3') {

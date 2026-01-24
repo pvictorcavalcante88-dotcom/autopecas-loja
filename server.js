@@ -1594,27 +1594,26 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         // --- VALORES PADRÃO PARA AUTOPEÇAS ---
         const ncmPadrao = "87089990"; // Peças e Acessórios
         const cestPadrao = "0199900"; // Substituição Tributária (Autopeças)
-        const codigoTeste = `TESTE-${Date.now()}`;
+    
         // ...
         // GERA UM CÓDIGO QUE NUNCA EXISTIU
-        const codigoLimpo = `TESTE-NOVO-${Date.now()}`; 
+// ...
+        // GERA CÓDIGO ÚNICO
+        const codigoTeste = `PELADO-${Date.now()}`; 
 
         const dadosTiny = {
             produto: {
                 sequencia: 1,
-                codigo: codigoLimpo, // <--- CÓDIGO NOVO
-                nome: "Produto de Teste API", // <--- NOME NOVO
+                codigo: codigoTeste,
+                nome: "Teste Produto Simples",
+                unidade: "UN", // Garanta que essa unidade existe no Tiny
                 preco: "100.00",
-                unidade: "UN",
                 situacao: "A",
-                tipo: "P",
-                origem: "0", 
-                ncm: "87089990", 
-                cest: "0199900", 
-                tipo_item_sped: "00", 
-                categoria: "" // <--- ENVIE VAZIO POR ENQUANTO
+                tipo: "P"
+                // REMOVEMOS TUDO: NCM, ORIGEM, CEST, SPED, CATEGORIA
             }
         };
+        // ...
         // ...
 
         const params = new URLSearchParams();

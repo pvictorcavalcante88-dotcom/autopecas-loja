@@ -1619,39 +1619,37 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
                 tipo_item_sped: "00"
             }
         };
-
-
-// ... (seu código de configuração do dadosTiny continua igual) ...
+// ... (seu objeto dadosTiny continua igual) ...
 
         // ====================================================================
-        // 🚀 SOLUÇÃO DEFINITIVA: ENVIO VIA URL (Query String)
-        // Isso elimina qualquer problema de compatibilidade do axios/body
+        // 🚀 TÉCNICA DO CARTÃO POSTAL (Query Params no POST)
+        // Mandamos os dados na URL para garantir que o Tiny leia
         // ====================================================================
 
-        // PREPARA O PACOTE DO JEITO "RAIZ"
-        // .trim() remove espaços vazios que podem ter vindo no copy-paste do token
-        const requestBody = qs.stringify({
-            token: process.env.TINY_TOKEN.trim(), 
-            formato: 'json',
-            produto: JSON.stringify(dadosTiny)
-        });
-
-        console.log("📤 Enviando pacote blindado...");
+        console.log("📤 Enviando via Query Params...");
+        
+        // Verifica se o token está lendo corretamente (segurança)
+        const tokenLimpo = process.env.TINY_TOKEN ? process.env.TINY_TOKEN.trim() : "";
+        if (tokenLimpo.length < 10) console.log("⚠️ ALERTA: Token parece inválido ou curto!");
 
         const response = await axios.post(
             'https://api.tiny.com.br/api2/produto.incluir.php', 
-            requestBody,
+            null, // <--- CORPO VAZIO
             {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
+                // O axios vai montar a URL certinha com esses dados
+                params: {
+                    token: tokenLimpo,
+                    formato: 'json',
+                    produto: JSON.stringify(dadosTiny)
                 }
             }
         );
 
+        // ====================================================================
+
         const retorno = response.data.retorno;
         console.log("Resposta Tiny:", JSON.stringify(retorno));
 
-        // ... (resto do código igual) ...
 
         // Se status OK e processamento != 3, deu sucesso!
         if (retorno.status === 'OK' && retorno.status_processamento !== '3') {

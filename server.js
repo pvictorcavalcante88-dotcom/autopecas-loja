@@ -1619,18 +1619,24 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
                 categoria: "" // Deixe vazio por enquanto para garantir
             }
         };
-        // ...
-        // ...
-        // ...
 
-        const params = new URLSearchParams();
-        params.append('token', process.env.TINY_TOKEN);
-        params.append('produto', JSON.stringify(dadosTiny));
-        params.append('formato', 'json');
 
-        console.log("Enviando com SPED:", JSON.stringify(dadosTiny));
+        const postData = new URLSearchParams();
+        postData.append('token', process.env.TINY_TOKEN);
+        postData.append('formato', 'json');
+        postData.append('produto', JSON.stringify(dadosTiny));
 
-        const response = await axios.post('https://api.tiny.com.br/api2/produto.incluir.php', params);
+        console.log("📤 Enviando para o Tiny...");
+
+        const response = await axios.post(
+            'https://api.tiny.com.br/api2/produto.incluir.php', 
+            postData.toString(), // <--- O segredo está aqui!
+            {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            }
+        );
         const retorno = response.data.retorno;
 
         console.log("Resposta Tiny:", JSON.stringify(retorno));

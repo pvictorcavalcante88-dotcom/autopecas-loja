@@ -1648,6 +1648,9 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             }
         );
 
+        const retorno = response.data.retorno;
+        console.log("Resposta Tiny:", JSON.stringify(retorno));
+
         // ... (resto do código igual) ...
 
         // Se status OK e processamento != 3, deu sucesso!

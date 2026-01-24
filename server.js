@@ -1621,34 +1621,39 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         };
 // ... (seu objeto dadosTiny continua igual) ...
 
+// ... (seu objeto dadosTiny continua igual) ...
+
         // ====================================================================
-        // 🚀 TÉCNICA DO CARTÃO POSTAL (Query Params no POST)
-        // Mandamos os dados na URL para garantir que o Tiny leia
+        // 🚨 MUDANÇA DE TECNOLOGIA: AXIOS -> FETCH
+        // Vamos usar o fetch nativo para garantir que o formato seja "bruto"
         // ====================================================================
 
-        console.log("📤 Enviando via Query Params...");
-        
-        // Verifica se o token está lendo corretamente (segurança)
-        const tokenLimpo = process.env.TINY_TOKEN ? process.env.TINY_TOKEN.trim() : "";
-        if (tokenLimpo.length < 10) console.log("⚠️ ALERTA: Token parece inválido ou curto!");
+        const params = new URLSearchParams();
+        params.append('token', process.env.TINY_TOKEN.trim());
+        params.append('formato', 'json');
+        params.append('produto', JSON.stringify(dadosTiny));
 
-        const response = await axios.post(
-            'https://api.tiny.com.br/api2/produto.incluir.php', 
-            null, // <--- CORPO VAZIO
-            {
-                // O axios vai montar a URL certinha com esses dados
-                params: {
-                    token: tokenLimpo,
-                    formato: 'json',
-                    produto: JSON.stringify(dadosTiny)
-                }
+        console.log("📤 Enviando via FETCH Nativo...");
+
+        // Usamos o fetch que já vem no Node.js
+        const responseTiny = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
+            method: 'POST',
+            body: params, // O fetch sabe lidar com URLSearchParams perfeitamente
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
             }
-        );
+        });
+
+        // Convertendo a resposta para JSON
+        const retornoTiny = await responseTiny.json();
+        const retorno = retornoTiny.retorno;
+
+        console.log("Resposta Tiny:", JSON.stringify(retorno));
 
         // ====================================================================
 
-        const retorno = response.data.retorno;
-        console.log("Resposta Tiny:", JSON.stringify(retorno));
+        // Se status OK e processamento != 3, deu sucesso!
+        // ... (o resto do seu if/else continua igual, usando a variável 'retorno') ...
 
 
         // Se status OK e processamento != 3, deu sucesso!

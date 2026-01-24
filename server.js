@@ -1599,20 +1599,27 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         // GERA UM CÓDIGO QUE NUNCA EXISTIU
 // ...
         // GERA CÓDIGO ÚNICO
-        const codigoTeste = `PELADO-${Date.now()}`; 
+// ...
+        // GERA CÓDIGO NOVO PARA NÃO DAR DUPLICIDADE
+        const codigoFinal = `PROD-REAL-${Date.now()}`; 
 
         const dadosTiny = {
             produto: {
                 sequencia: 1,
-                codigo: codigoTeste,
-                nome: "Teste Produto Simples",
-                unidade: "UN", // Garanta que essa unidade existe no Tiny
+                codigo: codigoFinal, // Código novo
+                nome: "Produto Teste Final",
                 preco: "100.00",
+                unidade: "UN", // AGORA VAI FUNCIONAR (Se você criou lá)
                 situacao: "A",
-                tipo: "P"
-                // REMOVEMOS TUDO: NCM, ORIGEM, CEST, SPED, CATEGORIA
+                tipo: "P",
+                origem: "0", 
+                ncm: "87089990", 
+                cest: "0199900", 
+                tipo_item_sped: "00", // Mercadoria Revenda
+                categoria: "" // Deixe vazio por enquanto para garantir
             }
         };
+        // ...
         // ...
         // ...
 

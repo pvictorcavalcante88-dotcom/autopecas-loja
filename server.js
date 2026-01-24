@@ -1595,31 +1595,27 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         const ncmPadrao = "87089990"; // Peças e Acessórios
         const cestPadrao = "0199900"; // Substituição Tributária (Autopeças)
         const codigoTeste = `TESTE-${Date.now()}`;
-        let gtinEnvio = {};
-        if (produto.ean && produto.ean.trim() !== "") {
-            gtinEnvio = { gtin: produto.ean };
-        }
+        // ...
+        // GERA UM CÓDIGO QUE NUNCA EXISTIU
+        const codigoLimpo = `TESTE-NOVO-${Date.now()}`; 
 
-            const dadosTiny = {
+        const dadosTiny = {
             produto: {
                 sequencia: 1,
-                // Usamos a referência. Se falhar, tente usar 'codigoUnico' para testar
-                codigo: String(produto.referencia), 
-                nome: String(produto.titulo).substring(0, 100),
-                preco: parseFloat(produto.preco_novo).toFixed(2),
-                unidade: "UN", // Garanta que 'UN' existe no Tiny (Passo 1 acima)
+                codigo: codigoLimpo, // <--- CÓDIGO NOVO
+                nome: "Produto de Teste API", // <--- NOME NOVO
+                preco: "100.00",
+                unidade: "UN",
                 situacao: "A",
                 tipo: "P",
                 origem: "0", 
                 ncm: "87089990", 
-                cest: "0199900", // Obrigatório para este NCM
-                tipo_item_sped: "00", // Obrigatório para sua conta
-                categoria: String(produto.categoria || ""),
-                
-                // Espalha o GTIN (ou não manda nada se não tiver)
-                ...gtinEnvio
+                cest: "0199900", 
+                tipo_item_sped: "00", 
+                categoria: "" // <--- ENVIE VAZIO POR ENQUANTO
             }
         };
+        // ...
 
         const params = new URLSearchParams();
         params.append('token', process.env.TINY_TOKEN);

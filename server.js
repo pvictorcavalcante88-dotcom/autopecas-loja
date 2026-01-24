@@ -4,6 +4,7 @@ const cors = require('cors');
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const qs = require('querystring');
 const axios = require('axios');
 const { enviarPedidoParaTiny } = require('./services/tinyService');
 const path = require('path'); 
@@ -1605,18 +1606,17 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         const dadosTiny = {
             produto: {
-                sequencia: 1,
-                codigo: codigoFinal, // Código novo
-                nome: "Produto Teste Final",
+                // Sem sequencia, para não confundir
+                codigo: "API-FINAL-" + Date.now(),
+                nome: "Teste Final de Integracao",
                 preco: "100.00",
-                unidade: "UN", // AGORA VAI FUNCIONAR (Se você criou lá)
+                unidade: "UN", // Tem que ser a mesma do teste manual
                 situacao: "A",
                 tipo: "P",
-                origem: "0", 
-                ncm: "87089990", 
-                cest: "0199900", 
-                tipo_item_sped: "00", // Mercadoria Revenda
-                categoria: "" // Deixe vazio por enquanto para garantir
+                origem: "0",
+                ncm: "87089990",
+                cest: "0199900",
+                tipo_item_sped: "00"
             }
         };
 
@@ -1628,23 +1628,25 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         // Isso elimina qualquer problema de compatibilidade do axios/body
         // ====================================================================
 
-        const params = new URLSearchParams();
-        params.append('token', process.env.TINY_TOKEN);
-        params.append('formato', 'json');
-        params.append('produto', JSON.stringify(dadosTiny));
+        // PREPARA O PACOTE DO JEITO "RAIZ"
+        // .trim() remove espaços vazios que podem ter vindo no copy-paste do token
+        const requestBody = qs.stringify({
+            token: process.env.TINY_TOKEN.trim(), 
+            formato: 'json',
+            produto: JSON.stringify(dadosTiny)
+        });
 
-        console.log("📤 Enviando via URL Direta...");
+        console.log("📤 Enviando pacote blindado...");
 
-        // A MÁGICA: Colocamos os dados direto no link
-        const linkTiny = `https://api.tiny.com.br/api2/produto.incluir.php?${params.toString()}`;
-
-        // Enviamos um POST com a URL cheia e corpo vazio
-        const response = await axios.post(linkTiny);
-
-        // ====================================================================
-
-        const retorno = response.data.retorno;
-        console.log("Resposta Tiny:", JSON.stringify(retorno));
+        const response = await axios.post(
+            'https://api.tiny.com.br/api2/produto.incluir.php', 
+            requestBody,
+            {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            }
+        );
 
         // ... (resto do código igual) ...
 

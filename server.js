@@ -1594,9 +1594,14 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         // --- VALORES PADRÃO PARA AUTOPEÇAS ---
         const ncmPadrao = "87089990"; // Peças e Acessórios
         const cestPadrao = "0199900"; // Substituição Tributária (Autopeças)
+        let gtinEnvio = {};
+        if (produto.ean && produto.ean.trim() !== "") {
+            gtinEnvio = { gtin: produto.ean };
+        }
 
         const dadosTiny = {
             produto: {
+                sequencia: 1, // Isso ajuda o Tiny a apontar o erro certo
                 codigo: String(produto.referencia),
                 nome: String(produto.titulo).substring(0, 100),
                 preco: parseFloat(produto.preco_novo).toFixed(2),
@@ -1604,15 +1609,17 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
                 unidade: "UN",
                 situacao: "A",
                 tipo: "P",
+                
+                // 🔴 AQUI ESTAVA O ERRO (tinha um espaço "orige m")
                 origem: "0", 
-                ncm: String(produto.ncm || ncmPadrao), 
-                cest: String(cestPadrao), 
                 
-                // ✅ O CAMPO QUE FALTAVA (SPED)
-                tipo_item_sped: "00", // 00 = Mercadoria para Revenda
-                
+                ncm: String(produto.ncm || "87089990"), 
+                cest: "0199900", 
+                tipo_item_sped: "00", 
                 categoria: String(produto.categoria || ""),
-                gtin: produto.ean || ""
+                
+                // Espalha o GTIN aqui (se existir, entra. Se não, não entra nada)
+                ...gtinEnvio
             }
         };
 

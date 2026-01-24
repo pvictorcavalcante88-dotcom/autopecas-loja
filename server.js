@@ -1594,6 +1594,7 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         // --- VALORES PADRÃO PARA AUTOPEÇAS ---
         const ncmPadrao = "87089990"; // Peças e Acessórios
         const cestPadrao = "0199900"; // Substituição Tributária (Autopeças)
+        const codigoTeste = `TESTE-${Date.now()}`;
         let gtinEnvio = {};
         if (produto.ean && produto.ean.trim() !== "") {
             gtinEnvio = { gtin: produto.ean };
@@ -1601,25 +1602,16 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         const dadosTiny = {
             produto: {
-                sequencia: 1, // Isso ajuda o Tiny a apontar o erro certo
-                codigo: String(produto.referencia),
+                sequencia: 1,
+                codigo: codigoTeste, // Usa o código gerado na hora
                 nome: String(produto.titulo).substring(0, 100),
                 preco: parseFloat(produto.preco_novo).toFixed(2),
-                preco_custo: parseFloat(produto.preco_custo || 0).toFixed(2),
-                unidade: "UN",
+                unidade: "UN", // Tem certeza que no Tiny é "UN"? Às vezes é "UNID" ou "PC"
                 situacao: "A",
                 tipo: "P",
-                
-                // 🔴 AQUI ESTAVA O ERRO (tinha um espaço "orige m")
-                origem: "0", 
-                
-                ncm: String(produto.ncm || "87089990"), 
-                cest: "0199900", 
-                tipo_item_sped: "00", 
-                categoria: String(produto.categoria || ""),
-                
-                // Espalha o GTIN aqui (se existir, entra. Se não, não entra nada)
-                ...gtinEnvio
+                origem: "0",
+                ncm: "87089990"
+                // Removi todo o resto para testar
             }
         };
 

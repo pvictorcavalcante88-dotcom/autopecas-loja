@@ -1600,18 +1600,24 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             gtinEnvio = { gtin: produto.ean };
         }
 
-        const dadosTiny = {
+            const dadosTiny = {
             produto: {
                 sequencia: 1,
-                codigo: codigoTeste, // Usa o código gerado na hora
+                // Usamos a referência. Se falhar, tente usar 'codigoUnico' para testar
+                codigo: String(produto.referencia), 
                 nome: String(produto.titulo).substring(0, 100),
                 preco: parseFloat(produto.preco_novo).toFixed(2),
-                unidade: "UN", // Tem certeza que no Tiny é "UN"? Às vezes é "UNID" ou "PC"
+                unidade: "UN", // Garanta que 'UN' existe no Tiny (Passo 1 acima)
                 situacao: "A",
                 tipo: "P",
-                origem: "0",
-                ncm: "87089990"
-                // Removi todo o resto para testar
+                origem: "0", 
+                ncm: "87089990", 
+                cest: "0199900", // Obrigatório para este NCM
+                tipo_item_sped: "00", // Obrigatório para sua conta
+                categoria: String(produto.categoria || ""),
+                
+                // Espalha o GTIN (ou não manda nada se não tiver)
+                ...gtinEnvio
             }
         };
 

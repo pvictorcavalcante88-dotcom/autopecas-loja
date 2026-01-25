@@ -1591,72 +1591,69 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
 
-        // --- 1. PREPARAÇÃO DOS DADOS ---
-        const removerAcentos = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        // --- PREPARAÇÃO DOS DADOS ---
+        // Limpeza de texto (XML é chato com acentos se não avisar)
+        const limparTexto = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
         
-        let ncmLimpo = produto.ncm ? produto.ncm.replace(/\D/g, "") : "87089990";
-        if (ncmLimpo.length === 8) ncmLimpo = `${ncmLimpo.substr(0,4)}.${ncmLimpo.substr(4,2)}.${ncmLimpo.substr(6,2)}`;
-
         let valorBruto = produto.preco_novo || produto.preco || 0;
         if (typeof valorBruto === 'string') valorBruto = parseFloat(valorBruto.replace(',', '.'));
         const precoFinal = valorBruto.toFixed(2);
 
-        // SKU NOVO para garantir que não caia na lixeira
-        const skuTeste = `TESTE-MANUAL-${Date.now()}`; 
+        // NCM com pontos (Padrão XML costuma gostar)
+        let ncmLimpo = produto.ncm ? produto.ncm.replace(/\D/g, "") : "87089990";
+        if (ncmLimpo.length === 8) ncmLimpo = `${ncmLimpo.substr(0,4)}.${ncmLimpo.substr(4,2)}.${ncmLimpo.substr(6,2)}`;
 
-        const dadosTiny = {
-            produto: {
-                sequencia: 1,
-                codigo: skuTeste,
-                nome: removerAcentos(produto.titulo),
-                preco: precoFinal,
-                unidade: (produto.unidade || "UN").toUpperCase(),
-                situacao: "A",
-                tipo: "P",
-                origem: produto.origem || "0",
-                ncm: ncmLimpo, 
-                tipo_item_sped: "00"
-            }
-        };
+        // SKU Novo para teste
+        const skuTeste = `TESTE-XML-${Date.now()}`;
 
-        // --- 2. CONSTRUÇÃO MANUAL DO PACOTE (A MÁGICA) ---
-        // Aqui convertemos o JSON para string e DEPOIS codificamos para URL
-        // Isso garante que espaços, aspas e caracteres especiais cheguem perfeitos
-        const jsonString = JSON.stringify(dadosTiny);
-        const produtoEncoded = encodeURIComponent(jsonString);
-        const tokenEncoded = process.env.TINY_TOKEN.trim(); // Token não precisa de encode se for só alfanumérico
+        // --- A MUDANÇA: MONTANDO O XML ---
+        // Essa é a linguagem nativa do Tiny. Impossível ele ignorar.
+        const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
+        <produto>
+            <sequencia>1</sequencia>
+            <codigo>${skuTeste}</codigo>
+            <nome>${limparTexto(produto.titulo)}</nome>
+            <unidade>${(produto.unidade || "UN").toUpperCase()}</unidade>
+            <preco>${precoFinal}</preco>
+            <origem>${produto.origem || "0"}</origem>
+            <situacao>A</situacao>
+            <tipo>P</tipo>
+            <ncm>${ncmLimpo}</ncm>
+            <cest>${produto.cest || ""}</cest>
+            <tipo_item_sped>00</tipo_item_sped>
+        </produto>`;
 
-        // Monta a string igual a um formulário HTML antigo
-        const bodyData = `token=${tokenEncoded}&formato=json&produto=${produtoEncoded}`;
+        console.log(`📜 Enviando XML (Tamanho: ${xmlPayload.length}):`);
+        console.log(xmlPayload);
 
-        console.log(`📤 Enviando String Manual (Tamanho: ${bodyData.length} chars)...`);
+        // --- ENVIO ---
+        // params: produto = XML, formato = JSON (para lermos a resposta fácil)
+        const params = new URLSearchParams();
+        params.append('token', process.env.TINY_TOKEN.trim());
+        params.append('formato', 'json'); // Pedimos a resposta em JSON
+        params.append('produto', xmlPayload); // Enviamos XML
 
-        // --- 3. ENVIO VIA AXIOS (COM STRING PURA) ---
-        const response = await axios.post(
-            'https://api.tiny.com.br/api2/produto.incluir.php', 
-            bodyData, // Envia a string direto
-            {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
-            }
-        );
+        const responseTiny = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
+            method: 'POST',
+            body: params,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
 
-        const retorno = response.data.retorno;
+        const retornoTiny = await responseTiny.json();
+        const retorno = retornoTiny.retorno;
+
         console.log("Resposta Tiny:", JSON.stringify(retorno));
 
         if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
             const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
-            return res.json({ sucesso: true, tinyId: idTiny, msg: "SUCESSO FINAL! Conexão Manual funcionou." });
+            
+            // Se funcionou com XML, podemos salvar!
+            // Mas como é um SKU de teste, vamos só avisar.
+            return res.json({ sucesso: true, tinyId: idTiny, msg: "SUCESSO! XML Funcionou." });
         } else {
             let erroMsg = "Erro Tiny.";
-            // Tenta achar o erro em todos os buracos possíveis
             if (retorno.erros) erroMsg = retorno.erros[0].erro;
-            else if (retorno.registros && retorno.registros.length > 0 && retorno.registros[0].registro.erros) {
-                erroMsg = retorno.registros[0].registro.erros[0].erro;
-            } else if (retorno.status_processamento === '3') {
-                erroMsg = "Erro 3: O Tiny recebeu mas rejeitou. (Possível bloqueio de API na conta)";
-            }
+            else if (retorno.status_processamento === '3') erroMsg = "Erro 3 (XML): Tiny rejeitou os dados.";
             
             return res.status(400).json({ erro: erroMsg, debug: retorno });
         }

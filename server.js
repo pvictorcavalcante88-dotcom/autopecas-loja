@@ -1584,46 +1584,103 @@ app.get('/admin/sincronizar-tiny/:referencia', authenticateToken, async (req, re
 // Rota para enviar um produto do seu banco para o Tiny
 
 app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
-    // 1. PEGA O TOKEN DA MEMÓRIA
-    const tokenAtual = process.env.TINY_TOKEN ? process.env.TINY_TOKEN.trim() : "NÃO ENCONTRADO";
-    
-    // 2. ESCONDE O MEIO (SEGURANÇA) E MOSTRA SÓ O INÍCIO E O FIM
-    const inicio = tokenAtual.substring(0, 5);
-    const fim = tokenAtual.substring(tokenAtual.length - 5);
-    const tamanho = tokenAtual.length;
+    if (req.user.role !== 'admin') return res.sendStatus(403);
 
-    console.log(`=========================================`);
-    console.log(`🕵️‍♂️ DIAGNÓSTICO DE TOKEN`);
-    console.log(`🔑 Token Carregado: ${inicio}...${fim}`);
-    console.log(`📏 Tamanho: ${tamanho} caracteres`);
-    console.log(`=========================================`);
-
-    // 3. VERIFICA SE O TOKEN PARECE CERTO
-    let veredito = "✅ Parece um Token Válido";
-    if (tamanho < 30) veredito = "❌ MUITO CURTO (Provavelmente inválido)";
-    if (tokenAtual.includes(" ")) veredito = "❌ TEM ESPAÇOS EM BRANCO (Erro de cópia)";
-    
-    // 4. TESTE REAL DE CONEXÃO COM ESSE TOKEN
     try {
-        const params = new URLSearchParams();
-        params.append('token', tokenAtual);
-        params.append('formato', 'json');
+        const id = parseInt(req.params.id);
+        const produto = await prisma.produto.findUnique({ where: { id } });
+
+        if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
+
+        // --- 1. PREPARAÇÃO E LIMPEZA DOS DADOS ---
         
-        const response = await fetch('https://api.tiny.com.br/api2/info.php', { // Rota mais leve do Tiny
-            method: 'POST',
-            body: params
+        // Remove acentos e caracteres especiais
+        const removerAcentos = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+
+        // Formata o Preço (Troca vírgula por ponto e garante 2 casas)
+        let valorBruto = produto.preco_novo || produto.preco || 0;
+        if (typeof valorBruto === 'string') valorBruto = parseFloat(valorBruto.replace(',', '.'));
+        const precoFinal = valorBruto.toFixed(2); // Ex: "100.00"
+
+        // Formata o NCM (Adiciona os pontos: 87089990 -> 8708.99.90)
+        let ncmLimpo = produto.ncm ? produto.ncm.replace(/\D/g, "") : "87089990"; // Padrão se vier vazio
+        if (ncmLimpo.length === 8) {
+            ncmLimpo = `${ncmLimpo.substr(0,4)}.${ncmLimpo.substr(4,2)}.${ncmLimpo.substr(6,2)}`;
+        }
+
+        // Define o SKU (Código)
+        const skuFinal = produto.referencia || produto['referência'] || produto.sku;
+        if (!skuFinal) return res.status(400).json({ erro: "Produto sem SKU (Referência)." });
+
+        // --- 2. MONTAGEM DO PACOTE ---
+        const objetoProduto = {
+            sequencia: 1,
+            codigo: skuFinal,
+            nome: removerAcentos(produto.titulo),
+            unidade: (produto.unidade || "UN").toUpperCase(),
+            preco: precoFinal,
+            origem: produto.origem || "0",
+            situacao: "A",
+            tipo: "P",
+            ncm: ncmLimpo,
+            tipo_item_sped: "00", // 00 = Mercadoria para Revenda
+            cest: produto.cest // Pode vir vazio
+        };
+
+        // 🧹 A FAXINA DE OURO: Remove campos vazios/nulos
+        // O Tiny odeia receber 'cest': "" (string vazia). Se não tem, deletamos a chave.
+        Object.keys(objetoProduto).forEach(key => {
+            if (!objetoProduto[key] || objetoProduto[key] === "") {
+                delete objetoProduto[key];
+            }
         });
-        const dados = await response.json();
-        
-        return res.json({
-            meuToken: `${inicio}...${fim}`,
-            tamanho: tamanho,
-            analise: veredito,
-            respostaTiny: dados.retorno // Aqui o Tiny vai dizer se aceita ou não
-        });
+
+        const dadosTiny = { produto: objetoProduto };
+        const jsonPayload = JSON.stringify(dadosTiny);
+
+        console.log(`📤 Enviando para o Tiny (Token Final)...`);
+        console.log(`📦 Payload: ${jsonPayload}`);
+
+        // --- 3. ENVIO SEGURO ---
+        const response = await axios.post(
+            'https://api.tiny.com.br/api2/produto.incluir.php',
+            qs.stringify({
+                token: process.env.TINY_TOKEN.trim(), // Token novo carregado
+                formato: 'json',
+                produto: jsonPayload
+            }),
+            {
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            }
+        );
+
+        const retorno = response.data.retorno;
+        console.log("Resposta Tiny:", JSON.stringify(retorno));
+
+        // --- 4. TRATAMENTO DA RESPOSTA ---
+        if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
+            const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
+            
+            if (idTiny) {
+                // Salva o ID do Tiny no seu banco para evitar duplicidade futura
+                await prisma.produto.update({ 
+                    where: { id: id }, 
+                    data: { tinyId: String(idTiny) } 
+                });
+            }
+            return res.json({ sucesso: true, tinyId: idTiny, msg: "Integrado com Sucesso!" });
+        } else {
+            // Se der erro, tenta pegar a mensagem detalhada
+            let erroMsg = "Erro desconhecido no Tiny.";
+            if (retorno.erros) erroMsg = retorno.erros[0].erro;
+            else if (retorno.status_processamento === '3') erroMsg = "Tiny rejeitou os dados. Verifique se o NCM é válido ou se o SKU já existe na lixeira.";
+            
+            return res.status(400).json({ erro: erroMsg, debug: retorno });
+        }
 
     } catch (e) {
-        return res.status(500).json({ erro: "Erro ao testar conexão", det: e.message });
+        console.error("Erro Server:", e);
+        res.status(500).json({ erro: e.message });
     }
 });
  

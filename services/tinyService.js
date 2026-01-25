@@ -1,59 +1,56 @@
 const axios = require('axios');
-
-const TINY_TOKEN = process.env.TINY_TOKEN;
+// Importe aqui sua função que busca/renova o token no banco de dados
+const { getValidToken } = require('./authService'); 
 
 async function enviarPedidoParaTiny(pedido) {
-    // 1. Tratamento dos itens (No seu banco eles são String JSON)
-    const listaItens = typeof pedido.itens === 'string' ? JSON.parse(pedido.itens) : pedido.itens;
+    try {
+        // 1. Pega o token atualizado (V3 exige Bearer Token)
+        const token = await getValidToken();
 
-    // 2. Monta o JSON no formato do Tiny
-    const dadosPedido = {
-        pedido: {
-            data_pedido: new Date(pedido.createdAt).toLocaleDateString('pt-BR'),
+        // 2. Tratamento dos itens
+        const listaItens = typeof pedido.itens === 'string' ? JSON.parse(pedido.itens) : pedido.itens;
+
+        // 3. Monta o JSON no formato da API V3
+        // Nota: A estrutura da V3 pode ter pequenas variações de nomes de campos
+        const dadosPedido = {
+            data: new Date(pedido.createdAt).toISOString().split('T')[0], // Formato YYYY-MM-DD
             cliente: {
                 nome: pedido.clienteNome,
-                cpf_cnpj: pedido.clienteDoc, // Usando o clienteDoc que já temos no checkout
-                fone: pedido.clienteTelefone,
+                cpf_cnpj: pedido.clienteDoc,
+                telefone: pedido.clienteTelefone,
                 email: pedido.clienteEmail,
-                // Como você salva o endereço completo em uma string, mandamos tudo para 'endereco'
-                endereco: pedido.clienteEndereco, 
+                endereco: pedido.clienteEndereco,
             },
             itens: listaItens.map(item => ({
-                item: {
-                    codigo: item.referencia || item.id.toString(), // SKU/Referência que o Tiny entende
-                    descricao: item.nome,
-                    unidade: "UN",
-                    qtd: item.qtd,
-                    valor_unitario: item.unitario
-                }
+                codigo: item.referencia || item.id.toString(),
+                descricao: item.nome,
+                quantidade: item.qtd,
+                valor_unitario: item.unitario,
+                unidade: "UN"
             })),
-            forma_pagamento: pedido.metodoPagamento === 'PIX' ? 'Pix' : 'Cartão',
-            obs: `Pedido #${pedido.id} | Afiliado: ${pedido.afiliadoId || 'Direto'} | Comissão: R$ ${pedido.comissaoGerada.toFixed(2)}`
-        }
-    };
+            meio_pagamento: pedido.metodoPagamento === 'PIX' ? 'pix' : 'cartao_credito',
+            observacoes: `Pedido #${pedido.id} | Afiliado: ${pedido.afiliadoId || 'Direto'}`
+        };
 
-    try {
-        const url = `https://api.tiny.com.br/api2/pedido.incluir.php`;
-        
-        const params = new URLSearchParams();
-        params.append('token', TINY_TOKEN);
-        params.append('pedido', JSON.stringify(dadosPedido));
-        params.append('formato', 'json');
+        const url = `https://api.tiny.com.br/public-api/v3/pedidos`;
 
-        const response = await axios.post(url, params);
-        const retorno = response.data.retorno;
+        // 4. Envio com Header de Autorização
+        const response = await axios.post(url, dadosPedido, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
 
-        if (retorno.status === 'OK') {
-            console.log(`✅ Pedido #${pedido.id} integrado ao Tiny! ID Tiny: ${retorno.pedido.id}`);
-            return { sucesso: true, tinyId: retorno.pedido.id };
-        } else {
-            console.error(`❌ Erro Tiny no Pedido #${pedido.id}:`, retorno.erros);
-            return { sucesso: false, erro: retorno.erros };
+        // Na V3, o sucesso geralmente vem em formatos de status HTTP (201 Created)
+        if (response.status === 201 || response.data.status === 'OK') {
+            console.log(`✅ Pedido #${pedido.id} integrado ao Tiny V3!`);
+            return { sucesso: true, tinyId: response.data.data?.id };
         }
 
     } catch (error) {
-        console.error("❌ Erro de conexão com Tiny:", error.message);
-        return { sucesso: false, erro: error.message };
+        console.error("❌ Erro na API V3 do Tiny:", error.response?.data || error.message);
+        return { sucesso: false, erro: error.response?.data || error.message };
     }
 }
 

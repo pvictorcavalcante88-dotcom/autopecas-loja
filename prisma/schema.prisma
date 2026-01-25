@@ -175,3 +175,10 @@ model ClienteAfiliado {
   
   createdAt   DateTime @default(now())
 }
+
+model TinyConfig {
+  id            Int      @id @default(1)
+  accessToken   String?  @db.Text
+  refreshToken  String?  @db.Text
+  expiresAt     DateTime?
+}

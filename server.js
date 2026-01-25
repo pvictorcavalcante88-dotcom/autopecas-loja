@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const qs = require('querystring');
 const axios = require('axios');
+const { getValidToken } = require('./services/tinyAuth');
 const { enviarPedidoParaTiny } = require('./services/tinyService');
 const path = require('path'); 
 const multer = require('multer');
@@ -1545,7 +1546,65 @@ app.get('/afiliado/estatisticas', authenticateToken, async (req, res) => {
     }
 });
 
-// Adicione o axios no topo: const axios = require('axios');
+
+
+// 1. Rota para iniciar a autorização
+// Você vai acessar: seu-site.com/admin/tiny/autorizar
+app.get('/admin/tiny/autorizar', (req, res) => {
+    const clientId = process.env.TINY_CLIENT_ID;
+    const redirectUri = encodeURIComponent(process.env.TINY_REDIRECT_URI);
+    
+    // URL oficial da documentação que você enviou
+    const url = `https://accounts.tiny.com.br/realms/tiny/protocol/openid-connect/auth?client_id=${clientId}&redirect_uri=${redirectUri}&scope=openid&response_type=code`;
+    
+    res.redirect(url);
+});
+
+// 2. Rota de Callback (Onde o Tiny devolve o 'code')
+// Essa URL deve ser EXATAMENTE a mesma que você cadastrou no painel do Tiny
+app.get('/tiny/callback', async (req, res) => {
+    const { code } = req.query;
+
+    if (!code) return res.send("Erro: Código não fornecido pelo Tiny.");
+
+    try {
+        const params = new URLSearchParams();
+        params.append('grant_type', 'authorization_code');
+        params.append('client_id', process.env.TINY_CLIENT_ID);
+        params.append('client_secret', process.env.TINY_CLIENT_SECRET);
+        params.append('redirect_uri', process.env.TINY_REDIRECT_URI);
+        params.append('code', code);
+
+        const response = await axios.post('https://accounts.tiny.com.br/realms/tiny/protocol/openid-connect/token', params);
+
+        const { access_token, refresh_token, expires_in } = response.data;
+        
+        // Calcula quando o token vai vencer (expires_in vem em segundos, ex: 14400 = 4h)
+        const dataExpiracao = new Date(Date.now() + (expires_in * 1000));
+
+        // Salva no banco (usando upsert para criar ou atualizar o ID 1)
+        await prisma.tinyConfig.upsert({
+            where: { id: 1 },
+            update: { 
+                accessToken: access_token, 
+                refreshToken: refresh_token, 
+                expiresAt: dataExpiracao 
+            },
+            create: { 
+                id: 1, 
+                accessToken: access_token, 
+                refreshToken: refresh_token, 
+                expiresAt: dataExpiracao 
+            }
+        });
+
+        res.send("<h1>✅ Sucesso!</h1><p>Seu sistema agora está conectado ao Tiny V3.</p>");
+
+    } catch (error) {
+        console.error("Erro no Callback:", error.response?.data || error.message);
+        res.status(500).send("Erro ao obter token. Verifique os logs.");
+    }
+});
 
 app.get('/admin/sincronizar-tiny/:referencia', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
@@ -1581,6 +1640,23 @@ app.get('/admin/sincronizar-tiny/:referencia', authenticateToken, async (req, re
     }
 });
 
+app.post('/enviar-produto', async (req, res) => {
+    try {
+        // Você chama a função e ela resolve tudo (vencimento, banco, renovação) sozinha!
+        const token = await getValidToken();
+
+        // Agora usa o token no Header Bearer (Padrão V3)
+        const response = await axios.post('https://api.tiny.com.br/public-api/v3/produtos', seuObjeto, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({ erro: error.message });
+    }
+});
 // Rota para enviar um produto do seu banco para o Tiny
 
 app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {

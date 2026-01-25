@@ -1589,34 +1589,47 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         const produto = await prisma.produto.findUnique({ where: { id } });
+
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
 
-        // --- DADOS DO SERVIÇO (Simplificado ao máximo) ---
-        const skuTeste = `DIAGNOSTICO-${Date.now()}`;
-        
-        const dadosTiny = {
-            produto: {
-                sequencia: 1,
-                codigo: skuTeste,
-                nome: "TESTE DIAGNOSTICO",
-                unidade: "UN",
-                preco: "1.00",
-                situacao: "A",
-                tipo: "S" // Serviço (Não pede NCM)
-            }
+        // 1. HELPER PARA LIMPAR TEXTO PARA XML (Evita erro de "Mal Formado")
+        const escapeXml = (unsafe) => {
+            if (!unsafe) return "";
+            return unsafe.toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&apos;');
         };
 
-        const jsonPayload = JSON.stringify(dadosTiny);
-        const token = process.env.TINY_TOKEN.trim();
+        // 2. PREPARAÇÃO
+        let valorBruto = produto.preco_novo || produto.preco || 0;
+        if (typeof valorBruto === 'string') valorBruto = parseFloat(valorBruto.replace(',', '.'));
+        const precoFinal = valorBruto.toFixed(2);
+        
+        const skuTeste = `DIAGNOSTICO-XML-${Date.now()}`;
+        
+        // 3. MONTAGEM DO XML (TIPO SERVIÇO - O MAIS LEVE)
+        // Usamos Serviço (S) para pular validações de NCM/Estoque/Peso
+        const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
+        <produto>
+            <sequencia>1</sequencia>
+            <codigo>${skuTeste}</codigo>
+            <nome>${escapeXml("TESTE CONEXAO XML PURO")}</nome>
+            <unidade>UN</unidade>
+            <preco>1.00</preco>
+            <situacao>A</situacao>
+            <tipo>S</tipo>
+        </produto>`;
 
-        console.log(`🕵️‍♂️ Enviando JSON, pedindo XML para ler o erro...`);
+        console.log(`📜 Enviando XML Puro...`);
 
-        // --- O TRUQUE: FORMATO=XML ---
-        // Vamos forçar o Tiny a falar a língua nativa dele para ver o erro real
+        // 4. ENVIO (TUDO EM XML)
         const params = new URLSearchParams();
-        params.append('token', token);
-        params.append('formato', 'xml'); // <--- A MUDANÇA
-        params.append('produto', jsonPayload);
+        params.append('token', process.env.TINY_TOKEN.trim());
+        params.append('formato', 'xml'); // <--- ENTRADA E SAÍDA EM XML
+        params.append('produto', xmlPayload);
 
         const responseTiny = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
             method: 'POST',
@@ -1624,23 +1637,27 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         });
 
-        // Pegamos a resposta como TEXTO puro (porque virá XML)
+        // 5. LEITURA DA RESPOSTA BRUTA
         const textoResposta = await responseTiny.text();
-        
-        console.log("📜 RESPOSTA BRUTA DO TINY:");
+        console.log("📜 RESPOSTA XML DO TINY:");
         console.log(textoResposta);
 
-        // --- DIAGNÓSTICO ---
-        if (textoResposta.includes('<status>OK</status>') && !textoResposta.includes('<status_processamento>3</status_processamento>')) {
-             // Se funcionou, ótimo!
-             return res.json({ sucesso: true, msg: "Funcionou em XML!", raw: textoResposta });
-        } else {
-            // Se deu erro, agora vamos ver a mensagem escrita no XML
-            return res.status(400).json({ 
-                erro: "Erro decodificado do XML.", 
-                debug: textoResposta // O Front vai mostrar o XML com o erro
-            });
+        // --- ANÁLISE DO XML ---
+        // Verificamos se tem a tag de erro
+        if (textoResposta.includes('<erro>')) {
+             // O erro vai estar entre <erro> e </erro>
+             // Vamos "roubar" o texto do erro sem precisar de parser complexo
+             const matchErro = textoResposta.match(/<erro>(.*?)<\/erro>/);
+             const msgErro = matchErro ? matchErro[1] : "Erro desconhecido no XML";
+
+             return res.status(400).json({ erro: msgErro, raw: textoResposta });
+        } 
+        
+        if (textoResposta.includes('<status>OK</status>')) {
+            return res.json({ sucesso: true, msg: "SUCESSO! XML Funcionou.", raw: textoResposta });
         }
+
+        return res.status(400).json({ erro: "Retorno confuso do Tiny", raw: textoResposta });
 
     } catch (e) {
         console.error("Erro Server:", e);

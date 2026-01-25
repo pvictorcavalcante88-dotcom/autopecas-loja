@@ -1591,52 +1591,43 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
 
-// 🔍 ESPIÃO DE DADOS (Vai mostrar no terminal o nome certo das colunas)
-        console.log("📦 O QUE TEM NO BANCO:", JSON.stringify(produto, null, 2));
-
-        // --- CORREÇÃO INTELIGENTE DE PREÇO ---
-        // Tenta achar o preço em colunas comuns (preco, price, valor)
-        const valorReal = produto.preco || produto.price || produto.valor || 0;
+        // --- MAPEAMENTO DOS CAMPOS DO SEU BANCO ---
+        // Aqui conectamos os nomes do seu banco com o que o Tiny espera
         
-        let precoFinal = "0.00";
-        if (valorReal) {
-            let precoString = valorReal.toString().replace(',', '.');
-            let numero = parseFloat(precoString);
-            precoFinal = isNaN(numero) ? "0.00" : numero.toFixed(2);
-        }
+        // 1. PREÇO: Pega 'preco_novo' (que vimos no log que é 100)
+        const valorBanco = produto.preco_novo || produto.preco || 0;
+        let precoFinal = parseFloat(valorBanco).toFixed(2);
 
-        if (precoFinal === "0.00") {
-            return res.status(400).json({ erro: "O Preço do produto está zerado ou não foi encontrado no banco." });
-        }
-        if (produto.preco) {
-            // Troca vírgula por ponto e converte
-            let precoString = produto.preco.toString().replace(',', '.');
-            let numero = parseFloat(precoString);
-            // Se der erro (NaN), força 0.00, senão usa o número formatado
-            precoFinal = isNaN(numero) ? "0.00" : numero.toFixed(2);
-        }
-        // ----------------------------------
+        // 2. SKU: Tenta pegar 'referencia' ou 'referência' (com acento)
+        const skuFinal = produto.referencia || produto['referência'] || produto.sku;
 
-        // --- DIAGNÓSTICO (Para você ver no log) ---
-        console.log(`💲 Preço Original: ${produto.preco} | Preço Enviado: ${precoFinal}`);
+        if (!skuFinal) return res.status(400).json({ erro: "Produto sem SKU (Referência)." });
+
+        // 3. UNIDADE: Se não tiver, assume UN
+        const unidadeFinal = (produto.unidade || "UN").toUpperCase();
+
+        // ------------------------------------------
+
+        console.log(`✅ Dados mapeados: SKU=${skuFinal} | Preço=${precoFinal}`);
 
         const dadosTiny = {
             produto: {
                 sequencia: 1, 
-                codigo: produto.referencia,
+                codigo: skuFinal,
                 nome: produto.titulo,
-                preco: precoFinal, // <--- AGORA VAI CERTO (SEM NaN)
-                unidade: (produto.unidade || "UN").toUpperCase(),
+                preco: precoFinal, 
+                unidade: unidadeFinal,
                 situacao: "A",
                 tipo: "P",
                 origem: produto.origem || "0",
-                ncm: produto.ncm ? produto.ncm.replace(/\./g, "") : "87089990",
+                // Se não tiver NCM no banco, usa o padrão de autopeças
+                ncm: produto.ncm ? produto.ncm.replace(/\./g, "") : "87089990", 
                 cest: produto.cest || "",
                 tipo_item_sped: "00"
             }
         };
 
-        // --- ENVIO (FETCH) ---
+        // --- ENVIO VIA FETCH ---
         const params = new URLSearchParams();
         const tokenLimpo = process.env.TINY_TOKEN ? process.env.TINY_TOKEN.trim() : "";
         
@@ -1644,7 +1635,7 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         params.append('formato', 'json');
         params.append('produto', JSON.stringify(dadosTiny));
 
-        console.log(`📤 Enviando: ${JSON.stringify(dadosTiny)}`);
+        console.log(`📤 Enviando para o Tiny...`);
 
         const responseTiny = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
             method: 'POST',
@@ -1659,14 +1650,19 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
             const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
+            
             if (idTiny) {
-                await prisma.produto.update({ where: { id: id }, data: { tinyId: String(idTiny) } });
+                // Salva o ID do Tiny de volta no seu banco
+                await prisma.produto.update({ 
+                    where: { id: id }, 
+                    data: { tinyId: String(idTiny) } 
+                });
             }
-            return res.json({ sucesso: true, tinyId: idTiny });
+            return res.json({ sucesso: true, tinyId: idTiny, msg: "Integrado com Sucesso!" });
         } else {
             let erroMsg = "Erro desconhecido";
             if(retorno.erros) erroMsg = retorno.erros[0].erro;
-            else if(retorno.status_processamento === '3') erroMsg = "Erro: Dados inválidos (Verifique se o NCM está correto e o Preço não é zero)";
+            else if(retorno.status_processamento === '3') erroMsg = "Tiny rejeitou o produto. Verifique se o SKU já existe na lixeira do Tiny.";
             
             return res.status(400).json({ erro: erroMsg, debug: retorno });
         }

@@ -1584,6 +1584,7 @@ app.get('/admin/sincronizar-tiny/:referencia', authenticateToken, async (req, re
 // Rota para enviar um produto do seu banco para o Tiny
 
 app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
+    // Só Admin
     if (req.user.role !== 'admin') return res.sendStatus(403);
 
     try {
@@ -1592,90 +1593,70 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
 
-        // --- 1. PREPARAÇÃO E LIMPEZA DOS DADOS ---
+        // --- 1. DADOS DE TESTE (Blindados) ---
+        // Geramos um SKU que NUNCA existiu para isolar o problema
+        const skuTeste = `DIAGNOSTICO-${Date.now()}`;
         
-        // Remove acentos e caracteres especiais
-        const removerAcentos = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+        // Formata NCM (Remove pontos e recoloca): 8708.99.90
+        let ncmRaw = (produto.ncm || "87089990").replace(/\D/g, "");
+        if(ncmRaw === "") ncmRaw = "87089990"; // Fallback se vier vazio
+        const ncmFinal = ncmRaw.replace(/^(\d{4})(\d{2})(\d{2})$/, "$1.$2.$3");
 
-        // Formata o Preço (Troca vírgula por ponto e garante 2 casas)
-        let valorBruto = produto.preco_novo || produto.preco || 0;
-        if (typeof valorBruto === 'string') valorBruto = parseFloat(valorBruto.replace(',', '.'));
-        const precoFinal = valorBruto.toFixed(2); // Ex: "100.00"
+        // Limpa caracteres especiais do nome
+        const tituloLimpo = produto.titulo.replace(/[^\w\s]/gi, '');
 
-        // Formata o NCM (Adiciona os pontos: 87089990 -> 8708.99.90)
-        let ncmLimpo = produto.ncm ? produto.ncm.replace(/\D/g, "") : "87089990"; // Padrão se vier vazio
-        if (ncmLimpo.length === 8) {
-            ncmLimpo = `${ncmLimpo.substr(0,4)}.${ncmLimpo.substr(4,2)}.${ncmLimpo.substr(6,2)}`;
-        }
+        // --- 2. PACOTE XML (A Prova Real) ---
+        // Enviamos como XML. Se tiver erro de NCM, Unidade ou Origem, vai aparecer escrito.
+        const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
+        <produto>
+            <sequencia>1</sequencia>
+            <codigo>${skuTeste}</codigo>
+            <nome>${tituloLimpo}</nome>
+            <unidade>UN</unidade>
+            <preco>100.00</preco>
+            <origem>0</origem>
+            <situacao>A</situacao>
+            <tipo>P</tipo>
+            <ncm>${ncmFinal}</ncm>
+            <tipo_item_sped>00</tipo_item_sped>
+        </produto>`;
 
-        // Define o SKU (Código)
-        const skuFinal = produto.referencia || produto['referência'] || produto.sku;
-        if (!skuFinal) return res.status(400).json({ erro: "Produto sem SKU (Referência)." });
+        console.log(`🧪 DIAGNÓSTICO XML - SKU: ${skuTeste} | NCM: ${ncmFinal}`);
 
-        // --- 2. MONTAGEM DO PACOTE ---
-        const objetoProduto = {
-            sequencia: 1,
-            codigo: skuFinal,
-            nome: removerAcentos(produto.titulo),
-            unidade: (produto.unidade || "UN").toUpperCase(),
-            preco: precoFinal,
-            origem: produto.origem || "0",
-            situacao: "A",
-            tipo: "P",
-            ncm: ncmLimpo,
-            tipo_item_sped: "00", // 00 = Mercadoria para Revenda
-            cest: produto.cest // Pode vir vazio
-        };
+        // --- 3. ENVIO ---
+        const params = new URLSearchParams();
+        params.append('token', process.env.TINY_TOKEN.trim());
+        params.append('formato', 'xml'); // <--- PEDE RESPOSTA EM XML
+        params.append('produto', xmlPayload);
 
-        // 🧹 A FAXINA DE OURO: Remove campos vazios/nulos
-        // O Tiny odeia receber 'cest': "" (string vazia). Se não tem, deletamos a chave.
-        Object.keys(objetoProduto).forEach(key => {
-            if (!objetoProduto[key] || objetoProduto[key] === "") {
-                delete objetoProduto[key];
-            }
+        const responseTiny = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
+            method: 'POST',
+            body: params,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         });
 
-        const dadosTiny = { produto: objetoProduto };
-        const jsonPayload = JSON.stringify(dadosTiny);
+        // Lemos o texto bruto para ver o erro
+        const textoResposta = await responseTiny.text();
+        console.log("📜 RESPOSTA TINY:", textoResposta);
 
-        console.log(`📤 Enviando para o Tiny (Token Final)...`);
-        console.log(`📦 Payload: ${jsonPayload}`);
-
-        // --- 3. ENVIO SEGURO ---
-        const response = await axios.post(
-            'https://api.tiny.com.br/api2/produto.incluir.php',
-            qs.stringify({
-                token: process.env.TINY_TOKEN.trim(), // Token novo carregado
-                formato: 'json',
-                produto: jsonPayload
-            }),
-            {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-            }
-        );
-
-        const retorno = response.data.retorno;
-        console.log("Resposta Tiny:", JSON.stringify(retorno));
-
-        // --- 4. TRATAMENTO DA RESPOSTA ---
-        if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
-            const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
-            
-            if (idTiny) {
-                // Salva o ID do Tiny no seu banco para evitar duplicidade futura
-                await prisma.produto.update({ 
-                    where: { id: id }, 
-                    data: { tinyId: String(idTiny) } 
-                });
-            }
-            return res.json({ sucesso: true, tinyId: idTiny, msg: "Integrado com Sucesso!" });
+        // --- 4. ANÁLISE ---
+        if (textoResposta.includes('<status>OK</status>')) {
+            return res.json({ 
+                sucesso: true, 
+                msg: "SUCESSO! O erro era formato JSON. XML funcionou.", 
+                debug: textoResposta 
+            });
         } else {
-            // Se der erro, tenta pegar a mensagem detalhada
-            let erroMsg = "Erro desconhecido no Tiny.";
-            if (retorno.erros) erroMsg = retorno.erros[0].erro;
-            else if (retorno.status_processamento === '3') erroMsg = "Tiny rejeitou os dados. Verifique se o NCM é válido ou se o SKU já existe na lixeira.";
-            
-            return res.status(400).json({ erro: erroMsg, debug: retorno });
+            // AQUI VAI APARECER O ERRO REAL
+            // O código vai procurar a tag <erro> e te mostrar
+            const matchErro = textoResposta.match(/<erro>(.*?)<\/erro>/);
+            const erroReal = matchErro ? matchErro[1] : textoResposta;
+
+            return res.status(400).json({ 
+                erro: `ERRO DESCOBERTO: ${erroReal}`, 
+                xml_enviado: xmlPayload,
+                raw: textoResposta
+            });
         }
 
     } catch (e) {

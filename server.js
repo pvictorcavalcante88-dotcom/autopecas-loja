@@ -1591,69 +1591,76 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
 
-        // 1. TRATAMENTO DE PREÇO BLINDADO
-        let valorBruto = produto.preco_novo || produto.preco || 0;
-        if (typeof valorBruto === 'string') valorBruto = parseFloat(valorBruto.replace(',', '.'));
-        const precoFinal = valorBruto.toFixed(2); // "100.00"
-
-        // 2. SKU ALEATÓRIO (PARA FUGIR DA LIXEIRA)
-        // Se isso funcionar, seus SKUs originais estão travados no Tiny
-        const skuTeste = `TESTE-${Date.now()}`; 
-        
-        console.log(`🔍 Testando com SKU novo: ${skuTeste} (Original era: ${produto.referencia})`);
-
-        // 3. MONTAGEM DO JSON (Sem campos vazios)
-        const objetoProduto = {
-            sequencia: 1,
-            codigo: skuTeste, // <--- FORÇANDO SKU NOVO
-            nome: produto.titulo,
-            preco: precoFinal,
-            unidade: (produto.unidade || "UN").toUpperCase(),
-            situacao: "A",
-            tipo: "P",
-            origem: produto.origem || "0",
-            ncm: produto.ncm ? produto.ncm.replace(/\./g, "") : "87089990",
-            tipo_item_sped: "00"
+        // 1. LIMPEZA DE ACENTOS (Tiny às vezes odeia UTF-8 via API)
+        const removerAcentos = (str) => {
+            return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         };
 
-        // Só adiciona CEST se tiver valor (evita erro de string vazia)
-        if (produto.cest && produto.cest.length > 2) {
-            objetoProduto.cest = produto.cest;
+        // 2. FORMATAÇÃO NCM (Adiciona os pontos: 87089990 -> 8708.99.90)
+        let ncmLimpo = produto.ncm ? produto.ncm.replace(/\D/g, "") : "87089990";
+        if (ncmLimpo.length === 8) {
+            ncmLimpo = `${ncmLimpo.substr(0,4)}.${ncmLimpo.substr(4,2)}.${ncmLimpo.substr(6,2)}`;
         }
 
-        const dadosTiny = { produto: objetoProduto };
-        const jsonPayload = JSON.stringify(dadosTiny);
+        // 3. PREÇO BLINDADO
+        let valorBruto = produto.preco_novo || produto.preco || 0;
+        if (typeof valorBruto === 'string') valorBruto = parseFloat(valorBruto.replace(',', '.'));
+        const precoFinal = valorBruto.toFixed(2);
 
-        console.log(`📤 Enviando: ${jsonPayload}`);
+        // 4. SKU NOVO (Para garantir)
+        const skuTeste = `TESTE-LIMPO-${Date.now()}`; 
 
-        // 4. ENVIO COM AXIOS + QUERYSTRING (Formato mais compatível)
-        const response = await axios.post(
-            'https://api.tiny.com.br/api2/produto.incluir.php',
-            qs.stringify({
-                token: process.env.TINY_TOKEN.trim(),
-                formato: 'json',
-                produto: jsonPayload
-            }),
-            {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        console.log(`🧹 Enviando Produto Limpo: ${removerAcentos(produto.titulo)} | NCM: ${ncmLimpo}`);
+
+        // 5. MONTAGEM (SEM GTIN VAZIO)
+        // Se GTIN for vazio, melhor nem enviar a chave
+        const dadosTiny = {
+            produto: {
+                sequencia: 1,
+                codigo: skuTeste,
+                nome: removerAcentos(produto.titulo), // Nome sem acento
+                preco: precoFinal,
+                unidade: (produto.unidade || "UN").toUpperCase(),
+                situacao: "A",
+                tipo: "P",
+                origem: produto.origem || "0",
+                ncm: ncmLimpo, // NCM com pontos
+                tipo_item_sped: "00"
             }
-        );
+        };
 
-        const retorno = response.data.retorno;
+        // Adiciona CEST só se existir
+        if (produto.cest && produto.cest.length > 2) {
+            dadosTiny.produto.cest = produto.cest;
+        }
+
+        // 6. ENVIO VIA FETCH (Formulário Padrão)
+        const params = new URLSearchParams();
+        params.append('token', process.env.TINY_TOKEN.trim());
+        params.append('formato', 'json');
+        params.append('produto', JSON.stringify(dadosTiny));
+
+        console.log(`📤 Payload: ${JSON.stringify(dadosTiny)}`);
+
+        const responseTiny = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
+            method: 'POST',
+            body: params,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
+
+        const retornoTiny = await responseTiny.json();
+        const retorno = retornoTiny.retorno;
+
         console.log("Resposta Tiny:", JSON.stringify(retorno));
 
         if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
             const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
-            
-            // ATENÇÃO: NÃO SALVAMOS O ID NO BANCO AGORA PARA NÃO ESTRAGAR SEU PRODUTO COM O TESTE
-            // Se der certo, você saberá que o problema é o SKU duplicado.
-            
-            return res.json({ sucesso: true, tinyId: idTiny, msg: "SUCESSO! O problema era SKU Duplicado/Lixeira." });
+            return res.json({ sucesso: true, tinyId: idTiny, msg: "SUCESSO! Era Acento ou NCM." });
         } else {
             let erroMsg = "Erro Tiny.";
             if (retorno.erros) erroMsg = retorno.erros[0].erro;
-            else if (retorno.status_processamento === '3') erroMsg = "Erro 3: Bloqueio do Tiny (Verifique NCM inválido ou dados fiscais)";
-
+            else if (retorno.status_processamento === '3') erroMsg = "Erro 3: Dados Inválidos (Provavelmente NCM ou CEST incompatíveis).";
+            
             return res.status(400).json({ erro: erroMsg, debug: retorno });
         }
 

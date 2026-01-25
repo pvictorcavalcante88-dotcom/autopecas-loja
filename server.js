@@ -1591,69 +1591,84 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
 
-        // --- PREPARAÇÃO DOS DADOS ---
-        // Limpeza de texto (XML é chato com acentos se não avisar)
-        const limparTexto = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+        // --- 1. PREPARAÇÃO DOS DADOS ---
         
+        // Remove acentos
+        const removerAcentos = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+
+        // Preço Blindado (Sempre Ponto)
         let valorBruto = produto.preco_novo || produto.preco || 0;
         if (typeof valorBruto === 'string') valorBruto = parseFloat(valorBruto.replace(',', '.'));
         const precoFinal = valorBruto.toFixed(2);
 
-        // NCM com pontos (Padrão XML costuma gostar)
+        // NCM com pontos (Padrão Aceito)
         let ncmLimpo = produto.ncm ? produto.ncm.replace(/\D/g, "") : "87089990";
         if (ncmLimpo.length === 8) ncmLimpo = `${ncmLimpo.substr(0,4)}.${ncmLimpo.substr(4,2)}.${ncmLimpo.substr(6,2)}`;
 
-        // SKU Novo para teste
-        const skuTeste = `TESTE-XML-${Date.now()}`;
+        // SKU Novo (Garante que não é lixeira)
+        const skuTeste = `TESTE-FINAL-${Date.now()}`;
 
-        // --- A MUDANÇA: MONTANDO O XML ---
-        // Essa é a linguagem nativa do Tiny. Impossível ele ignorar.
-        const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
-        <produto>
-            <sequencia>1</sequencia>
-            <codigo>${skuTeste}</codigo>
-            <nome>${limparTexto(produto.titulo)}</nome>
-            <unidade>${(produto.unidade || "UN").toUpperCase()}</unidade>
-            <preco>${precoFinal}</preco>
-            <origem>${produto.origem || "0"}</origem>
-            <situacao>A</situacao>
-            <tipo>P</tipo>
-            <ncm>${ncmLimpo}</ncm>
-            <cest>${produto.cest || ""}</cest>
-            <tipo_item_sped>00</tipo_item_sped>
-        </produto>`;
+        // --- 2. MONTAGEM INTELIGENTE ---
+        // Criamos o objeto completo primeiro
+        let objetoProduto = {
+            sequencia: 1,
+            codigo: skuTeste,
+            nome: removerAcentos(produto.titulo),
+            unidade: (produto.unidade || "UN").toUpperCase(),
+            preco: precoFinal,
+            origem: produto.origem || "0",
+            situacao: "A",
+            tipo: "P",
+            ncm: ncmLimpo,
+            tipo_item_sped: "00", // Mercadoria para Revenda
+            cest: produto.cest // Pode vir vazio ou null
+        };
 
-        console.log(`📜 Enviando XML (Tamanho: ${xmlPayload.length}):`);
-        console.log(xmlPayload);
-
-        // --- ENVIO ---
-        // params: produto = XML, formato = JSON (para lermos a resposta fácil)
-        const params = new URLSearchParams();
-        params.append('token', process.env.TINY_TOKEN.trim());
-        params.append('formato', 'json'); // Pedimos a resposta em JSON
-        params.append('produto', xmlPayload); // Enviamos XML
-
-        const responseTiny = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
-            method: 'POST',
-            body: params,
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        // 🧹 A FAXINA: Removemos chaves que estão vazias ou nulas
+        // Isso impede de mandar "cest": "" que quebra o Tiny
+        Object.keys(objetoProduto).forEach(key => {
+            if (!objetoProduto[key] || objetoProduto[key] === "") {
+                delete objetoProduto[key];
+            }
         });
 
-        const retornoTiny = await responseTiny.json();
-        const retorno = retornoTiny.retorno;
+        const dadosTiny = { produto: objetoProduto };
+        const jsonPayload = JSON.stringify(dadosTiny);
 
+        console.log(`📤 Enviando JSON Limpo: ${jsonPayload}`);
+
+        // --- 3. ENVIO VIA AXIOS + QS (Padrão Ouro) ---
+        const response = await axios.post(
+            'https://api.tiny.com.br/api2/produto.incluir.php',
+            qs.stringify({
+                token: process.env.TINY_TOKEN.trim(),
+                formato: 'json',
+                produto: jsonPayload
+            }),
+            {
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            }
+        );
+
+        const retorno = response.data.retorno;
         console.log("Resposta Tiny:", JSON.stringify(retorno));
 
         if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
             const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
             
-            // Se funcionou com XML, podemos salvar!
-            // Mas como é um SKU de teste, vamos só avisar.
-            return res.json({ sucesso: true, tinyId: idTiny, msg: "SUCESSO! XML Funcionou." });
+            // SUCESSO! Salvamos no banco
+            if (idTiny) {
+                 await prisma.produto.update({ 
+                    where: { id: id }, 
+                    data: { tinyId: String(idTiny) } 
+                });
+            }
+
+            return res.json({ sucesso: true, tinyId: idTiny, msg: "SUCESSO! Produto Integrado." });
         } else {
             let erroMsg = "Erro Tiny.";
             if (retorno.erros) erroMsg = retorno.erros[0].erro;
-            else if (retorno.status_processamento === '3') erroMsg = "Erro 3 (XML): Tiny rejeitou os dados.";
+            else if (retorno.status_processamento === '3') erroMsg = "Status 3: O Tiny rejeitou os dados (Verifique se NCM ou Origem são válidos na sua conta).";
             
             return res.status(400).json({ erro: erroMsg, debug: retorno });
         }

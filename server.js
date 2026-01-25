@@ -1582,62 +1582,34 @@ app.get('/admin/sincronizar-tiny/:referencia', authenticateToken, async (req, re
 });
 
 // Rota para enviar um produto do seu banco para o Tiny
+
 app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
 
     try {
         const id = parseInt(req.params.id);
-        const produto = await prisma.produto.findUnique({ where: { id } });
-
-        if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
-
-        // --- 1. PREPARAÇÃO DOS DADOS ---
         
-        // Remove acentos
-        const removerAcentos = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+        // SKU Novo para teste
+        const skuTeste = `TESTE-SERVICO-${Date.now()}`;
 
-        // Preço Blindado (Sempre Ponto)
-        let valorBruto = produto.preco_novo || produto.preco || 0;
-        if (typeof valorBruto === 'string') valorBruto = parseFloat(valorBruto.replace(',', '.'));
-        const precoFinal = valorBruto.toFixed(2);
-
-        // NCM com pontos (Padrão Aceito)
-        let ncmLimpo = produto.ncm ? produto.ncm.replace(/\D/g, "") : "87089990";
-        if (ncmLimpo.length === 8) ncmLimpo = `${ncmLimpo.substr(0,4)}.${ncmLimpo.substr(4,2)}.${ncmLimpo.substr(6,2)}`;
-
-        // SKU Novo (Garante que não é lixeira)
-        const skuTeste = `TESTE-FINAL-${Date.now()}`;
-
-        // --- 2. MONTAGEM INTELIGENTE ---
-        // Criamos o objeto completo primeiro
-        let objetoProduto = {
+        // --- MODO SERVIÇO (O TESTE FINAL) ---
+        // Estamos mandando um "Serviço" porque ele não exige NCM nem validação fiscal.
+        // Se isso passar, o problema é o NCM do seu produto.
+        const objetoProduto = {
             sequencia: 1,
             codigo: skuTeste,
-            nome: removerAcentos(produto.titulo),
-            unidade: (produto.unidade || "UN").toUpperCase(),
-            preco: precoFinal,
-            origem: produto.origem || "0",
+            nome: "TESTE DE CONEXAO (SERVICO)",
+            unidade: "UN",
+            preco: "1.00",
             situacao: "A",
-            tipo: "P",
-            ncm: ncmLimpo,
-            tipo_item_sped: "00", // Mercadoria para Revenda
-            cest: produto.cest // Pode vir vazio ou null
+            tipo: "S", // <--- TIPO S (SERVIÇO) NÃO PEDE NCM
         };
-
-        // 🧹 A FAXINA: Removemos chaves que estão vazias ou nulas
-        // Isso impede de mandar "cest": "" que quebra o Tiny
-        Object.keys(objetoProduto).forEach(key => {
-            if (!objetoProduto[key] || objetoProduto[key] === "") {
-                delete objetoProduto[key];
-            }
-        });
 
         const dadosTiny = { produto: objetoProduto };
         const jsonPayload = JSON.stringify(dadosTiny);
 
-        console.log(`📤 Enviando JSON Limpo: ${jsonPayload}`);
+        console.log(`🧪 TENTATIVA SERVIÇO: ${jsonPayload}`);
 
-        // --- 3. ENVIO VIA AXIOS + QS (Padrão Ouro) ---
         const response = await axios.post(
             'https://api.tiny.com.br/api2/produto.incluir.php',
             qs.stringify({
@@ -1656,19 +1628,15 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
             const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
             
-            // SUCESSO! Salvamos no banco
-            if (idTiny) {
-                 await prisma.produto.update({ 
-                    where: { id: id }, 
-                    data: { tinyId: String(idTiny) } 
-                });
-            }
-
-            return res.json({ sucesso: true, tinyId: idTiny, msg: "SUCESSO! Produto Integrado." });
+            return res.json({ 
+                sucesso: true, 
+                tinyId: idTiny, 
+                msg: "SUCESSO! O problema era o NCM/Fiscal. O Serviço passou!" 
+            });
         } else {
             let erroMsg = "Erro Tiny.";
             if (retorno.erros) erroMsg = retorno.erros[0].erro;
-            else if (retorno.status_processamento === '3') erroMsg = "Status 3: O Tiny rejeitou os dados (Verifique se NCM ou Origem são válidos na sua conta).";
+            else if (retorno.status_processamento === '3') erroMsg = "BLOQUEIO TOTAL: Sua conta Tiny está rejeitando qualquer API (Verifique Permissões).";
             
             return res.status(400).json({ erro: erroMsg, debug: retorno });
         }
@@ -1678,6 +1646,9 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         res.status(500).json({ erro: e.message });
     }
 });
+ 
+
+ 
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

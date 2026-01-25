@@ -1588,57 +1588,58 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
     try {
         const id = parseInt(req.params.id);
-        
-        // SKU Novo para teste
-        const skuTeste = `TESTE-SERVICO-${Date.now()}`;
+        const produto = await prisma.produto.findUnique({ where: { id } });
+        if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
 
-        // --- MODO SERVIÇO (O TESTE FINAL) ---
-        // Estamos mandando um "Serviço" porque ele não exige NCM nem validação fiscal.
-        // Se isso passar, o problema é o NCM do seu produto.
-        const objetoProduto = {
-            sequencia: 1,
-            codigo: skuTeste,
-            nome: "TESTE DE CONEXAO (SERVICO)",
-            unidade: "UN",
-            preco: "1.00",
-            situacao: "A",
-            tipo: "S", // <--- TIPO S (SERVIÇO) NÃO PEDE NCM
+        // --- DADOS DO SERVIÇO (Simplificado ao máximo) ---
+        const skuTeste = `DIAGNOSTICO-${Date.now()}`;
+        
+        const dadosTiny = {
+            produto: {
+                sequencia: 1,
+                codigo: skuTeste,
+                nome: "TESTE DIAGNOSTICO",
+                unidade: "UN",
+                preco: "1.00",
+                situacao: "A",
+                tipo: "S" // Serviço (Não pede NCM)
+            }
         };
 
-        const dadosTiny = { produto: objetoProduto };
         const jsonPayload = JSON.stringify(dadosTiny);
+        const token = process.env.TINY_TOKEN.trim();
 
-        console.log(`🧪 TENTATIVA SERVIÇO: ${jsonPayload}`);
+        console.log(`🕵️‍♂️ Enviando JSON, pedindo XML para ler o erro...`);
 
-        const response = await axios.post(
-            'https://api.tiny.com.br/api2/produto.incluir.php',
-            qs.stringify({
-                token: process.env.TINY_TOKEN.trim(),
-                formato: 'json',
-                produto: jsonPayload
-            }),
-            {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-            }
-        );
+        // --- O TRUQUE: FORMATO=XML ---
+        // Vamos forçar o Tiny a falar a língua nativa dele para ver o erro real
+        const params = new URLSearchParams();
+        params.append('token', token);
+        params.append('formato', 'xml'); // <--- A MUDANÇA
+        params.append('produto', jsonPayload);
 
-        const retorno = response.data.retorno;
-        console.log("Resposta Tiny:", JSON.stringify(retorno));
+        const responseTiny = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
+            method: 'POST',
+            body: params,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
 
-        if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
-            const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
-            
-            return res.json({ 
-                sucesso: true, 
-                tinyId: idTiny, 
-                msg: "SUCESSO! O problema era o NCM/Fiscal. O Serviço passou!" 
-            });
+        // Pegamos a resposta como TEXTO puro (porque virá XML)
+        const textoResposta = await responseTiny.text();
+        
+        console.log("📜 RESPOSTA BRUTA DO TINY:");
+        console.log(textoResposta);
+
+        // --- DIAGNÓSTICO ---
+        if (textoResposta.includes('<status>OK</status>') && !textoResposta.includes('<status_processamento>3</status_processamento>')) {
+             // Se funcionou, ótimo!
+             return res.json({ sucesso: true, msg: "Funcionou em XML!", raw: textoResposta });
         } else {
-            let erroMsg = "Erro Tiny.";
-            if (retorno.erros) erroMsg = retorno.erros[0].erro;
-            else if (retorno.status_processamento === '3') erroMsg = "BLOQUEIO TOTAL: Sua conta Tiny está rejeitando qualquer API (Verifique Permissões).";
-            
-            return res.status(400).json({ erro: erroMsg, debug: retorno });
+            // Se deu erro, agora vamos ver a mensagem escrita no XML
+            return res.status(400).json({ 
+                erro: "Erro decodificado do XML.", 
+                debug: textoResposta // O Front vai mostrar o XML com o erro
+            });
         }
 
     } catch (e) {

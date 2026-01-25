@@ -1659,6 +1659,31 @@ app.post('/enviar-produto', async (req, res) => {
 });
 // Rota para enviar um produto do seu banco para o Tiny
 
+app.post('/admin/teste-v3-direto', authenticateToken, async (req, res) => {
+    try {
+        const tokenV3 = "COLE_AQUI_SEU_TOKEN_DA_IMAGEM_6b9...";
+
+        const produtoTeste = {
+            nome: "PRODUTO TESTE V3",
+            codigo: "TESTE-" + Date.now(),
+            preco: 125.50,
+            unidade: "UN",
+            tipo: "P"
+        };
+
+        const response = await axios.post('https://api.tiny.com.br/public-api/v3/produtos', produtoTeste, {
+            headers: {
+                'Authorization': `Bearer ${tokenV3}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        res.json({ msg: "FINALMENTE FUNCIONOU!", data: response.data });
+    } catch (error) {
+        res.status(500).json({ erro: error.response?.data || error.message });
+    }
+});
+
 app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
 

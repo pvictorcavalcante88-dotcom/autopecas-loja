@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 async function getValidToken() {
     // 1. Busca os tokens salvos (Certifique-se que a tabela 'tinyConfig' existe no seu schema.prisma)
-    const config = await prisma.tinyConfig.findFirst(); 
+    const config = await prisma.TinyConfig.findFirst(); 
     
     if (!config || !config.refresh_token) {
         throw new Error("Nenhum token encontrado no banco. Você precisa autorizar o Tiny primeiro.");

@@ -1591,43 +1591,53 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
 
-        // --- MAPEAMENTO DOS CAMPOS DO SEU BANCO ---
-        // Aqui conectamos os nomes do seu banco com o que o Tiny espera
-        
-        // 1. PREÇO: Pega 'preco_novo' (que vimos no log que é 100)
+        // --- 1. TRATAMENTO DO PREÇO (O VILÃO DA VÍRGULA) ---
+        // Pega preço novo, ou preço normal, ou 0
         const valorBanco = produto.preco_novo || produto.preco || 0;
-        let precoFinal = parseFloat(valorBanco).toFixed(2);
+        
+        let precoFinal = "0.00";
+        if (valorBanco) {
+            // Passo 1: Transforma em texto e troca vírgula por ponto (ex: "100,00" vira "100.00")
+            let stringLimpa = valorBanco.toString().replace(',', '.');
+            
+            // Passo 2: Garante que é número
+            let numero = parseFloat(stringLimpa);
+            
+            // Passo 3: Formata com 2 casas decimais (isso garante o ponto final)
+            if (!isNaN(numero)) {
+                precoFinal = numero.toFixed(2); // Retorna "100.00"
+            }
+        }
 
-        // 2. SKU: Tenta pegar 'referencia' ou 'referência' (com acento)
+        // TRAVA DE SEGURANÇA FINAL: Se por milagre ainda tiver vírgula, mata ela aqui
+        precoFinal = precoFinal.replace(',', '.');
+
+        // --- 2. RESTO DOS DADOS ---
         const skuFinal = produto.referencia || produto['referência'] || produto.sku;
-
         if (!skuFinal) return res.status(400).json({ erro: "Produto sem SKU (Referência)." });
 
-        // 3. UNIDADE: Se não tiver, assume UN
         const unidadeFinal = (produto.unidade || "UN").toUpperCase();
 
-        // ------------------------------------------
-
-        console.log(`✅ Dados mapeados: SKU=${skuFinal} | Preço=${precoFinal}`);
+        console.log(`✅ Dados Ajustados: SKU=${skuFinal} | Preço=${precoFinal}`); 
+        // TEM QUE APARECER: Preço=100.00 (Com PONTO)
 
         const dadosTiny = {
             produto: {
                 sequencia: 1, 
                 codigo: skuFinal,
                 nome: produto.titulo,
-                preco: precoFinal, 
+                preco: precoFinal, // Agora vai com ponto!
                 unidade: unidadeFinal,
                 situacao: "A",
                 tipo: "P",
                 origem: produto.origem || "0",
-                // Se não tiver NCM no banco, usa o padrão de autopeças
                 ncm: produto.ncm ? produto.ncm.replace(/\./g, "") : "87089990", 
                 cest: produto.cest || "",
                 tipo_item_sped: "00"
             }
         };
 
-        // --- ENVIO VIA FETCH ---
+        // --- 3. ENVIO VIA FETCH ---
         const params = new URLSearchParams();
         const tokenLimpo = process.env.TINY_TOKEN ? process.env.TINY_TOKEN.trim() : "";
         
@@ -1635,7 +1645,7 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         params.append('formato', 'json');
         params.append('produto', JSON.stringify(dadosTiny));
 
-        console.log(`📤 Enviando para o Tiny...`);
+        console.log(`📤 Enviando JSON para o Tiny...`);
 
         const responseTiny = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
             method: 'POST',
@@ -1652,7 +1662,6 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
             
             if (idTiny) {
-                // Salva o ID do Tiny de volta no seu banco
                 await prisma.produto.update({ 
                     where: { id: id }, 
                     data: { tinyId: String(idTiny) } 
@@ -1661,8 +1670,10 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             return res.json({ sucesso: true, tinyId: idTiny, msg: "Integrado com Sucesso!" });
         } else {
             let erroMsg = "Erro desconhecido";
+            // Tenta pegar mensagem de erro de todos os lugares possíveis
             if(retorno.erros) erroMsg = retorno.erros[0].erro;
-            else if(retorno.status_processamento === '3') erroMsg = "Tiny rejeitou o produto. Verifique se o SKU já existe na lixeira do Tiny.";
+            else if(retorno.registros?.[0]?.registro?.erros) erroMsg = retorno.registros[0].registro.erros[0].erro;
+            else if(retorno.status_processamento === '3') erroMsg = "Tiny rejeitou (Status 3). Verifique se o SKU já existe na Lixeira do Tiny.";
             
             return res.status(400).json({ erro: erroMsg, debug: retorno });
         }

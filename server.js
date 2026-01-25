@@ -1591,18 +1591,28 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
 
-        // --- DIAGNÓSTICO DE TOKEN ---
-        const tokenAtual = process.env.TINY_TOKEN ? process.env.TINY_TOKEN.trim() : "";
-        console.log(`🔑 Token usado (inicio): ${tokenAtual.substring(0, 5)}...`); 
+        // --- FUNÇÃO DE CORREÇÃO DE PREÇO ---
+        // Transforma "100,00", "100.00" ou 100 em "100.00"
+        let precoFinal = "0.00";
+        if (produto.preco) {
+            // Troca vírgula por ponto e converte
+            let precoString = produto.preco.toString().replace(',', '.');
+            let numero = parseFloat(precoString);
+            // Se der erro (NaN), força 0.00, senão usa o número formatado
+            precoFinal = isNaN(numero) ? "0.00" : numero.toFixed(2);
+        }
+        // ----------------------------------
 
-        // --- PREPARAÇÃO DOS DADOS ---
+        // --- DIAGNÓSTICO (Para você ver no log) ---
+        console.log(`💲 Preço Original: ${produto.preco} | Preço Enviado: ${precoFinal}`);
+
         const dadosTiny = {
             produto: {
-                sequencia: 1, // <--- OBRIGATÓRIO PARA O RETORNO NÃO VIR VAZIO
+                sequencia: 1, 
                 codigo: produto.referencia,
                 nome: produto.titulo,
-                preco: parseFloat(produto.preco).toFixed(2),
-                unidade: (produto.unidade || "UN").toUpperCase(), // Garante UN maiúsculo
+                preco: precoFinal, // <--- AGORA VAI CERTO (SEM NaN)
+                unidade: (produto.unidade || "UN").toUpperCase(),
                 situacao: "A",
                 tipo: "P",
                 origem: produto.origem || "0",
@@ -1612,20 +1622,20 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             }
         };
 
-        // --- ENVIO COM FETCH (A MANEIRA MAIS SEGURA) ---
+        // --- ENVIO (FETCH) ---
         const params = new URLSearchParams();
-        params.append('token', tokenAtual);
-        params.append('formato', 'json');
+        const tokenLimpo = process.env.TINY_TOKEN ? process.env.TINY_TOKEN.trim() : "";
         
-        // Converte o objeto para string JSON
-        const jsonProduto = JSON.stringify(dadosTiny);
-        params.append('produto', jsonProduto);
+        params.append('token', tokenLimpo);
+        params.append('formato', 'json');
+        params.append('produto', JSON.stringify(dadosTiny));
 
-        console.log(`📤 Enviando payload: ${jsonProduto}`); // Mostra o que está sendo enviado
+        console.log(`📤 Enviando: ${JSON.stringify(dadosTiny)}`);
 
         const responseTiny = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
             method: 'POST',
-            body: params, // O fetch trata o URLSearchParams automaticamente
+            body: params,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         });
 
         const retornoTiny = await responseTiny.json();
@@ -1633,20 +1643,16 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         console.log("Resposta Tiny:", JSON.stringify(retorno));
 
-        // --- SUCESSO OU ERRO ---
         if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
-            // Tenta pegar o ID de várias formas possíveis que o Tiny retorna
             const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
-            
             if (idTiny) {
                 await prisma.produto.update({ where: { id: id }, data: { tinyId: String(idTiny) } });
             }
             return res.json({ sucesso: true, tinyId: idTiny });
         } else {
-            // Se der erro, mostramos o motivo exato
             let erroMsg = "Erro desconhecido";
-            if(retorno.erros) erroMsg = JSON.stringify(retorno.erros);
-            else if(retorno.registros?.[0]?.registro?.erros) erroMsg = JSON.stringify(retorno.registros[0].registro.erros);
+            if(retorno.erros) erroMsg = retorno.erros[0].erro;
+            else if(retorno.status_processamento === '3') erroMsg = "Erro: Dados inválidos (Verifique se o NCM está correto e o Preço não é zero)";
             
             return res.status(400).json({ erro: erroMsg, debug: retorno });
         }

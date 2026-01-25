@@ -1591,9 +1591,23 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
 
-        // --- FUNÇÃO DE CORREÇÃO DE PREÇO ---
-        // Transforma "100,00", "100.00" ou 100 em "100.00"
+// 🔍 ESPIÃO DE DADOS (Vai mostrar no terminal o nome certo das colunas)
+        console.log("📦 O QUE TEM NO BANCO:", JSON.stringify(produto, null, 2));
+
+        // --- CORREÇÃO INTELIGENTE DE PREÇO ---
+        // Tenta achar o preço em colunas comuns (preco, price, valor)
+        const valorReal = produto.preco || produto.price || produto.valor || 0;
+        
         let precoFinal = "0.00";
+        if (valorReal) {
+            let precoString = valorReal.toString().replace(',', '.');
+            let numero = parseFloat(precoString);
+            precoFinal = isNaN(numero) ? "0.00" : numero.toFixed(2);
+        }
+
+        if (precoFinal === "0.00") {
+            return res.status(400).json({ erro: "O Preço do produto está zerado ou não foi encontrado no banco." });
+        }
         if (produto.preco) {
             // Troca vírgula por ponto e converte
             let precoString = produto.preco.toString().replace(',', '.');

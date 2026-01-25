@@ -1584,83 +1584,86 @@ app.get('/admin/sincronizar-tiny/:referencia', authenticateToken, async (req, re
 // Rota para enviar um produto do seu banco para o Tiny
 
 app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
-    // Só Admin
-    if (req.user.role !== 'admin') return res.sendStatus(403);
+    // 1. PRIMEIRO: TESTE DE LEITURA (PESQUISA)
+    // Isso vai nos dizer se o Token tem permissão de verdade.
+    try {
+        console.log("📡 1. Testando LEITURA (Pesquisa de Produtos)...");
+        const paramsBusca = new URLSearchParams();
+        paramsBusca.append('token', process.env.TINY_TOKEN.trim());
+        paramsBusca.append('formato', 'json');
 
+        const responseBusca = await fetch('https://api.tiny.com.br/api2/produtos.pesquisa.php', {
+            method: 'POST',
+            body: paramsBusca,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8' }
+        });
+        const jsonBusca = await responseBusca.json();
+        
+        console.log(`🔍 Resultado da Leitura: Status ${jsonBusca.retorno.status_processamento}`);
+        
+        // Se a busca der erro, nem adianta tentar enviar. O problema é permissão.
+        if (jsonBusca.retorno.status === 'Erro') {
+            return res.status(400).json({ 
+                erro: "SEU TOKEN NÃO TEM PERMISSÃO DE PESQUISA.", 
+                dica: "Vá no Tiny > Extensões > API > Edite o Token > Marque todas as caixinhas de 'Produtos' e SALVE.",
+                debug: jsonBusca.retorno 
+            });
+        }
+    } catch (e) {
+        console.log("Erro no teste de leitura:", e.message);
+    }
+
+    // 2. SE A LEITURA PASSOU, TENTA O ENVIO COM CORREÇÃO DE CHARSET
     try {
         const id = parseInt(req.params.id);
         const produto = await prisma.produto.findUnique({ where: { id } });
-
-        if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
-
-        // --- 1. DADOS DE TESTE (Blindados) ---
-        // Geramos um SKU que NUNCA existiu para isolar o problema
-        const skuTeste = `DIAGNOSTICO-${Date.now()}`;
         
-        // Formata NCM (Remove pontos e recoloca): 8708.99.90
-        let ncmRaw = (produto.ncm || "87089990").replace(/\D/g, "");
-        if(ncmRaw === "") ncmRaw = "87089990"; // Fallback se vier vazio
-        const ncmFinal = ncmRaw.replace(/^(\d{4})(\d{2})(\d{2})$/, "$1.$2.$3");
-
-        // Limpa caracteres especiais do nome
-        const tituloLimpo = produto.titulo.replace(/[^\w\s]/gi, '');
-
-        // --- 2. PACOTE XML (A Prova Real) ---
-        // Enviamos como XML. Se tiver erro de NCM, Unidade ou Origem, vai aparecer escrito.
-        const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
-        <produto>
+        // SKU Novo para evitar lixeira
+        const skuTeste = `TESTE-CHARSET-${Date.now()}`;
+        
+        // XML SIMPLIFICADO (Sem cabeçalho <?xml...?> que as vezes atrapalha em POST)
+        const xmlPayload = 
+        `<produto>
             <sequencia>1</sequencia>
             <codigo>${skuTeste}</codigo>
-            <nome>${tituloLimpo}</nome>
+            <nome>TESTE DE CONEXAO UTF8</nome>
             <unidade>UN</unidade>
             <preco>100.00</preco>
             <origem>0</origem>
             <situacao>A</situacao>
-            <tipo>P</tipo>
-            <ncm>${ncmFinal}</ncm>
-            <tipo_item_sped>00</tipo_item_sped>
+            <tipo>S</tipo>
         </produto>`;
 
-        console.log(`🧪 DIAGNÓSTICO XML - SKU: ${skuTeste} | NCM: ${ncmFinal}`);
+        console.log(`📤 2. Enviando XML com Header UTF-8...`);
 
-        // --- 3. ENVIO ---
-        const params = new URLSearchParams();
-        params.append('token', process.env.TINY_TOKEN.trim());
-        params.append('formato', 'xml'); // <--- PEDE RESPOSTA EM XML
-        params.append('produto', xmlPayload);
+        const paramsEnvio = new URLSearchParams();
+        paramsEnvio.append('token', process.env.TINY_TOKEN.trim());
+        paramsEnvio.append('formato', 'xml'); // Pede resposta em XML
+        paramsEnvio.append('produto', xmlPayload);
 
-        const responseTiny = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
+        const responseEnvio = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
             method: 'POST',
-            body: params,
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            body: paramsEnvio,
+            // 🚨 O PULO DO GATO: Forçar charset utf-8 no header
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8' }
         });
 
-        // Lemos o texto bruto para ver o erro
-        const textoResposta = await responseTiny.text();
-        console.log("📜 RESPOSTA TINY:", textoResposta);
+        const textoResposta = await responseEnvio.text();
+        console.log("📜 RESPOSTA FINAL:", textoResposta);
 
-        // --- 4. ANÁLISE ---
-        if (textoResposta.includes('<status>OK</status>')) {
-            return res.json({ 
-                sucesso: true, 
-                msg: "SUCESSO! O erro era formato JSON. XML funcionou.", 
-                debug: textoResposta 
-            });
+        if (textoResposta.includes('<status>OK</status>') && !textoResposta.includes('<registros/>')) {
+             return res.json({ sucesso: true, msg: "SUCESSO! O problema era Charset/Encoding." });
+        } else if (textoResposta.includes('<registros/>')) {
+             // Se continuar vazio, é permissão de ESCRITA faltando no token
+             return res.status(400).json({ 
+                 erro: "TOKEN SEM PERMISSÃO DE ESCRITA (INCLUIR)", 
+                 dica: "O Tiny leu mas ignorou. Verifique se a caixa 'Incluir' está marcada na configuração do Token." 
+             });
         } else {
-            // AQUI VAI APARECER O ERRO REAL
-            // O código vai procurar a tag <erro> e te mostrar
-            const matchErro = textoResposta.match(/<erro>(.*?)<\/erro>/);
-            const erroReal = matchErro ? matchErro[1] : textoResposta;
-
-            return res.status(400).json({ 
-                erro: `ERRO DESCOBERTO: ${erroReal}`, 
-                xml_enviado: xmlPayload,
-                raw: textoResposta
-            });
+             return res.status(400).json({ erro: "Erro detalhado", debug: textoResposta });
         }
 
     } catch (e) {
-        console.error("Erro Server:", e);
         res.status(500).json({ erro: e.message });
     }
 });

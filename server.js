@@ -1584,82 +1584,46 @@ app.get('/admin/sincronizar-tiny/:referencia', authenticateToken, async (req, re
 // Rota para enviar um produto do seu banco para o Tiny
 
 app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
-    // 1. TESTE DE CONEXÃO (PESQUISA)
+    // 1. PEGA O TOKEN DA MEMÓRIA
+    const tokenAtual = process.env.TINY_TOKEN ? process.env.TINY_TOKEN.trim() : "NÃO ENCONTRADO";
+    
+    // 2. ESCONDE O MEIO (SEGURANÇA) E MOSTRA SÓ O INÍCIO E O FIM
+    const inicio = tokenAtual.substring(0, 5);
+    const fim = tokenAtual.substring(tokenAtual.length - 5);
+    const tamanho = tokenAtual.length;
+
+    console.log(`=========================================`);
+    console.log(`🕵️‍♂️ DIAGNÓSTICO DE TOKEN`);
+    console.log(`🔑 Token Carregado: ${inicio}...${fim}`);
+    console.log(`📏 Tamanho: ${tamanho} caracteres`);
+    console.log(`=========================================`);
+
+    // 3. VERIFICA SE O TOKEN PARECE CERTO
+    let veredito = "✅ Parece um Token Válido";
+    if (tamanho < 30) veredito = "❌ MUITO CURTO (Provavelmente inválido)";
+    if (tokenAtual.includes(" ")) veredito = "❌ TEM ESPAÇOS EM BRANCO (Erro de cópia)";
+    
+    // 4. TESTE REAL DE CONEXÃO COM ESSE TOKEN
     try {
-        console.log("📡 Testando conexão com Tiny (Pesquisa)...");
-        
         const params = new URLSearchParams();
-        params.append('token', process.env.TINY_TOKEN.trim());
+        params.append('token', tokenAtual);
         params.append('formato', 'json');
         
-        // Vamos pesquisar qualquer coisa só para ver se a API responde
-        const response = await fetch('https://api.tiny.com.br/api2/produtos.pesquisa.php', {
+        const response = await fetch('https://api.tiny.com.br/api2/info.php', { // Rota mais leve do Tiny
             method: 'POST',
-            body: params,
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            body: params
         });
-
         const dados = await response.json();
-        console.log("🔍 Resultado do Teste de Conexão:", JSON.stringify(dados.retorno));
-
-        if (dados.retorno.status !== 'OK') {
-             return res.status(400).json({ erro: "Sua conta Tiny está bloqueando a API. Verifique o Token.", debug: dados.retorno });
-        }
-    } catch (e) {
-        return res.status(500).json({ erro: "Falha total na conexão.", debug: e.message });
-    }
-
-    // 2. SE PASSOU NO TESTE, TENTA O ENVIO COM UMA MUDANÇA RADICAL
-    // Tática: Enviar JSON sem o wrapper "produto" (Às vezes o Tiny se confunde com wrappers duplos)
-    
-    try {
-        const id = parseInt(req.params.id);
-        const produto = await prisma.produto.findUnique({ where: { id } });
         
-        const skuTeste = `TESTE-FINAL-${Date.now()}`;
-        
-        // DADOS PUROS (SEM O WRAPPER { produto: ... })
-        const objetoProduto = {
-            sequencia: 1,
-            codigo: skuTeste,
-            nome: "TESTE DE INTEGRACAO",
-            unidade: "UN",
-            preco: "1.00",
-            origem: "0",
-            situacao: "A",
-            tipo: "S" // Serviço para facilitar
-        };
-
-        const jsonPayload = JSON.stringify({ produto: objetoProduto }); // Wrapper padrão
-
-        console.log(`📤 Enviando Payload: ${jsonPayload}`);
-
-        const paramsEnvio = new URLSearchParams();
-        paramsEnvio.append('token', process.env.TINY_TOKEN.trim());
-        paramsEnvio.append('formato', 'json');
-        paramsEnvio.append('produto', jsonPayload);
-
-        const responseEnvio = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
-            method: 'POST',
-            body: paramsEnvio,
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        return res.json({
+            meuToken: `${inicio}...${fim}`,
+            tamanho: tamanho,
+            analise: veredito,
+            respostaTiny: dados.retorno // Aqui o Tiny vai dizer se aceita ou não
         });
 
-        const retornoEnvio = (await responseEnvio.json()).retorno;
-        console.log("📦 Resposta do Envio:", JSON.stringify(retornoEnvio));
-
-        if (retornoEnvio.status === 'OK' && retornoEnvio.status_processamento !== '3') {
-            return res.json({ sucesso: true, msg: "SUCESSO!" });
-        } else {
-            // Se der erro de novo, mostramos o erro da PESQUISA também para comparar
-            return res.status(400).json({ 
-                erro: "Erro no envio (Inclusão)", 
-                debugEnvio: retornoEnvio 
-            });
-        }
-
     } catch (e) {
-        res.status(500).json({ erro: e.message });
+        return res.status(500).json({ erro: "Erro ao testar conexão", det: e.message });
     }
 });
  

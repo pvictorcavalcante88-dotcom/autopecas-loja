@@ -1584,86 +1584,88 @@ app.get('/admin/sincronizar-tiny/:referencia', authenticateToken, async (req, re
 // Rota para enviar um produto do seu banco para o Tiny
 
 app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
-    // 1. PRIMEIRO: TESTE DE LEITURA (PESQUISA)
-    // Isso vai nos dizer se o Token tem permissão de verdade.
-    try {
-        console.log("📡 1. Testando LEITURA (Pesquisa de Produtos)...");
-        const paramsBusca = new URLSearchParams();
-        paramsBusca.append('token', process.env.TINY_TOKEN.trim());
-        paramsBusca.append('formato', 'json');
+    if (req.user.role !== 'admin') return res.sendStatus(403);
 
-        const responseBusca = await fetch('https://api.tiny.com.br/api2/produtos.pesquisa.php', {
-            method: 'POST',
-            body: paramsBusca,
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8' }
-        });
-        const jsonBusca = await responseBusca.json();
-        
-        console.log(`🔍 Resultado da Leitura: Status ${jsonBusca.retorno.status_processamento}`);
-        
-        // Se a busca der erro, nem adianta tentar enviar. O problema é permissão.
-        if (jsonBusca.retorno.status === 'Erro') {
-            return res.status(400).json({ 
-                erro: "SEU TOKEN NÃO TEM PERMISSÃO DE PESQUISA.", 
-                dica: "Vá no Tiny > Extensões > API > Edite o Token > Marque todas as caixinhas de 'Produtos' e SALVE.",
-                debug: jsonBusca.retorno 
-            });
-        }
-    } catch (e) {
-        console.log("Erro no teste de leitura:", e.message);
-    }
-
-    // 2. SE A LEITURA PASSOU, TENTA O ENVIO COM CORREÇÃO DE CHARSET
     try {
         const id = parseInt(req.params.id);
         const produto = await prisma.produto.findUnique({ where: { id } });
-        
-        // SKU Novo para evitar lixeira
-        const skuTeste = `TESTE-CHARSET-${Date.now()}`;
-        
-        // XML SIMPLIFICADO (Sem cabeçalho <?xml...?> que as vezes atrapalha em POST)
-        const xmlPayload = 
-        `<produto>
-            <sequencia>1</sequencia>
-            <codigo>${skuTeste}</codigo>
-            <nome>TESTE DE CONEXAO UTF8</nome>
-            <unidade>UN</unidade>
-            <preco>100.00</preco>
-            <origem>0</origem>
-            <situacao>A</situacao>
-            <tipo>S</tipo>
-        </produto>`;
 
-        console.log(`📤 2. Enviando XML com Header UTF-8...`);
+        if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
 
-        const paramsEnvio = new URLSearchParams();
-        paramsEnvio.append('token', process.env.TINY_TOKEN.trim());
-        paramsEnvio.append('formato', 'xml'); // Pede resposta em XML
-        paramsEnvio.append('produto', xmlPayload);
+        // 1. LIMPEZA E FORMATAÇÃO
+        const removerAcentos = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
 
-        const responseEnvio = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
-            method: 'POST',
-            body: paramsEnvio,
-            // 🚨 O PULO DO GATO: Forçar charset utf-8 no header
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8' }
+        let valorBruto = produto.preco_novo || produto.preco || 0;
+        if (typeof valorBruto === 'string') valorBruto = parseFloat(valorBruto.replace(',', '.'));
+        const precoFinal = valorBruto.toFixed(2);
+
+        let ncmLimpo = produto.ncm ? produto.ncm.replace(/\D/g, "") : "87089990";
+        if (ncmLimpo.length === 8) {
+            ncmLimpo = `${ncmLimpo.substr(0,4)}.${ncmLimpo.substr(4,2)}.${ncmLimpo.substr(6,2)}`;
+        }
+
+        const skuFinal = produto.referencia || produto['referência'] || produto.sku;
+
+        // 2. MONTAGEM DO JSON
+        const objetoProduto = {
+            sequencia: 1,
+            codigo: skuFinal,
+            nome: removerAcentos(produto.titulo),
+            unidade: (produto.unidade || "UN").toUpperCase(),
+            preco: precoFinal,
+            origem: produto.origem || "0",
+            situacao: "A",
+            tipo: "P",
+            ncm: ncmLimpo,
+            tipo_item_sped: "00",
+            cest: produto.cest
+        };
+
+        // Remove campos vazios (Evita erro no CEST vazio)
+        Object.keys(objetoProduto).forEach(key => {
+            if (!objetoProduto[key] || objetoProduto[key] === "") {
+                delete objetoProduto[key];
+            }
         });
 
-        const textoResposta = await responseEnvio.text();
-        console.log("📜 RESPOSTA FINAL:", textoResposta);
+        const jsonPayload = JSON.stringify({ produto: objetoProduto });
 
-        if (textoResposta.includes('<status>OK</status>') && !textoResposta.includes('<registros/>')) {
-             return res.json({ sucesso: true, msg: "SUCESSO! O problema era Charset/Encoding." });
-        } else if (textoResposta.includes('<registros/>')) {
-             // Se continuar vazio, é permissão de ESCRITA faltando no token
-             return res.status(400).json({ 
-                 erro: "TOKEN SEM PERMISSÃO DE ESCRITA (INCLUIR)", 
-                 dica: "O Tiny leu mas ignorou. Verifique se a caixa 'Incluir' está marcada na configuração do Token." 
-             });
+        console.log(`📤 Enviando produto validado: ${skuFinal}`);
+
+        // 3. ENVIO
+        const response = await axios.post(
+            'https://api.tiny.com.br/api2/produto.incluir.php',
+            qs.stringify({
+                token: process.env.TINY_TOKEN.trim(),
+                formato: 'json',
+                produto: jsonPayload
+            }),
+            {
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            }
+        );
+
+        const retorno = response.data.retorno;
+        console.log("Resposta Tiny:", JSON.stringify(retorno));
+
+        if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
+            const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
+            
+            // Salva o ID no seu banco
+            await prisma.produto.update({ 
+                where: { id: id }, 
+                data: { tinyId: String(idTiny) } 
+            });
+
+            return res.json({ sucesso: true, tinyId: idTiny, msg: "Integrado com Sucesso!" });
         } else {
-             return res.status(400).json({ erro: "Erro detalhado", debug: textoResposta });
+            let erroMsg = "Erro no Tiny";
+            if (retorno.erros) erroMsg = retorno.erros[0].erro;
+            return res.status(400).json({ erro: erroMsg, debug: retorno });
         }
 
     } catch (e) {
+        console.error("Erro Server:", e);
         res.status(500).json({ erro: e.message });
     }
 });

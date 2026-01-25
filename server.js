@@ -1591,75 +1591,72 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
 
-        // 1. LIMPEZA DE ACENTOS (Tiny às vezes odeia UTF-8 via API)
-        const removerAcentos = (str) => {
-            return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        };
-
-        // 2. FORMATAÇÃO NCM (Adiciona os pontos: 87089990 -> 8708.99.90)
+        // --- 1. PREPARAÇÃO DOS DADOS ---
+        const removerAcentos = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        
         let ncmLimpo = produto.ncm ? produto.ncm.replace(/\D/g, "") : "87089990";
-        if (ncmLimpo.length === 8) {
-            ncmLimpo = `${ncmLimpo.substr(0,4)}.${ncmLimpo.substr(4,2)}.${ncmLimpo.substr(6,2)}`;
-        }
+        if (ncmLimpo.length === 8) ncmLimpo = `${ncmLimpo.substr(0,4)}.${ncmLimpo.substr(4,2)}.${ncmLimpo.substr(6,2)}`;
 
-        // 3. PREÇO BLINDADO
         let valorBruto = produto.preco_novo || produto.preco || 0;
         if (typeof valorBruto === 'string') valorBruto = parseFloat(valorBruto.replace(',', '.'));
         const precoFinal = valorBruto.toFixed(2);
 
-        // 4. SKU NOVO (Para garantir)
-        const skuTeste = `TESTE-LIMPO-${Date.now()}`; 
+        // SKU NOVO para garantir que não caia na lixeira
+        const skuTeste = `TESTE-MANUAL-${Date.now()}`; 
 
-        console.log(`🧹 Enviando Produto Limpo: ${removerAcentos(produto.titulo)} | NCM: ${ncmLimpo}`);
-
-        // 5. MONTAGEM (SEM GTIN VAZIO)
-        // Se GTIN for vazio, melhor nem enviar a chave
         const dadosTiny = {
             produto: {
                 sequencia: 1,
                 codigo: skuTeste,
-                nome: removerAcentos(produto.titulo), // Nome sem acento
+                nome: removerAcentos(produto.titulo),
                 preco: precoFinal,
                 unidade: (produto.unidade || "UN").toUpperCase(),
                 situacao: "A",
                 tipo: "P",
                 origem: produto.origem || "0",
-                ncm: ncmLimpo, // NCM com pontos
+                ncm: ncmLimpo, 
                 tipo_item_sped: "00"
             }
         };
 
-        // Adiciona CEST só se existir
-        if (produto.cest && produto.cest.length > 2) {
-            dadosTiny.produto.cest = produto.cest;
-        }
+        // --- 2. CONSTRUÇÃO MANUAL DO PACOTE (A MÁGICA) ---
+        // Aqui convertemos o JSON para string e DEPOIS codificamos para URL
+        // Isso garante que espaços, aspas e caracteres especiais cheguem perfeitos
+        const jsonString = JSON.stringify(dadosTiny);
+        const produtoEncoded = encodeURIComponent(jsonString);
+        const tokenEncoded = process.env.TINY_TOKEN.trim(); // Token não precisa de encode se for só alfanumérico
 
-        // 6. ENVIO VIA FETCH (Formulário Padrão)
-        const params = new URLSearchParams();
-        params.append('token', process.env.TINY_TOKEN.trim());
-        params.append('formato', 'json');
-        params.append('produto', JSON.stringify(dadosTiny));
+        // Monta a string igual a um formulário HTML antigo
+        const bodyData = `token=${tokenEncoded}&formato=json&produto=${produtoEncoded}`;
 
-        console.log(`📤 Payload: ${JSON.stringify(dadosTiny)}`);
+        console.log(`📤 Enviando String Manual (Tamanho: ${bodyData.length} chars)...`);
 
-        const responseTiny = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
-            method: 'POST',
-            body: params,
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-        });
+        // --- 3. ENVIO VIA AXIOS (COM STRING PURA) ---
+        const response = await axios.post(
+            'https://api.tiny.com.br/api2/produto.incluir.php', 
+            bodyData, // Envia a string direto
+            {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            }
+        );
 
-        const retornoTiny = await responseTiny.json();
-        const retorno = retornoTiny.retorno;
-
+        const retorno = response.data.retorno;
         console.log("Resposta Tiny:", JSON.stringify(retorno));
 
         if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
             const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
-            return res.json({ sucesso: true, tinyId: idTiny, msg: "SUCESSO! Era Acento ou NCM." });
+            return res.json({ sucesso: true, tinyId: idTiny, msg: "SUCESSO FINAL! Conexão Manual funcionou." });
         } else {
             let erroMsg = "Erro Tiny.";
+            // Tenta achar o erro em todos os buracos possíveis
             if (retorno.erros) erroMsg = retorno.erros[0].erro;
-            else if (retorno.status_processamento === '3') erroMsg = "Erro 3: Dados Inválidos (Provavelmente NCM ou CEST incompatíveis).";
+            else if (retorno.registros && retorno.registros.length > 0 && retorno.registros[0].registro.erros) {
+                erroMsg = retorno.registros[0].registro.erros[0].erro;
+            } else if (retorno.status_processamento === '3') {
+                erroMsg = "Erro 3: O Tiny recebeu mas rejeitou. (Possível bloqueio de API na conta)";
+            }
             
             return res.status(400).json({ erro: erroMsg, debug: retorno });
         }

@@ -1584,83 +1584,81 @@ app.get('/admin/sincronizar-tiny/:referencia', authenticateToken, async (req, re
 // Rota para enviar um produto do seu banco para o Tiny
 
 app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin') return res.sendStatus(403);
-
+    // 1. TESTE DE CONEXÃO (PESQUISA)
     try {
-        const id = parseInt(req.params.id);
-        const produto = await prisma.produto.findUnique({ where: { id } });
-
-        if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
-
-        // 1. HELPER PARA LIMPAR TEXTO PARA XML (Evita erro de "Mal Formado")
-        const escapeXml = (unsafe) => {
-            if (!unsafe) return "";
-            return unsafe.toString()
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&apos;');
-        };
-
-        // 2. PREPARAÇÃO
-        let valorBruto = produto.preco_novo || produto.preco || 0;
-        if (typeof valorBruto === 'string') valorBruto = parseFloat(valorBruto.replace(',', '.'));
-        const precoFinal = valorBruto.toFixed(2);
+        console.log("📡 Testando conexão com Tiny (Pesquisa)...");
         
-        const skuTeste = `DIAGNOSTICO-XML-${Date.now()}`;
-        
-        // 3. MONTAGEM DO XML (TIPO SERVIÇO - O MAIS LEVE)
-        // Usamos Serviço (S) para pular validações de NCM/Estoque/Peso
-        const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
-        <produto>
-            <sequencia>1</sequencia>
-            <codigo>${skuTeste}</codigo>
-            <nome>${escapeXml("TESTE CONEXAO XML PURO")}</nome>
-            <unidade>UN</unidade>
-            <preco>1.00</preco>
-            <situacao>A</situacao>
-            <tipo>S</tipo>
-        </produto>`;
-
-        console.log(`📜 Enviando XML Puro...`);
-
-        // 4. ENVIO (TUDO EM XML)
         const params = new URLSearchParams();
         params.append('token', process.env.TINY_TOKEN.trim());
-        params.append('formato', 'xml'); // <--- ENTRADA E SAÍDA EM XML
-        params.append('produto', xmlPayload);
-
-        const responseTiny = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
+        params.append('formato', 'json');
+        
+        // Vamos pesquisar qualquer coisa só para ver se a API responde
+        const response = await fetch('https://api.tiny.com.br/api2/produtos.pesquisa.php', {
             method: 'POST',
             body: params,
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         });
 
-        // 5. LEITURA DA RESPOSTA BRUTA
-        const textoResposta = await responseTiny.text();
-        console.log("📜 RESPOSTA XML DO TINY:");
-        console.log(textoResposta);
+        const dados = await response.json();
+        console.log("🔍 Resultado do Teste de Conexão:", JSON.stringify(dados.retorno));
 
-        // --- ANÁLISE DO XML ---
-        // Verificamos se tem a tag de erro
-        if (textoResposta.includes('<erro>')) {
-             // O erro vai estar entre <erro> e </erro>
-             // Vamos "roubar" o texto do erro sem precisar de parser complexo
-             const matchErro = textoResposta.match(/<erro>(.*?)<\/erro>/);
-             const msgErro = matchErro ? matchErro[1] : "Erro desconhecido no XML";
+        if (dados.retorno.status !== 'OK') {
+             return res.status(400).json({ erro: "Sua conta Tiny está bloqueando a API. Verifique o Token.", debug: dados.retorno });
+        }
+    } catch (e) {
+        return res.status(500).json({ erro: "Falha total na conexão.", debug: e.message });
+    }
 
-             return res.status(400).json({ erro: msgErro, raw: textoResposta });
-        } 
+    // 2. SE PASSOU NO TESTE, TENTA O ENVIO COM UMA MUDANÇA RADICAL
+    // Tática: Enviar JSON sem o wrapper "produto" (Às vezes o Tiny se confunde com wrappers duplos)
+    
+    try {
+        const id = parseInt(req.params.id);
+        const produto = await prisma.produto.findUnique({ where: { id } });
         
-        if (textoResposta.includes('<status>OK</status>')) {
-            return res.json({ sucesso: true, msg: "SUCESSO! XML Funcionou.", raw: textoResposta });
+        const skuTeste = `TESTE-FINAL-${Date.now()}`;
+        
+        // DADOS PUROS (SEM O WRAPPER { produto: ... })
+        const objetoProduto = {
+            sequencia: 1,
+            codigo: skuTeste,
+            nome: "TESTE DE INTEGRACAO",
+            unidade: "UN",
+            preco: "1.00",
+            origem: "0",
+            situacao: "A",
+            tipo: "S" // Serviço para facilitar
+        };
+
+        const jsonPayload = JSON.stringify({ produto: objetoProduto }); // Wrapper padrão
+
+        console.log(`📤 Enviando Payload: ${jsonPayload}`);
+
+        const paramsEnvio = new URLSearchParams();
+        paramsEnvio.append('token', process.env.TINY_TOKEN.trim());
+        paramsEnvio.append('formato', 'json');
+        paramsEnvio.append('produto', jsonPayload);
+
+        const responseEnvio = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
+            method: 'POST',
+            body: paramsEnvio,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
+
+        const retornoEnvio = (await responseEnvio.json()).retorno;
+        console.log("📦 Resposta do Envio:", JSON.stringify(retornoEnvio));
+
+        if (retornoEnvio.status === 'OK' && retornoEnvio.status_processamento !== '3') {
+            return res.json({ sucesso: true, msg: "SUCESSO!" });
+        } else {
+            // Se der erro de novo, mostramos o erro da PESQUISA também para comparar
+            return res.status(400).json({ 
+                erro: "Erro no envio (Inclusão)", 
+                debugEnvio: retornoEnvio 
+            });
         }
 
-        return res.status(400).json({ erro: "Retorno confuso do Tiny", raw: textoResposta });
-
     } catch (e) {
-        console.error("Erro Server:", e);
         res.status(500).json({ erro: e.message });
     }
 });

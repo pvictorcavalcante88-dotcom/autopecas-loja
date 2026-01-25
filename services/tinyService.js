@@ -1,20 +1,17 @@
 const axios = require('axios');
-// No topo do seu tinyService.js
-const { getValidToken } = require('./tinyAuth'); // Ajustado para o nome real do arquivo
-
+const { getValidToken } = require('./tinyAuth'); // Função que busca o token no seu model TinyConfig
 
 async function enviarPedidoParaTiny(pedido) {
     try {
-        // 1. Pega o token atualizado (V3 exige Bearer Token)
+        // 1. Pega o token automático do seu model TinyConfig
         const token = await getValidToken();
 
         // 2. Tratamento dos itens
         const listaItens = typeof pedido.itens === 'string' ? JSON.parse(pedido.itens) : pedido.itens;
 
-        // 3. Monta o JSON no formato da API V3
-        // Nota: A estrutura da V3 pode ter pequenas variações de nomes de campos
+        // 3. Monta o JSON no formato EXATO da API V3
         const dadosPedido = {
-            data: new Date(pedido.createdAt).toISOString().split('T')[0], // Formato YYYY-MM-DD
+            data: new Date(pedido.createdAt).toISOString().split('T')[0],
             cliente: {
                 nome: pedido.clienteNome,
                 cpf_cnpj: pedido.clienteDoc,
@@ -26,16 +23,19 @@ async function enviarPedidoParaTiny(pedido) {
                 codigo: item.referencia || item.id.toString(),
                 descricao: item.nome,
                 quantidade: item.qtd,
-                valor_unitario: item.unitario,
+                valor_unitario: parseFloat(item.unitario),
                 unidade: "UN"
             })),
             meio_pagamento: pedido.metodoPagamento === 'PIX' ? 'pix' : 'cartao_credito',
-            observacoes: `Pedido #${pedido.id} | Afiliado: ${pedido.afiliadoId || 'Direto'}`
+            situacao: "aberto"
         };
 
+        // 4. A NOVA URL (V3)
         const url = `https://api.tiny.com.br/public-api/v3/pedidos`;
 
-        // 4. Envio com Header de Autorização
+        console.log(`🚀 Enviando Pedido #${pedido.id} via API V3...`);
+
+        // 5. ENVIO COM HEADER BEARER
         const response = await axios.post(url, dadosPedido, {
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -43,15 +43,17 @@ async function enviarPedidoParaTiny(pedido) {
             }
         });
 
-        // Na V3, o sucesso geralmente vem em formatos de status HTTP (201 Created)
-        if (response.status === 201 || response.data.status === 'OK') {
-            console.log(`✅ Pedido #${pedido.id} integrado ao Tiny V3!`);
+        // Na V3, o sucesso retorna status 201 (Created)
+        if (response.status === 201 || response.status === 200) {
+            console.log(`✅ Sucesso na V3! ID: ${response.data.data?.id}`);
             return { sucesso: true, tinyId: response.data.data?.id };
         }
 
     } catch (error) {
-        console.error("❌ Erro na API V3 do Tiny:", error.response?.data || error.message);
-        return { sucesso: false, erro: error.response?.data || error.message };
+        // Log detalhado para a gente não ficar no escuro
+        const erroDetalhado = error.response?.data || error.message;
+        console.error("❌ Erro na API V3:", JSON.stringify(erroDetalhado));
+        return { sucesso: false, erro: erroDetalhado };
     }
 }
 

@@ -1591,26 +1591,26 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
 
-        // --- 1. TRATAMENTO DO PREÇO (O VILÃO DA VÍRGULA) ---
-        // Pega preço novo, ou preço normal, ou 0
-        const valorBanco = produto.preco_novo || produto.preco || 0;
+        // --- 1. CAPTURA O VALOR (Seja lá como ele estiver no banco) ---
+        // Pega 'preco_novo' ou 'preco'
+        const valorBruto = produto.preco_novo || produto.preco || 0;
         
-        let precoFinal = "0.00";
-        if (valorBanco) {
-            // Passo 1: Transforma em texto e troca vírgula por ponto (ex: "100,00" vira "100.00")
-            let stringLimpa = valorBanco.toString().replace(',', '.');
-            
-            // Passo 2: Garante que é número
-            let numero = parseFloat(stringLimpa);
-            
-            // Passo 3: Formata com 2 casas decimais (isso garante o ponto final)
-            if (!isNaN(numero)) {
-                precoFinal = numero.toFixed(2); // Retorna "100.00"
-            }
-        }
+        // Converte para String forçada
+        let precoString = String(valorBruto);
+        
+        // ⚠️ A MARRETADA: Troca qualquer vírgula por ponto
+        precoString = precoString.replace(',', '.');
+        
+        // Garante 2 casas decimais com ponto (ex: 100 -> 100.00)
+        // O parseFloat garante que é numero, o toFixed(2) devolve string com ponto
+        let precoFinal = parseFloat(precoString).toFixed(2);
 
-        // TRAVA DE SEGURANÇA FINAL: Se por milagre ainda tiver vírgula, mata ela aqui
-        precoFinal = precoFinal.replace(',', '.');
+        // 🚨 CHECAGEM DE SEGURANÇA (DUPLA):
+        // Se por algum motivo bizarro o toFixed() gerou vírgula (config do servidor),
+        // nós trocamos por ponto de novo manualmente.
+        if (precoFinal.includes(',')) {
+            precoFinal = precoFinal.replace(',', '.');
+        }
 
         // --- 2. RESTO DOS DADOS ---
         const skuFinal = produto.referencia || produto['referência'] || produto.sku;
@@ -1618,15 +1618,15 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         const unidadeFinal = (produto.unidade || "UN").toUpperCase();
 
-        console.log(`✅ Dados Ajustados: SKU=${skuFinal} | Preço=${precoFinal}`); 
-        // TEM QUE APARECER: Preço=100.00 (Com PONTO)
+        // LOG PARA CONFIRMAR: TEM QUE TER PONTO!
+        console.log(`✅ Dados Finais: SKU=${skuFinal} | Preço=${precoFinal}`); 
 
         const dadosTiny = {
             produto: {
                 sequencia: 1, 
                 codigo: skuFinal,
                 nome: produto.titulo,
-                preco: precoFinal, // Agora vai com ponto!
+                preco: precoFinal, // <--- AQUI VAI O VALOR COM PONTO
                 unidade: unidadeFinal,
                 situacao: "A",
                 tipo: "P",
@@ -1639,13 +1639,14 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         // --- 3. ENVIO VIA FETCH ---
         const params = new URLSearchParams();
+        // .trim() no token para limpar espaços
         const tokenLimpo = process.env.TINY_TOKEN ? process.env.TINY_TOKEN.trim() : "";
         
         params.append('token', tokenLimpo);
         params.append('formato', 'json');
         params.append('produto', JSON.stringify(dadosTiny));
 
-        console.log(`📤 Enviando JSON para o Tiny...`);
+        console.log(`📤 Enviando JSON blindado...`);
 
         const responseTiny = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
             method: 'POST',
@@ -1670,10 +1671,9 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             return res.json({ sucesso: true, tinyId: idTiny, msg: "Integrado com Sucesso!" });
         } else {
             let erroMsg = "Erro desconhecido";
-            // Tenta pegar mensagem de erro de todos os lugares possíveis
             if(retorno.erros) erroMsg = retorno.erros[0].erro;
             else if(retorno.registros?.[0]?.registro?.erros) erroMsg = retorno.registros[0].registro.erros[0].erro;
-            else if(retorno.status_processamento === '3') erroMsg = "Tiny rejeitou (Status 3). Verifique se o SKU já existe na Lixeira do Tiny.";
+            else if(retorno.status_processamento === '3') erroMsg = "Tiny rejeitou. Verifique se o SKU já existe na Lixeira ou se o Preço está zerado.";
             
             return res.status(400).json({ erro: erroMsg, debug: retorno });
         }

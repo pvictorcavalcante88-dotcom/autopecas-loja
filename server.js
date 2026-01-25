@@ -1582,7 +1582,6 @@ app.get('/admin/sincronizar-tiny/:referencia', authenticateToken, async (req, re
 });
 
 // Rota para enviar um produto do seu banco para o Tiny
-// Rota de Envio ao Tiny (Versão Fetch Nativo - Blindada)
 app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
 
@@ -1591,49 +1590,42 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         const produto = await prisma.produto.findUnique({ where: { id } });
 
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
-        if (!produto.referencia) return res.status(400).json({ erro: "Produto sem SKU (Referência)." });
 
-        // --- PREPARAÇÃO DOS DADOS (BASEADO NA SUA PLANILHA) ---
-        
-        // 1. Garante que a Unidade seja sempre "UN" (Maiúsculo)
-        // Se no banco estiver "Un" ou "un", ele corrige.
-        const unidadeCorrigida = (produto.unidade || "UN").toUpperCase(); 
+        // --- DIAGNÓSTICO DE TOKEN ---
+        const tokenAtual = process.env.TINY_TOKEN ? process.env.TINY_TOKEN.trim() : "";
+        console.log(`🔑 Token usado (inicio): ${tokenAtual.substring(0, 5)}...`); 
 
-        // 2. Garante NCM limpo ou padrão
-        const ncmFinal = produto.ncm ? produto.ncm.replace(/\./g, "") : "87089990"; // Remove pontos para garantir
-
-        // 3. Monta o JSON do Tiny
+        // --- PREPARAÇÃO DOS DADOS ---
         const dadosTiny = {
             produto: {
-                codigo: produto.referencia,  // Ex: JOG-IA
-                nome: produto.titulo,        // Ex: Jogo Imagem & Ação
-                preco: parseFloat(produto.preco).toFixed(2), // Ex: 79.99
-                unidade: unidadeCorrigida,   // Ex: UN
+                sequencia: 1, // <--- OBRIGATÓRIO PARA O RETORNO NÃO VIR VAZIO
+                codigo: produto.referencia,
+                nome: produto.titulo,
+                preco: parseFloat(produto.preco).toFixed(2),
+                unidade: (produto.unidade || "UN").toUpperCase(), // Garante UN maiúsculo
                 situacao: "A",
                 tipo: "P",
                 origem: produto.origem || "0",
-                ncm: ncmFinal,
+                ncm: produto.ncm ? produto.ncm.replace(/\./g, "") : "87089990",
                 cest: produto.cest || "",
-                tipo_item_sped: "00" // Mercadoria para Revenda
+                tipo_item_sped: "00"
             }
         };
 
-        // --- O ENVIO BLINDADO (USANDO FETCH) ---
-        // Aqui abandonamos o axios para usar o padrão nativo da Web
-        
+        // --- ENVIO COM FETCH (A MANEIRA MAIS SEGURA) ---
         const params = new URLSearchParams();
-        params.append('token', process.env.TINY_TOKEN.trim()); // Limpa o token
+        params.append('token', tokenAtual);
         params.append('formato', 'json');
-        params.append('produto', JSON.stringify(dadosTiny));
+        
+        // Converte o objeto para string JSON
+        const jsonProduto = JSON.stringify(dadosTiny);
+        params.append('produto', jsonProduto);
 
-        console.log(`📤 Enviando SKU ${produto.referencia} via FETCH...`);
+        console.log(`📤 Enviando payload: ${jsonProduto}`); // Mostra o que está sendo enviado
 
         const responseTiny = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
             method: 'POST',
-            body: params,
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
+            body: params, // O fetch trata o URLSearchParams automaticamente
         });
 
         const retornoTiny = await responseTiny.json();
@@ -1641,30 +1633,22 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         console.log("Resposta Tiny:", JSON.stringify(retorno));
 
-        // --- TRATAMENTO DA RESPOSTA ---
-
+        // --- SUCESSO OU ERRO ---
         if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
-            // SUCESSO! 
+            // Tenta pegar o ID de várias formas possíveis que o Tiny retorna
             const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
             
             if (idTiny) {
-                await prisma.produto.update({
-                    where: { id: id },
-                    data: { tinyId: String(idTiny) }
-                });
+                await prisma.produto.update({ where: { id: id }, data: { tinyId: String(idTiny) } });
             }
-            return res.json({ sucesso: true, tinyId: idTiny, msg: "Produto Integrado com Sucesso!" });
-
+            return res.json({ sucesso: true, tinyId: idTiny });
         } else {
-            // ERRO
-            let msgErro = "Erro desconhecido no Tiny.";
-            if (retorno.erros && retorno.erros.length > 0) {
-                msgErro = retorno.erros[0].erro;
-            } else if (retorno.status_processamento === '3') {
-                msgErro = "Erro de Validação: O Tiny rejeitou os dados (Verifique se o SKU já existe na lixeira).";
-            }
+            // Se der erro, mostramos o motivo exato
+            let erroMsg = "Erro desconhecido";
+            if(retorno.erros) erroMsg = JSON.stringify(retorno.erros);
+            else if(retorno.registros?.[0]?.registro?.erros) erroMsg = JSON.stringify(retorno.registros[0].registro.erros);
             
-            return res.status(400).json({ erro: msgErro, debug: retorno });
+            return res.status(400).json({ erro: erroMsg, debug: retorno });
         }
 
     } catch (e) {

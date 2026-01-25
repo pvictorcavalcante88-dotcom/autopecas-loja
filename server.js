@@ -1582,10 +1582,6 @@ app.get('/admin/sincronizar-tiny/:referencia', authenticateToken, async (req, re
 });
 
 // Rota para enviar um produto do seu banco para o Tiny
-// Adicione isso no topo se não tiver
-const qs = require('querystring'); 
-const axios = require('axios');
-
 app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
 

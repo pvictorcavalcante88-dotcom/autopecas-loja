@@ -1,6 +1,7 @@
 const axios = require('axios');
-// Importe aqui sua função que busca/renova o token no banco de dados
-const { getValidToken } = require('./authService'); 
+// No topo do seu tinyService.js
+const { getValidToken } = require('./tinyAuth'); // Ajustado para o nome real do arquivo
+
 
 async function enviarPedidoParaTiny(pedido) {
     try {

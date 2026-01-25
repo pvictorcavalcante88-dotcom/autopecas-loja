@@ -1591,43 +1591,23 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
 
-        // --- 1. CAPTURA O VALOR (Seja lá como ele estiver no banco) ---
-        // Pega 'preco_novo' ou 'preco'
-        const valorBruto = produto.preco_novo || produto.preco || 0;
+        // --- 1. CAPTURA DE DADOS ---
+        // Pega o valor bruto (ex: 100 ou "100,00")
+        let valorBruto = produto.preco_novo || produto.preco || 0;
         
-        // Converte para String forçada
-        let precoString = String(valorBruto);
-        
-        // ⚠️ A MARRETADA: Troca qualquer vírgula por ponto
-        precoString = precoString.replace(',', '.');
-        
-        // Garante 2 casas decimais com ponto (ex: 100 -> 100.00)
-        // O parseFloat garante que é numero, o toFixed(2) devolve string com ponto
-        let precoFinal = parseFloat(precoString).toFixed(2);
-
-        // 🚨 CHECAGEM DE SEGURANÇA (DUPLA):
-        // Se por algum motivo bizarro o toFixed() gerou vírgula (config do servidor),
-        // nós trocamos por ponto de novo manualmente.
-        if (precoFinal.includes(',')) {
-            precoFinal = precoFinal.replace(',', '.');
+        // Garante que é um número para o JS não se perder
+        if (typeof valorBruto === 'string') {
+            valorBruto = parseFloat(valorBruto.replace(',', '.'));
         }
 
-        // --- 2. RESTO DOS DADOS ---
-        const skuFinal = produto.referencia || produto['referência'] || produto.sku;
-        if (!skuFinal) return res.status(400).json({ erro: "Produto sem SKU (Referência)." });
-
-        const unidadeFinal = (produto.unidade || "UN").toUpperCase();
-
-        // LOG PARA CONFIRMAR: TEM QUE TER PONTO!
-        console.log(`✅ Dados Finais: SKU=${skuFinal} | Preço=${precoFinal}`); 
-
+        // --- 2. MONTAGEM DOS DADOS (Com números puros) ---
         const dadosTiny = {
             produto: {
                 sequencia: 1, 
-                codigo: skuFinal,
+                codigo: produto.referencia || produto['referência'] || produto.sku,
                 nome: produto.titulo,
-                preco: precoFinal, // <--- AQUI VAI O VALOR COM PONTO
-                unidade: unidadeFinal,
+                preco: valorBruto, // Manda o NÚMERO puro (sem aspas, sem toFixed agora)
+                unidade: (produto.unidade || "UN").toUpperCase(),
                 situacao: "A",
                 tipo: "P",
                 origem: produto.origem || "0",
@@ -1637,16 +1617,31 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             }
         };
 
-        // --- 3. ENVIO VIA FETCH ---
-        const params = new URLSearchParams();
-        // .trim() no token para limpar espaços
-        const tokenLimpo = process.env.TINY_TOKEN ? process.env.TINY_TOKEN.trim() : "";
+        // --- 3. A MÁGICA NUCLEAR (JSON Stringify + Replace) ---
+        // Transformamos tudo em texto
+        let jsonPayload = JSON.stringify(dadosTiny);
         
-        params.append('token', tokenLimpo);
-        params.append('formato', 'json');
-        params.append('produto', JSON.stringify(dadosTiny));
+        // ☢️ AQUI ONDE A MÁGICA ACONTECE:
+        // O JSON oficial usa ponto. Se por acaso o servidor gerou vírgula, matamos ela aqui.
+        // Mas CUIDADO: isso troca TODAS as vírgulas.
+        // Como o JSON usa vírgula para separar campos, vamos ser cirúrgicos no Preço.
+        
+        // Vamos reconstruir o JSON manualmente para o Preço ficar blindado
+        const precoCerto = valorBruto.toFixed(2).replace(',', '.'); // "100.00"
+        
+        dadosTiny.produto.preco = precoCerto; // Força string com ponto
+        jsonPayload = JSON.stringify(dadosTiny);
 
-        console.log(`📤 Enviando JSON blindado...`);
+        console.log(`✅ Payload Final: ${jsonPayload}`); 
+        // TEM QUE APARECER: "preco":"100.00"
+
+        // --- 4. ENVIO ---
+        const params = new URLSearchParams();
+        params.append('token', process.env.TINY_TOKEN.trim());
+        params.append('formato', 'json');
+        params.append('produto', jsonPayload); // Manda o JSON corrigido
+
+        console.log(`📤 Enviando...`);
 
         const responseTiny = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
             method: 'POST',
@@ -1661,21 +1656,17 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
             const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
-            
             if (idTiny) {
-                await prisma.produto.update({ 
-                    where: { id: id }, 
-                    data: { tinyId: String(idTiny) } 
-                });
+                await prisma.produto.update({ where: { id: id }, data: { tinyId: String(idTiny) } });
             }
-            return res.json({ sucesso: true, tinyId: idTiny, msg: "Integrado com Sucesso!" });
+            return res.json({ sucesso: true, tinyId: idTiny });
         } else {
-            let erroMsg = "Erro desconhecido";
-            if(retorno.erros) erroMsg = retorno.erros[0].erro;
-            else if(retorno.registros?.[0]?.registro?.erros) erroMsg = retorno.registros[0].registro.erros[0].erro;
-            else if(retorno.status_processamento === '3') erroMsg = "Tiny rejeitou. Verifique se o SKU já existe na Lixeira ou se o Preço está zerado.";
-            
-            return res.status(400).json({ erro: erroMsg, debug: retorno });
+             // Tratamento de erro detalhado
+             let erroMsg = "Erro Tiny.";
+             if(retorno.erros) erroMsg = retorno.erros[0].erro;
+             else if(retorno.status_processamento === '3') erroMsg = "Tiny bloqueou (Status 3). VERIFIQUE A LIXEIRA DO TINY.";
+             
+             return res.status(400).json({ erro: erroMsg, debug: retorno });
         }
 
     } catch (e) {

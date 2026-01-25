@@ -1582,6 +1582,10 @@ app.get('/admin/sincronizar-tiny/:referencia', authenticateToken, async (req, re
 });
 
 // Rota para enviar um produto do seu banco para o Tiny
+// Adicione isso no topo se não tiver
+const qs = require('querystring'); 
+const axios = require('axios');
+
 app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
 
@@ -1591,82 +1595,70 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
 
-        // --- 1. CAPTURA DE DADOS ---
-        // Pega o valor bruto (ex: 100 ou "100,00")
+        // 1. TRATAMENTO DE PREÇO BLINDADO
         let valorBruto = produto.preco_novo || produto.preco || 0;
-        
-        // Garante que é um número para o JS não se perder
-        if (typeof valorBruto === 'string') {
-            valorBruto = parseFloat(valorBruto.replace(',', '.'));
-        }
+        if (typeof valorBruto === 'string') valorBruto = parseFloat(valorBruto.replace(',', '.'));
+        const precoFinal = valorBruto.toFixed(2); // "100.00"
 
-        // --- 2. MONTAGEM DOS DADOS (Com números puros) ---
-        const dadosTiny = {
-            produto: {
-                sequencia: 1, 
-                codigo: produto.referencia || produto['referência'] || produto.sku,
-                nome: produto.titulo,
-                preco: valorBruto, // Manda o NÚMERO puro (sem aspas, sem toFixed agora)
-                unidade: (produto.unidade || "UN").toUpperCase(),
-                situacao: "A",
-                tipo: "P",
-                origem: produto.origem || "0",
-                ncm: produto.ncm ? produto.ncm.replace(/\./g, "") : "87089990", 
-                cest: produto.cest || "",
-                tipo_item_sped: "00"
-            }
+        // 2. SKU ALEATÓRIO (PARA FUGIR DA LIXEIRA)
+        // Se isso funcionar, seus SKUs originais estão travados no Tiny
+        const skuTeste = `TESTE-${Date.now()}`; 
+        
+        console.log(`🔍 Testando com SKU novo: ${skuTeste} (Original era: ${produto.referencia})`);
+
+        // 3. MONTAGEM DO JSON (Sem campos vazios)
+        const objetoProduto = {
+            sequencia: 1,
+            codigo: skuTeste, // <--- FORÇANDO SKU NOVO
+            nome: produto.titulo,
+            preco: precoFinal,
+            unidade: (produto.unidade || "UN").toUpperCase(),
+            situacao: "A",
+            tipo: "P",
+            origem: produto.origem || "0",
+            ncm: produto.ncm ? produto.ncm.replace(/\./g, "") : "87089990",
+            tipo_item_sped: "00"
         };
 
-        // --- 3. A MÁGICA NUCLEAR (JSON Stringify + Replace) ---
-        // Transformamos tudo em texto
-        let jsonPayload = JSON.stringify(dadosTiny);
-        
-        // ☢️ AQUI ONDE A MÁGICA ACONTECE:
-        // O JSON oficial usa ponto. Se por acaso o servidor gerou vírgula, matamos ela aqui.
-        // Mas CUIDADO: isso troca TODAS as vírgulas.
-        // Como o JSON usa vírgula para separar campos, vamos ser cirúrgicos no Preço.
-        
-        // Vamos reconstruir o JSON manualmente para o Preço ficar blindado
-        const precoCerto = valorBruto.toFixed(2).replace(',', '.'); // "100.00"
-        
-        dadosTiny.produto.preco = precoCerto; // Força string com ponto
-        jsonPayload = JSON.stringify(dadosTiny);
+        // Só adiciona CEST se tiver valor (evita erro de string vazia)
+        if (produto.cest && produto.cest.length > 2) {
+            objetoProduto.cest = produto.cest;
+        }
 
-        console.log(`✅ Payload Final: ${jsonPayload}`); 
-        // TEM QUE APARECER: "preco":"100.00"
+        const dadosTiny = { produto: objetoProduto };
+        const jsonPayload = JSON.stringify(dadosTiny);
 
-        // --- 4. ENVIO ---
-        const params = new URLSearchParams();
-        params.append('token', process.env.TINY_TOKEN.trim());
-        params.append('formato', 'json');
-        params.append('produto', jsonPayload); // Manda o JSON corrigido
+        console.log(`📤 Enviando: ${jsonPayload}`);
 
-        console.log(`📤 Enviando...`);
+        // 4. ENVIO COM AXIOS + QUERYSTRING (Formato mais compatível)
+        const response = await axios.post(
+            'https://api.tiny.com.br/api2/produto.incluir.php',
+            qs.stringify({
+                token: process.env.TINY_TOKEN.trim(),
+                formato: 'json',
+                produto: jsonPayload
+            }),
+            {
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            }
+        );
 
-        const responseTiny = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
-            method: 'POST',
-            body: params,
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-        });
-
-        const retornoTiny = await responseTiny.json();
-        const retorno = retornoTiny.retorno;
-
+        const retorno = response.data.retorno;
         console.log("Resposta Tiny:", JSON.stringify(retorno));
 
         if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
             const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
-            if (idTiny) {
-                await prisma.produto.update({ where: { id: id }, data: { tinyId: String(idTiny) } });
-            }
-            return res.json({ sucesso: true, tinyId: idTiny });
+            
+            // ATENÇÃO: NÃO SALVAMOS O ID NO BANCO AGORA PARA NÃO ESTRAGAR SEU PRODUTO COM O TESTE
+            // Se der certo, você saberá que o problema é o SKU duplicado.
+            
+            return res.json({ sucesso: true, tinyId: idTiny, msg: "SUCESSO! O problema era SKU Duplicado/Lixeira." });
         } else {
-             // Tratamento de erro detalhado
-             let erroMsg = "Erro Tiny.";
-             if(retorno.erros) erroMsg = retorno.erros[0].erro;
-             else if(retorno.status_processamento === '3') erroMsg = "Tiny bloqueou (Status 3). VERIFIQUE A LIXEIRA DO TINY.";
-             
-             return res.status(400).json({ erro: erroMsg, debug: retorno });
+            let erroMsg = "Erro Tiny.";
+            if (retorno.erros) erroMsg = retorno.erros[0].erro;
+            else if (retorno.status_processamento === '3') erroMsg = "Erro 3: Bloqueio do Tiny (Verifique NCM inválido ou dados fiscais)";
+
+            return res.status(400).json({ erro: erroMsg, debug: retorno });
         }
 
     } catch (e) {

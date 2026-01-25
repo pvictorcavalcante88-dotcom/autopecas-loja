@@ -1582,6 +1582,7 @@ app.get('/admin/sincronizar-tiny/:referencia', authenticateToken, async (req, re
 });
 
 // Rota para enviar um produto do seu banco para o Tiny
+// Rota de Envio ao Tiny (Versão Fetch Nativo - Blindada)
 app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
 
@@ -1590,98 +1591,80 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         const produto = await prisma.produto.findUnique({ where: { id } });
 
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
-        if (!produto.referencia) return res.status(400).json({ erro: "Produto sem Referência (SKU)." });
+        if (!produto.referencia) return res.status(400).json({ erro: "Produto sem SKU (Referência)." });
 
-        // --- VALORES PADRÃO PARA AUTOPEÇAS ---
-        const ncmPadrao = "87089990"; // Peças e Acessórios
-        const cestPadrao = "0199900"; // Substituição Tributária (Autopeças)
-    
-        // ...
-        // GERA UM CÓDIGO QUE NUNCA EXISTIU
-// ...
-        // GERA CÓDIGO ÚNICO
-// ...
-        // GERA CÓDIGO NOVO PARA NÃO DAR DUPLICIDADE
-        const codigoFinal = `PROD-REAL-${Date.now()}`; 
+        // --- PREPARAÇÃO DOS DADOS (BASEADO NA SUA PLANILHA) ---
+        
+        // 1. Garante que a Unidade seja sempre "UN" (Maiúsculo)
+        // Se no banco estiver "Un" ou "un", ele corrige.
+        const unidadeCorrigida = (produto.unidade || "UN").toUpperCase(); 
 
+        // 2. Garante NCM limpo ou padrão
+        const ncmFinal = produto.ncm ? produto.ncm.replace(/\./g, "") : "87089990"; // Remove pontos para garantir
+
+        // 3. Monta o JSON do Tiny
         const dadosTiny = {
             produto: {
-                // Sem sequencia, para não confundir
-                codigo: "API-FINAL-" + Date.now(),
-                nome: "Teste Final de Integracao",
-                preco: "100.00",
-                unidade: "UN", // Tem que ser a mesma do teste manual
+                codigo: produto.referencia,  // Ex: JOG-IA
+                nome: produto.titulo,        // Ex: Jogo Imagem & Ação
+                preco: parseFloat(produto.preco).toFixed(2), // Ex: 79.99
+                unidade: unidadeCorrigida,   // Ex: UN
                 situacao: "A",
                 tipo: "P",
-                origem: "0",
-                ncm: "87089990",
-                cest: "0199900",
-                tipo_item_sped: "00"
+                origem: produto.origem || "0",
+                ncm: ncmFinal,
+                cest: produto.cest || "",
+                tipo_item_sped: "00" // Mercadoria para Revenda
             }
         };
-// ... (seu objeto dadosTiny continua igual) ...
 
-// ... (seu objeto dadosTiny continua igual) ...
-
-        // ====================================================================
-        // 🚨 MUDANÇA DE TECNOLOGIA: AXIOS -> FETCH
-        // Vamos usar o fetch nativo para garantir que o formato seja "bruto"
-        // ====================================================================
-
+        // --- O ENVIO BLINDADO (USANDO FETCH) ---
+        // Aqui abandonamos o axios para usar o padrão nativo da Web
+        
         const params = new URLSearchParams();
-        params.append('token', process.env.TINY_TOKEN.trim());
+        params.append('token', process.env.TINY_TOKEN.trim()); // Limpa o token
         params.append('formato', 'json');
         params.append('produto', JSON.stringify(dadosTiny));
 
-        console.log("📤 Enviando via FETCH Nativo...");
+        console.log(`📤 Enviando SKU ${produto.referencia} via FETCH...`);
 
-        // Usamos o fetch que já vem no Node.js
         const responseTiny = await fetch('https://api.tiny.com.br/api2/produto.incluir.php', {
             method: 'POST',
-            body: params, // O fetch sabe lidar com URLSearchParams perfeitamente
+            body: params,
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
         });
 
-        // Convertendo a resposta para JSON
         const retornoTiny = await responseTiny.json();
         const retorno = retornoTiny.retorno;
 
         console.log("Resposta Tiny:", JSON.stringify(retorno));
 
-        // ====================================================================
+        // --- TRATAMENTO DA RESPOSTA ---
 
-        // Se status OK e processamento != 3, deu sucesso!
-        // ... (o resto do seu if/else continua igual, usando a variável 'retorno') ...
-
-
-        // Se status OK e processamento != 3, deu sucesso!
         if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
-            
+            // SUCESSO! 
             const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
-
+            
             if (idTiny) {
                 await prisma.produto.update({
                     where: { id: id },
                     data: { tinyId: String(idTiny) }
                 });
             }
-            res.json(response.data);
+            return res.json({ sucesso: true, tinyId: idTiny, msg: "Produto Integrado com Sucesso!" });
 
         } else {
-            // Tratamento de Erro (Mantivemos a lógica para te avisar o motivo)
-            let msgErro = "Erro de validação no Tiny.";
-            
-            if (retorno.registros?.[0]?.registro?.erros) {
-                msgErro = retorno.registros[0].registro.erros[0].erro;
-            } else if (retorno.erros?.length > 0) {
+            // ERRO
+            let msgErro = "Erro desconhecido no Tiny.";
+            if (retorno.erros && retorno.erros.length > 0) {
                 msgErro = retorno.erros[0].erro;
             } else if (retorno.status_processamento === '3') {
-                msgErro = "Erro 3: Verifique se o SKU já existe na lixeira ou se falta algum dado fiscal.";
+                msgErro = "Erro de Validação: O Tiny rejeitou os dados (Verifique se o SKU já existe na lixeira).";
             }
-
-            res.status(400).json({ erro: msgErro, debug: retorno });
+            
+            return res.status(400).json({ erro: msgErro, debug: retorno });
         }
 
     } catch (e) {

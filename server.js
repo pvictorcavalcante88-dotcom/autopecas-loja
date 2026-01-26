@@ -1716,11 +1716,10 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             preco_custo: precoCusto,
 
             // ESTAS DUAS LINHAS SÃO A CHAVE PARA ATIVAR O CONTROLE:
-            situacao: "A", 
-            classe_produto: "P", 
-            unidade_medida: { id: "Un" },
-            garantia: 0,
-            sob_encomenda: "N" // No Tiny V3, isso ajuda a ativar o controle de estoque físico
+            situacao: "A",
+            controle_estoque: "S", // Comando explícito para ativar o Sim
+            sob_encomenda: "N",
+            marca: removerAcentos(produto.marca || ""),
         };
 
         console.log(`🚀 (1/3) Criando ${dadosCompletos.sku}...`);

@@ -1691,56 +1691,42 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         const id = parseInt(req.params.id);
         const produto = await prisma.produto.findUnique({ where: { id } });
 
-        // --- BLOCO DE AUTO-REPARO ---
+        // 1. GARANTIA DE TOKEN (Usa o do banco ou o manual de contingência)
         let config = await prisma.tinyConfig.findFirst();
-        
-        // COLE O TOKEN 6b9... AQUI PARA O TESTE MANUAL
-        const tokenManual = "6b95d2c4d26..."; 
+        const tokenFinal = config?.accessToken?.trim(); // Adicione sua lógica de token manual aqui se precisar
 
-        if (!config && tokenManual) {
-            config = await prisma.tinyConfig.create({
-                data: {
-                    id: 1,
-                    accessToken: tokenManual,
-                    refreshToken: "manual", // valor temporário
-                    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30) // 30 dias
-                }
-            });
+        if (!tokenFinal) {
+            return res.status(400).json({ erro: "Token não encontrado. Faça a autorização." });
         }
-        // ----------------------------
 
-        const tokenFinal = config?.accessToken?.trim();
+        // 2. PREPARAÇÃO DOS VALORES (O Segredo do Preço e Estoque)
+        // Remove acentos
         const removerAcentos = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
         
-        // Garante que o preço seja um número puro com ponto
-        const precoLimpo = parseFloat(String(produto.preco_novo || produto.preco || 0).replace(',', '.'));
-        // 1. Limpeza dos valores do banco (Garante ponto em vez de vírgula)
+        // Converte "100,00" para 100.00 (Número puro)
         const precoVenda = parseFloat(String(produto.preco_novo || produto.preco || 0).replace(',', '.'));
         const precoCusto = parseFloat(String(produto.preco_custo || 0).replace(',', '.'));
         const estoqueInicial = parseInt(produto.estoque || 0);
 
-        // 2. Montagem do Objeto seguindo a sua planilha e a documentação V3
+        // 3. MONTAGEM DO OBJETO V3 (Mapeamento Correto)
         const dadosProdutoV3 = {
-            descricao: removerAcentos(produto.titulo).trim(),
-            sku: String(produto.referencia || produto.sku).trim(),
-            tipo: "S",             // Conforme sua planilha
-            unidade: "Un",         // Conforme sua planilha
-            
-            // PREÇO: A V3 espera o campo 'preco' como número (100.50)
-            preco: parseFloat(String(produto.preco_novo || produto.preco || 0).replace(',', '.')),
-            
-            // CUSTO: O campo na V3 é 'preco_custo'
-            preco_custo: parseFloat(String(produto.preco_custo || 0).replace(',', '.')),
-            
-            // ESTOQUE: No cadastro inicial da V3, usamos 'saldo_inicial'
-            saldo_inicial: parseInt(produto.estoque || 0),
-            
+            descricao: removerAcentos(produto.titulo).substring(0, 120).trim(),
+            sku: String(produto.referencia || produto.sku || `PROD-${id}`).trim(),
+            tipo: "S",              // "S" = Simples (Conforme sua planilha)
+            unidade: "Un",          // "Un" (Conforme sua planilha)
             origem: 0,
-            ncm: "87089990"
+            ncm: String(produto.ncm || "87089990").replace(/\./g, ""), // Remove pontos do NCM
+
+            // --- AQUI ESTÁ A CORREÇÃO DOS ZEROS ---
+            preco: precoVenda,          // Campo obrigatório da V3 (Number)
+            preco_custo: precoCusto,    // Campo de custo da V3 (Number)
+            saldo_inicial: estoqueInicial // É assim que se manda estoque na criação V3
+            // --------------------------------------
         };
 
-        // ... no momento do axios.post ...
+        console.log(`🚀 Enviando V3: ${dadosProdutoV3.sku} | Preço: ${dadosProdutoV3.preco} | Estoque: ${dadosProdutoV3.saldo_inicial}`);
 
+        // 4. ENVIO
         const response = await axios.post('https://api.tiny.com.br/public-api/v3/produtos', dadosProdutoV3, {
             headers: {
                 'Authorization': `Bearer ${tokenFinal}`,
@@ -1748,17 +1734,33 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             }
         });
 
-        // A V3 retorna status 201 quando cria com sucesso
+        // 5. O GRANDE FINAL: SALVAR O ID NO BANCO (Para o botão ficar verde)
         if (response.status === 201 || response.status === 200) {
-            console.log("✅ Produto cadastrado com sucesso!");
-            return res.json({ sucesso: true, msg: "ENVIADO COM SUCESSO!" });
-        }
+            // O ID vem dentro de data.data.id ou data.id dependendo da resposta
+            const idTiny = response.data.data?.id || response.data.id;
 
-        res.json({ sucesso: true, msg: "ENVIADO COM SUCESSO!", data: response.data });
+            console.log(`✅ Sucesso! ID Tiny recebido: ${idTiny}`);
+
+            // ATUALIZA O SEU BANCO DE DADOS
+            await prisma.produto.update({
+                where: { id: id },
+                data: { 
+                    tinyId: String(idTiny) // <--- ISSO MUDA A COR DO BOTÃO
+                }
+            });
+
+            return res.json({ 
+                sucesso: true, 
+                msg: "INTEGRADO COM SUCESSO!", 
+                tinyId: idTiny 
+            });
+        }
 
     } catch (error) {
         console.error("❌ Erro:", error.response?.data || error.message);
-        res.status(500).json({ erro: "Falha no envio", detalhe: error.response?.data || error.message });
+        // Retorna o erro detalhado do Tiny se houver
+        const msgErro = error.response?.data?.detalhes?.[0]?.mensagem || "Erro ao enviar";
+        res.status(500).json({ erro: "Falha no envio", detalhe: msgErro });
     }
 });
  

@@ -1687,7 +1687,6 @@ app.post('/admin/teste-v3-direto', authenticateToken, async (req, res) => {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 
-
 app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
 
@@ -1720,7 +1719,7 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         console.log(`🚀 (1/3) Criando ${dadosCompletos.sku}...`);
 
         // ==============================================================================
-        // PASSO 1: CRIAR PRODUTO
+        // PASSO 1: CRIAR PRODUTO (POST)
         // ==============================================================================
         const response = await axios.post('https://api.tiny.com.br/public-api/v3/produtos', dadosCompletos, {
             headers: { 'Authorization': `Bearer ${tokenFinal}`, 'Content-Type': 'application/json' }
@@ -1732,7 +1731,7 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             await sleep(3000); 
 
             // ==============================================================================
-            // PASSO 2: ATUALIZAR PREÇO (Já validamos que funciona)
+            // PASSO 2: ATUALIZAR PREÇO (Dados Completos)
             // ==============================================================================
             try {
                 await axios.put(`https://api.tiny.com.br/public-api/v3/produtos/${idTiny}`, dadosCompletos, { 
@@ -1744,19 +1743,20 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             await sleep(2000);
 
             // ==============================================================================
-            // PASSO 3: ESTOQUE (NA PORTA CERTA - PUT)
+            // PASSO 3: ESTOQUE (A MUDANÇA FINAL)
+            // URL: /estoque/{id}
+            // Método: POST (Era PUT e dava 405)
             // ==============================================================================
             if (estoque > 0) {
                 try {
-                    // Tentativa A: Formato de Atualização Direta
-                    // Se o erro 400 persistir, é certeza que falta a permissão de "Incluir/Editar" no token
                     const dadosEstoque = {
-                        quantidade: estoque, // Mudamos de 'saldo' para 'quantidade'
-                        tipo: "B", // B = Balanço (Define o valor exato)
-                        observacao: "Carga Inicial"
+                        quantidade: estoque,
+                        tipo: "B", // B = Balanço (Define o valor exato, ignora o que tinha antes)
+                        observacao: "Carga Inicial Site"
                     };
 
-                    await axios.put(`https://api.tiny.com.br/public-api/v3/estoque/${idTiny}`, dadosEstoque, { 
+                    // MUDANÇA AQUI: DE 'PUT' PARA 'POST'
+                    await axios.post(`https://api.tiny.com.br/public-api/v3/estoque/${idTiny}`, dadosEstoque, { 
                         headers: { 'Authorization': `Bearer ${tokenFinal}` } 
                     });
                     
@@ -1765,9 +1765,9 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
                 } catch (errEstoque) {
                     console.error("❌ Erro Estoque:", errEstoque.response?.data || errEstoque.message);
                     
-                    // Dica final de permissão se der erro
-                    if(errEstoque.response?.status === 403 || errEstoque.response?.status === 400) {
-                        console.error("DICA DE OURO: Vá em Configurações > API > Permissões e marque 'Incluir e Editar' na linha ESTOQUE e GATILHOS.");
+                    // Se der erro aqui, é 100% permissão
+                    if(errEstoque.response?.status === 403) {
+                         console.error("ERRO 403: O Token tem permissão para LER estoque, mas não para ESCREVER. Marque 'Incluir e Editar' na linha Estoque.");
                     }
                 }
             }
@@ -1775,7 +1775,7 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             // FINALIZA
             await prisma.produto.update({ where: { id: id }, data: { tinyId: String(idTiny) } });
             
-            return res.json({ sucesso: true, msg: "INTEGRADO!", tinyId: idTiny });
+            return res.json({ sucesso: true, msg: "INTEGRADO 100%!", tinyId: idTiny });
         }
 
     } catch (error) {

@@ -1835,7 +1835,7 @@ app.get('/admin/teste-estoque/:idTiny', async (req, res) => {
 });
 
 // ROTA DE EMERGÊNCIA: Reseta o status de integração de TODOS os produtos
-app.get('/admin/resetar-status-tiny', authenticateToken, async (req, res) => {
+app.get('/admin/resetar-status-tiny', async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
 
     try {

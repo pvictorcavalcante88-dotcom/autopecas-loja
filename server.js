@@ -1691,54 +1691,49 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         const id = parseInt(req.params.id);
         const produto = await prisma.produto.findUnique({ where: { id } });
 
-        // 1. BUSCA O TOKEN DIRETO DO BANCO (MODEL TINYCONFIG)
-        const config = await prisma.tinyConfig.findFirst();
+        // --- BLOCO DE AUTO-REPARO ---
+        let config = await prisma.tinyConfig.findFirst();
         
-        // Verifica se o token existe no banco antes de tentar dar o .trim()
-        const tokenFinal = config?.accessToken ? config.accessToken.trim() : process.env.TINY_TOKEN?.trim();
+        // COLE O TOKEN 6b9... AQUI PARA O TESTE MANUAL
+        const tokenManual = "6b95d2c4d26..."; 
 
-        if (!tokenFinal) {
-            return res.status(400).json({ erro: "Token não encontrado no banco nem no sistema. Por favor, autorize o Tiny novamente." });
+        if (!config && tokenManual) {
+            config = await prisma.tinyConfig.create({
+                data: {
+                    id: 1,
+                    accessToken: tokenManual,
+                    refreshToken: "manual", // valor temporário
+                    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30) // 30 dias
+                }
+            });
         }
+        // ----------------------------
 
-        // 2. PREPARAÇÃO DOS DADOS (FORMATO V3)
+        const tokenFinal = config?.accessToken?.trim();
         const removerAcentos = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
         
-        let valorBruto = produto.preco_novo || produto.preco || 0;
-        if (typeof valorBruto === 'string') valorBruto = parseFloat(valorBruto.replace(',', '.'));
-
-        const dadosProdutoV3 = {
-            sequencia: 1,
-            codigo: produto.referencia || produto.sku || `PROD-${id}`,
+        const dadosV3 = {
             nome: removerAcentos(produto.titulo),
+            codigo: produto.referencia || `PROD-${id}`,
+            preco: parseFloat(String(produto.preco_novo || produto.preco).replace(',', '.')),
             unidade: "UN",
-            preco: valorBruto,
-            origem: "0",
-            situacao: "A",
             tipo: "P",
-            ncm: "8708.99.90"
+            ncm: "8708.99.90",
+            origem: "0"
         };
 
-        console.log(`🚀 Enviando para Tiny V3 via Token do Banco: ${tokenFinal.substring(0, 5)}...`);
-
-        // 3. ENVIO PARA A URL DA V3
-        const response = await axios.post('https://api.tiny.com.br/public-api/v3/produtos', dadosProdutoV3, {
+        const response = await axios.post('https://api.tiny.com.br/public-api/v3/produtos', dadosV3, {
             headers: {
                 'Authorization': `Bearer ${tokenFinal}`,
                 'Content-Type': 'application/json'
             }
         });
 
-        if (response.status === 201 || response.status === 200) {
-            return res.json({ sucesso: true, msg: "Integrado com Sucesso!", data: response.data });
-        }
+        res.json({ sucesso: true, msg: "ENVIADO COM SUCESSO!", data: response.data });
 
     } catch (error) {
-        console.error("❌ Erro no Envio:");
-        const erroMsg = error.response?.data || error.message;
-        console.log(JSON.stringify(erroMsg));
-        
-        res.status(500).json({ erro: "Erro ao enviar", detalhe: erroMsg });
+        console.error("❌ Erro:", error.response?.data || error.message);
+        res.status(500).json({ erro: "Falha no envio", detalhe: error.response?.data || error.message });
     }
 });
  

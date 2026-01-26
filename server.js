@@ -1723,15 +1723,20 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         const dadosProdutoV3 = {
             descricao: removerAcentos(produto.titulo).trim(),
             sku: String(produto.referencia || produto.sku).trim(),
-            tipo: "S",             // "S" de Simples conforme sua planilha
+            tipo: "S",             // Conforme sua planilha
             unidade: "Un",         // Conforme sua planilha
-            preco: precoVenda,     // Campo obrigatório para o preço de venda
-            preco_custo: precoCusto, 
-            origem: 0,
-            ncm: "87089990",
             
-            // Na V3, para mandar o estoque no CADASTRO, usamos saldo_inicial
-            saldo_inicial: estoqueInicial 
+            // PREÇO: A V3 espera o campo 'preco' como número (100.50)
+            preco: parseFloat(String(produto.preco_novo || produto.preco || 0).replace(',', '.')),
+            
+            // CUSTO: O campo na V3 é 'preco_custo'
+            preco_custo: parseFloat(String(produto.preco_custo || 0).replace(',', '.')),
+            
+            // ESTOQUE: No cadastro inicial da V3, usamos 'saldo_inicial'
+            saldo_inicial: parseInt(produto.estoque || 0),
+            
+            origem: 0,
+            ncm: "87089990"
         };
 
         // ... no momento do axios.post ...

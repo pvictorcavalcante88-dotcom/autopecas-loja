@@ -1696,75 +1696,87 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         try { tokenFinal = await getValidToken(); } 
         catch (e) { return res.status(401).json({ erro: "Token expirado. Reautorize." }); }
 
-        // 2. PREPARAÇÃO DOS DADOS (Conversão Forçada para Números)
+        // 2. DADOS LIMPOS
         const removerAcentos = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
-        const precoVenda = Number(parseFloat(String(produto.preco_novo || produto.preco || 0).replace(',', '.')).toFixed(2));
-        const precoCusto = Number(parseFloat(String(produto.preco_custo || 0).replace(',', '.')).toFixed(2));
+        
+        // DICA: O Tiny às vezes prefere o preço como String com ponto ("150.00")
+        const precoVenda = parseFloat(String(produto.preco_novo || produto.preco || 0).replace(',', '.')).toFixed(2);
+        const precoCusto = parseFloat(String(produto.preco_custo || 0).replace(',', '.')).toFixed(2);
         const estoque = parseInt(produto.estoque || 0);
 
-        // 3. MONTAGEM DO OBJETO V3
-        const dadosProdutoV3 = {
+        const dadosCriacao = {
             descricao: removerAcentos(produto.titulo).substring(0, 120).trim(),
             sku: String(produto.referencia || produto.sku || `PROD-${id}`).trim(),
-            tipo: "S",              // "S" = Simples (Conforme sua planilha)
-            unidade: "Un",          // "Un" (Conforme sua planilha)
-            origem: 0,              // 0 = Nacional
+            tipo: "S",      // Simples
+            unidade: "Un",  // Conforme sua planilha
+            origem: 0,
             ncm: String(produto.ncm || "87089990").replace(/\./g, ""),
-            preco: precoVenda,          
-            preco_custo: precoCusto,    
-            saldo_inicial: estoque, // Tenta definir na criação
+            preco: parseFloat(precoVenda), // Tenta enviar como number
+            preco_custo: parseFloat(precoCusto)
         };
 
-        console.log(`🚀 Tentando criar: ${dadosProdutoV3.sku} | $${dadosProdutoV3.preco} | Qtd: ${dadosProdutoV3.saldo_inicial}`);
+        console.log(`🚀 Passo 1: Criando ${dadosCriacao.sku}...`);
 
-        // 4. ENVIA O PRODUTO (POST)
-        const response = await axios.post('https://api.tiny.com.br/public-api/v3/produtos', dadosProdutoV3, {
+        // ==============================================================================
+        // PASSO 1: CRIAR O PRODUTO
+        // ==============================================================================
+        const response = await axios.post('https://api.tiny.com.br/public-api/v3/produtos', dadosCriacao, {
             headers: { 'Authorization': `Bearer ${tokenFinal}`, 'Content-Type': 'application/json' }
         });
 
         if (response.status === 201 || response.status === 200) {
             const idTiny = response.data.data?.id || response.data.id;
-            
-            // =================================================================================
-            // 🚑 A CURA DO "PRODUTO ZUMBI" (ATUALIZAÇÃO FORÇADA DE ESTOQUE)
-            // Se o produto já existia, o 'saldo_inicial' acima foi ignorado. 
-            // Vamos forçar a atualização do estoque agora.
-            // =================================================================================
+            console.log(`✅ Criado! ID: ${idTiny}. Iniciando correções...`);
+
+            // ==============================================================================
+            // PASSO 2: FORÇAR O PREÇO (Muitas vezes a criação ignora, o Update resolve)
+            // ==============================================================================
+            try {
+                await axios.put(`https://api.tiny.com.br/public-api/v3/produtos/${idTiny}`, {
+                    preco: parseFloat(precoVenda),
+                    preco_custo: parseFloat(precoCusto)
+                }, { headers: { 'Authorization': `Bearer ${tokenFinal}` } });
+                console.log("✅ Preço corrigido via PUT.");
+            } catch (errPreco) {
+                console.error("⚠️ Erro ao corrigir preço:", errPreco.message);
+            }
+
+            // ==============================================================================
+            // PASSO 3: LANÇAR ESTOQUE (Na URL correta desta vez)
+            // URL Correta V3: https://api.tiny.com.br/public-api/v3/estoque
+            // ==============================================================================
             if (estoque > 0) {
                 try {
-                    console.log("🔄 Forçando atualização de estoque...");
-                    await axios.post('https://api.tiny.com.br/public-api/v3/produtos/estoque', {
-                        id: idTiny,
+                    const dadosEstoque = {
+                        produto: { id: idTiny },
                         quantidade: estoque,
-                        tipo_lancamento: "E", // E = Entrada
-                        observacao: "Carga inicial do Site"
-                    }, { headers: { 'Authorization': `Bearer ${tokenFinal}` } });
-                    console.log("✅ Estoque corrigido!");
+                        tipo: "E", // Entrada
+                        observacao: "Carga inicial via Site"
+                    };
+
+                    await axios.post('https://api.tiny.com.br/public-api/v3/estoque', dadosEstoque, { 
+                        headers: { 'Authorization': `Bearer ${tokenFinal}` } 
+                    });
+                    console.log("✅ Estoque lançado com sucesso!");
                 } catch (errEstoque) {
-                    console.error("⚠️ Aviso: Não foi possível atualizar estoque secundário.", errEstoque.message);
+                    console.error("⚠️ Erro no estoque:", errEstoque.response?.data || errEstoque.message);
                 }
             }
-            // =================================================================================
 
-            // 5. SALVA NO BANCO E RETORNA
-            await prisma.produto.update({
-                where: { id: id },
-                data: { tinyId: String(idTiny) }
-            });
+            // ==============================================================================
+            // FINALIZAÇÃO
+            // ==============================================================================
+            await prisma.produto.update({ where: { id: id }, data: { tinyId: String(idTiny) } });
 
-            return res.json({ sucesso: true, msg: "INTEGRADO 100%!", tinyId: idTiny });
+            return res.json({ sucesso: true, msg: "INTEGRADO, PREÇIFICADO E ESTOCADO!", tinyId: idTiny });
         }
 
     } catch (error) {
-        console.error("❌ Erro:", error.response?.data || error.message);
-        // Tenta pegar mensagem amigável
-        const msgErro = error.response?.data?.detalhes?.[0]?.mensagem || error.response?.data?.mensagem || "Erro na API";
+        console.error("❌ Erro Fatal:", error.response?.data || error.message);
+        const msgErro = error.response?.data?.detalhes?.[0]?.mensagem || "Erro na API Tiny";
         res.status(500).json({ erro: "Falha no envio", detalhe: msgErro });
     }
 });
- 
-
- 
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

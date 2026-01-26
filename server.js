@@ -1713,11 +1713,11 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         const removerAcentos = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
         
         const dadosProdutoV3 = {
-            descricao: removerAcentos(produto.titulo), // V3 usa 'descricao' em vez de 'nome'
-            sku: produto.referencia || produto.sku || `PROD-${id}`, // V3 usa 'sku' em vez de 'codigo'
-            preco: parseFloat(String(produto.preco_novo || produto.preco).replace(',', '.')),
+            descricao: removerAcentos(produto.titulo).substring(0, 120).trim(), 
+            sku: String(produto.referencia || produto.sku || `PROD-${id}`).trim(),
+            preco: parseFloat(Number(produto.preco_novo || produto.preco || 0).toFixed(2)),
             unidade: "UN",
-            tipo: "P", // Deve ser 'P' para Produto ou 'S' para Serviço
+            tipo: "P", // Forçamos 'P' sem variáveis
             origem: 0,
             ncm: "8708.99.90"
         };

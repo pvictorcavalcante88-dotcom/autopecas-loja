@@ -1691,83 +1691,54 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         const id = parseInt(req.params.id);
         const produto = await prisma.produto.findUnique({ where: { id } });
 
-        if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
+        // 1. BUSCA O TOKEN DIRETO DO BANCO (MODEL TINYCONFIG)
+        const config = await prisma.tinyConfig.findFirst();
+        
+        // Verifica se o token existe no banco antes de tentar dar o .trim()
+        const tokenFinal = config?.accessToken ? config.accessToken.trim() : process.env.TINY_TOKEN?.trim();
 
-        // 1. LIMPEZA E FORMATAÇÃO
-        const removerAcentos = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
-
-        let valorBruto = produto.preco_novo || produto.preco || 0;
-        if (typeof valorBruto === 'string') valorBruto = parseFloat(valorBruto.replace(',', '.'));
-        const precoFinal = valorBruto.toFixed(2);
-
-        let ncmLimpo = produto.ncm ? produto.ncm.replace(/\D/g, "") : "87089990";
-        if (ncmLimpo.length === 8) {
-            ncmLimpo = `${ncmLimpo.substr(0,4)}.${ncmLimpo.substr(4,2)}.${ncmLimpo.substr(6,2)}`;
+        if (!tokenFinal) {
+            return res.status(400).json({ erro: "Token não encontrado no banco nem no sistema. Por favor, autorize o Tiny novamente." });
         }
 
-        const skuFinal = produto.referencia || produto['referência'] || produto.sku;
+        // 2. PREPARAÇÃO DOS DADOS (FORMATO V3)
+        const removerAcentos = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+        
+        let valorBruto = produto.preco_novo || produto.preco || 0;
+        if (typeof valorBruto === 'string') valorBruto = parseFloat(valorBruto.replace(',', '.'));
 
-        // 2. MONTAGEM DO JSON
-        const objetoProduto = {
+        const dadosProdutoV3 = {
             sequencia: 1,
-            codigo: skuFinal,
+            codigo: produto.referencia || produto.sku || `PROD-${id}`,
             nome: removerAcentos(produto.titulo),
-            unidade: (produto.unidade || "UN").toUpperCase(),
-            preco: precoFinal,
-            origem: produto.origem || "0",
+            unidade: "UN",
+            preco: valorBruto,
+            origem: "0",
             situacao: "A",
             tipo: "P",
-            ncm: ncmLimpo,
-            tipo_item_sped: "00",
-            cest: produto.cest
+            ncm: "8708.99.90"
         };
 
-        // Remove campos vazios (Evita erro no CEST vazio)
-        Object.keys(objetoProduto).forEach(key => {
-            if (!objetoProduto[key] || objetoProduto[key] === "") {
-                delete objetoProduto[key];
+        console.log(`🚀 Enviando para Tiny V3 via Token do Banco: ${tokenFinal.substring(0, 5)}...`);
+
+        // 3. ENVIO PARA A URL DA V3
+        const response = await axios.post('https://api.tiny.com.br/public-api/v3/produtos', dadosProdutoV3, {
+            headers: {
+                'Authorization': `Bearer ${tokenFinal}`,
+                'Content-Type': 'application/json'
             }
         });
 
-        const jsonPayload = JSON.stringify({ produto: objetoProduto });
-
-        console.log(`📤 Enviando produto validado: ${skuFinal}`);
-
-        // 3. ENVIO
-        const response = await axios.post(
-            'https://api.tiny.com.br/api2/produto.incluir.php',
-            qs.stringify({
-                token: process.env.TINY_TOKEN.trim(),
-                formato: 'json',
-                produto: jsonPayload
-            }),
-            {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-            }
-        );
-
-        const retorno = response.data.retorno;
-        console.log("Resposta Tiny:", JSON.stringify(retorno));
-
-        if (retorno.status === 'OK' && retorno.status_processamento !== '3') {
-            const idTiny = retorno.registros?.[0]?.registro?.id || retorno.registro?.id;
-            
-            // Salva o ID no seu banco
-            await prisma.produto.update({ 
-                where: { id: id }, 
-                data: { tinyId: String(idTiny) } 
-            });
-
-            return res.json({ sucesso: true, tinyId: idTiny, msg: "Integrado com Sucesso!" });
-        } else {
-            let erroMsg = "Erro no Tiny";
-            if (retorno.erros) erroMsg = retorno.erros[0].erro;
-            return res.status(400).json({ erro: erroMsg, debug: retorno });
+        if (response.status === 201 || response.status === 200) {
+            return res.json({ sucesso: true, msg: "Integrado com Sucesso!", data: response.data });
         }
 
-    } catch (e) {
-        console.error("Erro Server:", e);
-        res.status(500).json({ erro: e.message });
+    } catch (error) {
+        console.error("❌ Erro no Envio:");
+        const erroMsg = error.response?.data || error.message;
+        console.log(JSON.stringify(erroMsg));
+        
+        res.status(500).json({ erro: "Erro ao enviar", detalhe: erroMsg });
     }
 });
  

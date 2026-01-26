@@ -1835,18 +1835,27 @@ app.get('/admin/teste-estoque/:idTiny', async (req, res) => {
 });
 
 // ROTA DE EMERGÊNCIA: Reseta o status de integração de TODOS os produtos
-app.get('/admin/resetar-status-tiny', async (req, res) => {
-    if (req.user.role !== 'admin') return res.sendStatus(403);
+// ROTA DE RESET - Versão Blindada
+app.get('/admin/resetar-status-tiny', authenticateToken, async (req, res) => {
+    // Verifica se o usuário existe antes de ler o 'role' para evitar o Erro 500
+    if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).send("Acesso negado: Somente administradores.");
+    }
 
     try {
-        // Define tinyId como NULL em todos os produtos
-        await prisma.produto.updateMany({
+        console.log("🔄 Iniciando reset de status do Tiny...");
+
+        // Limpa o tinyId de todos os produtos
+        const resultado = await prisma.produto.updateMany({
             data: { tinyId: null } 
         });
 
-        res.send("<h1>✅ Pronto! Todos os produtos foram resetados.</h1><p>Volte ao painel de produtos e os botões estarão azuis novamente para o reenvio.</p>");
+        console.log(`✅ Reset concluído. ${resultado.count} produtos liberados.`);
+        res.send(`Sucesso! ${resultado.count} produtos foram resetados e estão prontos para reenvio.`);
+        
     } catch (error) {
-        res.status(500).send("Erro ao resetar: " + error.message);
+        console.error("❌ Erro no reset:", error);
+        res.status(500).send("Erro interno ao tentar resetar os produtos.");
     }
 });
 

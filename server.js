@@ -1766,6 +1766,60 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// ROTA DE TESTE: Tenta descobrir qual a URL de estoque correta
+app.get('/admin/teste-estoque/:idTiny', async (req, res) => {
+    const idTiny = req.params.idTiny;
+    const qtdTeste = 15; // Vamos tentar lançar 15 unidades
+
+    try {
+        const token = await getValidToken();
+        let log = `<h1>🕵️ Diagnóstico de Estoque para ID: ${idTiny}</h1>`;
+
+        // TENTATIVA 1: URL Geral (POST /estoque)
+        log += "<h3>Tentativa 1: POST /estoque</h3>";
+        try {
+            await axios.post('https://api.tiny.com.br/public-api/v3/estoque', {
+                produto: { id: idTiny },
+                quantidade: qtdTeste,
+                tipo: "E",
+                observacao: "Teste 1"
+            }, { headers: { 'Authorization': `Bearer ${token}` } });
+            log += "<p style='color:green'>✅ SUCESSO! A URL certa é a Geral.</p>";
+        } catch (e) {
+            log += `<p style='color:red'>❌ Falhou (Erro ${e.response?.status})</p>`;
+        }
+
+        // TENTATIVA 2: URL Específica (POST /produtos/ID/estoque)
+        log += "<h3>Tentativa 2: POST /produtos/{id}/estoque</h3>";
+        try {
+            await axios.post(`https://api.tiny.com.br/public-api/v3/produtos/${idTiny}/estoque`, {
+                quantidade: qtdTeste,
+                tipo: "E",
+                observacao: "Teste 2"
+            }, { headers: { 'Authorization': `Bearer ${token}` } });
+            log += "<p style='color:green'>✅ SUCESSO! A URL certa é a Específica.</p>";
+        } catch (e) {
+            log += `<p style='color:red'>❌ Falhou (Erro ${e.response?.status})</p>`;
+        }
+
+        // TENTATIVA 3: URL Direta (PUT /estoque/ID)
+        log += "<h3>Tentativa 3: PUT /estoque/{id}</h3>";
+        try {
+            await axios.put(`https://api.tiny.com.br/public-api/v3/estoque/${idTiny}`, {
+                saldo: qtdTeste
+            }, { headers: { 'Authorization': `Bearer ${token}` } });
+            log += "<p style='color:green'>✅ SUCESSO! A URL certa é PUT direto.</p>";
+        } catch (e) {
+            log += `<p style='color:red'>❌ Falhou (Erro ${e.response?.status})</p>`;
+        }
+
+        res.send(log);
+
+    } catch (error) {
+        res.send("Erro geral no teste: " + error.message);
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);

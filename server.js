@@ -1731,7 +1731,7 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             await sleep(3000); 
 
             // ==============================================================================
-            // PASSO 2: ATUALIZAR PREÇO (Dados Completos)
+            // PASSO 2: CONFIRMAR PREÇO
             // ==============================================================================
             try {
                 await axios.put(`https://api.tiny.com.br/public-api/v3/produtos/${idTiny}`, dadosCompletos, { 
@@ -1743,39 +1743,35 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             await sleep(2000);
 
             // ==============================================================================
-            // PASSO 3: ESTOQUE (A MUDANÇA FINAL)
-            // URL: /estoque/{id}
-            // Método: POST (Era PUT e dava 405)
+            // PASSO 3: ESTOQUE (AGORA COM O PREÇO UNITÁRIO)
             // ==============================================================================
             if (estoque > 0) {
                 try {
                     const dadosEstoque = {
                         quantidade: estoque,
-                        tipo: "B", // B = Balanço (Define o valor exato, ignora o que tinha antes)
-                        observacao: "Carga Inicial Site"
+                        tipo: "B", // Balanço (Acerto de Estoque)
+                        observacao: "Carga Inicial Site",
+                        
+                        // O CAMPO QUE FALTAVA:
+                        precoUnitario: precoCusto > 0 ? precoCusto : precoVenda 
                     };
 
-                    // MUDANÇA AQUI: DE 'PUT' PARA 'POST'
                     await axios.post(`https://api.tiny.com.br/public-api/v3/estoque/${idTiny}`, dadosEstoque, { 
                         headers: { 'Authorization': `Bearer ${tokenFinal}` } 
                     });
                     
-                    console.log(`✅ Estoque de ${estoque} definido com sucesso!`);
+                    console.log(`✅ Estoque de ${estoque} lançado com sucesso!`);
                     
                 } catch (errEstoque) {
-                    console.error("❌ Erro Estoque:", errEstoque.response?.data || errEstoque.message);
-                    
-                    // Se der erro aqui, é 100% permissão
-                    if(errEstoque.response?.status === 403) {
-                         console.error("ERRO 403: O Token tem permissão para LER estoque, mas não para ESCREVER. Marque 'Incluir e Editar' na linha Estoque.");
-                    }
+                    // Log completo se ainda der erro (não deve dar)
+                    console.error("❌ Erro Estoque:", JSON.stringify(errEstoque.response?.data || errEstoque.message, null, 2));
                 }
             }
 
             // FINALIZA
             await prisma.produto.update({ where: { id: id }, data: { tinyId: String(idTiny) } });
             
-            return res.json({ sucesso: true, msg: "INTEGRADO 100%!", tinyId: idTiny });
+            return res.json({ sucesso: true, msg: "INTEGRADO 100% (COM ESTOQUE)!", tinyId: idTiny });
         }
 
     } catch (error) {

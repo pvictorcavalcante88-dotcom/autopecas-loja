@@ -1687,6 +1687,7 @@ app.post('/admin/teste-v3-direto', authenticateToken, async (req, res) => {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 
+
 app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
 
@@ -1699,13 +1700,12 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         try { tokenFinal = await getValidToken(); } 
         catch (e) { return res.status(401).json({ erro: "Token expirado. Reautorize." }); }
 
-        // 2. PREPARAÇÃO (Dados completos)
+        // 2. PREPARAÇÃO
         const removerAcentos = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
         const precoVenda = parseFloat(String(produto.preco_novo || produto.preco || 0).replace(',', '.'));
         const precoCusto = parseFloat(String(produto.preco_custo || 0).replace(',', '.'));
         const estoque = parseInt(produto.estoque || 0);
 
-        // Objeto COMPLETO (vamos usar na criação e na atualização)
         const dadosCompletos = {
             descricao: removerAcentos(produto.titulo).substring(0, 120).trim(),
             sku: String(produto.referencia || produto.sku || `PROD-${id}`).trim(),
@@ -1717,10 +1717,10 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             preco_custo: precoCusto
         };
 
-        console.log(`🚀 Passo 1: Criando ${dadosCompletos.sku} (R$ ${precoVenda})...`);
+        console.log(`🚀 (1/3) Criando ${dadosCompletos.sku}...`);
 
         // ==============================================================================
-        // PASSO 1: CRIAR (POST)
+        // PASSO 1: CRIAR PRODUTO
         // ==============================================================================
         const response = await axios.post('https://api.tiny.com.br/public-api/v3/produtos', dadosCompletos, {
             headers: { 'Authorization': `Bearer ${tokenFinal}`, 'Content-Type': 'application/json' }
@@ -1728,41 +1728,59 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (response.status === 201 || response.status === 200) {
             const idTiny = response.data.data?.id || response.data.id;
-            console.log(`✅ Criado! ID: ${idTiny}. Aguardando 2s...`);
-            await sleep(2000); 
+            console.log(`✅ Criado! ID: ${idTiny}. Aguardando 3s...`);
+            await sleep(3000); 
 
             // ==============================================================================
-            // PASSO 2: FORÇAR PREÇO (PUT COM DADOS COMPLETOS)
+            // PASSO 2: ATUALIZAR PREÇO (Já validamos que funciona)
             // ==============================================================================
-            // O segredo: Enviamos 'dadosCompletos' de novo, não só o preço.
             try {
                 await axios.put(`https://api.tiny.com.br/public-api/v3/produtos/${idTiny}`, dadosCompletos, { 
                     headers: { 'Authorization': `Bearer ${tokenFinal}` } 
                 });
-                console.log("✅ Preço e dados confirmados via PUT.");
-            } catch (errPreco) {
-                console.error("⚠️ Erro no PUT (Preço):", errPreco.response?.data || errPreco.message);
-            }
+                console.log("✅ Preço confirmado.");
+            } catch (err) { console.error("⚠️ Aviso Preço:", err.message); }
+
+            await sleep(2000);
 
             // ==============================================================================
-            // PASSO 3: ESTOQUE (PAUSADO TEMPORARIAMENTE)
+            // PASSO 3: ESTOQUE (NA PORTA CERTA - PUT)
             // ==============================================================================
-            // Como estamos tomando 404, vamos pular o estoque automático por um minuto
-            // para garantir que pelo menos o PRODUTO e PREÇO fiquem 100%.
-            
+            if (estoque > 0) {
+                try {
+                    // Tentativa A: Formato de Atualização Direta
+                    // Se o erro 400 persistir, é certeza que falta a permissão de "Incluir/Editar" no token
+                    const dadosEstoque = {
+                        quantidade: estoque, // Mudamos de 'saldo' para 'quantidade'
+                        tipo: "B", // B = Balanço (Define o valor exato)
+                        observacao: "Carga Inicial"
+                    };
+
+                    await axios.put(`https://api.tiny.com.br/public-api/v3/estoque/${idTiny}`, dadosEstoque, { 
+                        headers: { 'Authorization': `Bearer ${tokenFinal}` } 
+                    });
+                    
+                    console.log(`✅ Estoque de ${estoque} definido com sucesso!`);
+                    
+                } catch (errEstoque) {
+                    console.error("❌ Erro Estoque:", errEstoque.response?.data || errEstoque.message);
+                    
+                    // Dica final de permissão se der erro
+                    if(errEstoque.response?.status === 403 || errEstoque.response?.status === 400) {
+                        console.error("DICA DE OURO: Vá em Configurações > API > Permissões e marque 'Incluir e Editar' na linha ESTOQUE e GATILHOS.");
+                    }
+                }
+            }
+
+            // FINALIZA
             await prisma.produto.update({ where: { id: id }, data: { tinyId: String(idTiny) } });
             
-            return res.json({ 
-                sucesso: true, 
-                msg: "Produto Integrado! (Verifique se o PREÇO apareceu correto)", 
-                tinyId: idTiny 
-            });
+            return res.json({ sucesso: true, msg: "INTEGRADO!", tinyId: idTiny });
         }
 
     } catch (error) {
-        console.error("❌ Erro:", error.response?.data || error.message);
-        const msgErro = error.response?.data?.detalhes?.[0]?.mensagem || "Erro na API Tiny";
-        res.status(500).json({ erro: "Falha no envio", detalhe: msgErro });
+        console.error("❌ Erro Fatal:", error.response?.data || error.message);
+        res.status(500).json({ erro: "Falha no envio" });
     }
 });
 

@@ -1713,13 +1713,13 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         const removerAcentos = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
         
         const dadosProdutoV3 = {
-            descricao: removerAcentos(produto.titulo).trim(), // Corresponde à coluna 'Descrição'
-            sku: String(produto.referencia || produto.sku).trim(), // Corresponde à coluna 'Código (SKU)'
-            preco: parseFloat(produto.preco), // Corresponde à coluna 'Preço'
-            unidade: "Un", // Conforme sua planilha: 'Un' (com 'U' maiúsculo)
-            tipo: "P", // Mapeamento para o valor 'Simples' da sua planilha
-            origem: parseInt(produto.origem) || 0, // Corresponde à coluna 'Origem' (ex: 0.0)
-            ncm: String(produto.ncm).replace(/\./g, "").trim() // Corresponde à coluna 'NCM'
+            descricao: removerAcentos(produto.titulo).trim(), 
+            sku: String(produto.referencia || produto.sku || `PROD-${id}`).trim(),
+            preco: parseFloat(Number(produto.preco_novo || produto.preco || 0).toFixed(2)),
+            unidade: "Un", // Conforme sua planilha (U maiúsculo, n minúsculo)
+            tipo: "S",     // "S" de Simples, conforme sua planilha
+            origem: 0,
+            ncm: "87089990" // Dica: Envie sem os pontos para evitar rejeição
         };
 
         console.log(`🚀 Enviando para V3: ${dadosProdutoV3.sku}`);

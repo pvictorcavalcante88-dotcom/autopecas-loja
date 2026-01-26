@@ -1714,14 +1714,24 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         
         // Garante que o preço seja um número puro com ponto
         const precoLimpo = parseFloat(String(produto.preco_novo || produto.preco || 0).replace(',', '.'));
+        // 1. Limpeza dos valores do banco (Garante ponto em vez de vírgula)
+        const precoVenda = parseFloat(String(produto.preco_novo || produto.preco || 0).replace(',', '.'));
+        const precoCusto = parseFloat(String(produto.preco_custo || 0).replace(',', '.'));
+        const estoqueInicial = parseInt(produto.estoque || 0);
 
+        // 2. Montagem do Objeto seguindo a sua planilha e a documentação V3
         const dadosProdutoV3 = {
             descricao: removerAcentos(produto.titulo).trim(),
             sku: String(produto.referencia || produto.sku).trim(),
-            preco: precoLimpo, // Enviando como Number puro (ex: 100.5)
-            unidade: "Un",      // Conforme sua planilha
-            tipo: "S",         // "S" para Simples, conforme sua planilha
-            origem: 0
+            tipo: "S",             // "S" de Simples conforme sua planilha
+            unidade: "Un",         // Conforme sua planilha
+            preco: precoVenda,     // Campo obrigatório para o preço de venda
+            preco_custo: precoCusto, 
+            origem: 0,
+            ncm: "87089990",
+            
+            // Na V3, para mandar o estoque no CADASTRO, usamos saldo_inicial
+            saldo_inicial: estoqueInicial 
         };
 
         // ... no momento do axios.post ...

@@ -1686,6 +1686,7 @@ app.post('/admin/teste-v3-direto', authenticateToken, async (req, res) => {
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+
 app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
 
@@ -1698,10 +1699,10 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         try { tokenFinal = await getValidToken(); } 
         catch (e) { return res.status(401).json({ erro: "Token expirado. Reautorize." }); }
 
-        // 2. PREPARAÇÃO
+        // 2. PREPARAÇÃO DOS DADOS
         const removerAcentos = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
         
-        // Garante números puros (ex: 150.00)
+        // Converte para Number puro (ex: 150.00)
         const precoVenda = parseFloat(String(produto.preco_novo || produto.preco || 0).replace(',', '.'));
         const precoCusto = parseFloat(String(produto.preco_custo || 0).replace(',', '.'));
         const estoque = parseInt(produto.estoque || 0);
@@ -1713,14 +1714,14 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             unidade: "Un",
             origem: 0,
             ncm: String(produto.ncm || "87089990").replace(/\./g, ""),
-            preco: precoVenda,
+            preco: precoVenda,       // Vai funcionar agora!
             preco_custo: precoCusto
         };
 
-        console.log(`🚀 (1/3) Criando: ${dadosCriacao.sku}...`);
+        console.log(`🚀 (1/2) Criando produto: ${dadosCriacao.sku} | $${precoVenda}`);
 
         // ==============================================================================
-        // PASSO 1: CRIAR (POST)
+        // PASSO 1: CRIAR O PRODUTO (POST)
         // ==============================================================================
         const response = await axios.post('https://api.tiny.com.br/public-api/v3/produtos', dadosCriacao, {
             headers: { 'Authorization': `Bearer ${tokenFinal}`, 'Content-Type': 'application/json' }
@@ -1728,46 +1729,38 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (response.status === 201 || response.status === 200) {
             const idTiny = response.data.data?.id || response.data.id;
-            console.log(`✅ Produto criado! ID: ${idTiny}. Aguardando 3s...`);
+            console.log(`✅ Produto criado! ID: ${idTiny}. Configurando estoque...`);
             
-            await sleep(3000); // Aumentei para 3s para garantir indexação
+            // Pausa de segurança para o Tiny indexar o ID
+            await sleep(2000); 
 
             // ==============================================================================
-            // PASSO 2: CORRIGIR PREÇO (PUT LIMPO)
-            // ==============================================================================
-            try {
-                // Manda APENAS o preço. Sem 'tipo', sem 'unidade'.
-                await axios.put(`https://api.tiny.com.br/public-api/v3/produtos/${idTiny}`, {
-                    preco: precoVenda,
-                    preco_custo: precoCusto
-                }, { headers: { 'Authorization': `Bearer ${tokenFinal}` } });
-                console.log("✅ (2/3) Preço atualizado.");
-            } catch (errPreco) {
-                console.error("⚠️ Erro Preço:", errPreco.response?.status, errPreco.response?.data);
-            }
-
-            await sleep(2000);
-
-            // ==============================================================================
-            // PASSO 3: LANÇAR ESTOQUE (POST ESPECÍFICO)
+            // PASSO 2: LANÇAR ESTOQUE (URL GERAL)
+            // A URL correta é /estoque (sem ID na URL)
             // ==============================================================================
             if (estoque > 0) {
                 try {
-                    const urlEstoque = `https://api.tiny.com.br/public-api/v3/produtos/${idTiny}/estoque`;
-                    console.log(`🚀 Tentando estoque em: ${urlEstoque}`);
-
-                    await axios.post(urlEstoque, { 
+                    const dadosEstoque = {
+                        produto: {
+                            id: idTiny  // O ID vai aqui dentro!
+                        },
                         tipo: "E", // Entrada
                         quantidade: estoque,
-                        observacao: "Carga Inicial Site"
-                    }, { headers: { 'Authorization': `Bearer ${tokenFinal}` } });
+                        observacao: "Carga inicial Site",
+                        data: new Date().toISOString().split('T')[0]
+                    };
+
+                    console.log(`🚀 Enviando estoque para URL Geral...`);
+
+                    // URL CORRETA V3:
+                    await axios.post('https://api.tiny.com.br/public-api/v3/estoque', dadosEstoque, { 
+                        headers: { 'Authorization': `Bearer ${tokenFinal}` } 
+                    });
                     
-                    console.log(`✅ (3/3) Estoque de ${estoque} lançado!`);
+                    console.log(`✅ (2/2) Estoque de ${estoque} lançado com sucesso!`);
                 } catch (errEstoque) {
-                    // Log detalhado para descobrirmos se é Permissão ou URL
-                    console.error("❌ Erro Estoque:", errEstoque.response?.status);
-                    if(errEstoque.response?.status === 403) console.error("DICA: Verifique se o Token tem permissão de 'Estoque' marcada no Tiny.");
-                    if(errEstoque.response?.status === 404) console.error("DICA: O ID do produto ainda não propagou ou a URL mudou.");
+                    // Se der erro aqui, é 99% certeza que é permissão do Token ou SKU duplicado na lixeira
+                    console.error("❌ Erro Estoque:", errEstoque.response?.data || errEstoque.message);
                 }
             }
 
@@ -1776,7 +1769,7 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             
             return res.json({ 
                 sucesso: true, 
-                msg: "INTEGRADO! Verifique preço e estoque no Tiny.", 
+                msg: "INTEGRADO! Verifique se preço e estoque apareceram.", 
                 tinyId: idTiny 
             });
         }

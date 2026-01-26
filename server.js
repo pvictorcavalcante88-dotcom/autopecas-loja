@@ -1713,7 +1713,14 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             origem: 0,
             ncm: String(produto.ncm || "87089990").replace(/\./g, ""),
             preco: precoVenda,
-            preco_custo: precoCusto
+            preco_custo: precoCusto,
+
+            // ESTAS DUAS LINHAS SÃO A CHAVE PARA ATIVAR O CONTROLE:
+            situacao: "A", 
+            classe_produto: "P", 
+            unidade_medida: { id: "Un" },
+            garantia: 0,
+            sob_encomenda: "N" // No Tiny V3, isso ajuda a ativar o controle de estoque físico
         };
 
         console.log(`🚀 (1/3) Criando ${dadosCompletos.sku}...`);

@@ -1834,6 +1834,22 @@ app.get('/admin/teste-estoque/:idTiny', async (req, res) => {
     }
 });
 
+// ROTA DE EMERGÊNCIA: Reseta o status de integração de TODOS os produtos
+app.get('/admin/resetar-status-tiny', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+
+    try {
+        // Define tinyId como NULL em todos os produtos
+        await prisma.produto.updateMany({
+            data: { tinyId: null } 
+        });
+
+        res.send("<h1>✅ Pronto! Todos os produtos foram resetados.</h1><p>Volte ao painel de produtos e os botões estarão azuis novamente para o reenvio.</p>");
+    } catch (error) {
+        res.status(500).send("Erro ao resetar: " + error.message);
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);

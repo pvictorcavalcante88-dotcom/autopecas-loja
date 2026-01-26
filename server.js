@@ -1712,17 +1712,19 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         const tokenFinal = config?.accessToken?.trim();
         const removerAcentos = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
         
+        // Garante que o preço seja um número puro com ponto
+        const precoLimpo = parseFloat(String(produto.preco_novo || produto.preco || 0).replace(',', '.'));
+
         const dadosProdutoV3 = {
-            descricao: removerAcentos(produto.titulo).trim(), 
-            sku: String(produto.referencia || produto.sku || `PROD-${id}`).trim(),
-            preco: parseFloat(Number(produto.preco_novo || produto.preco || 0).toFixed(2)),
-            unidade: "Un", // Conforme sua planilha (U maiúsculo, n minúsculo)
-            tipo: "S",     // "S" de Simples, conforme sua planilha
-            origem: 0,
-            ncm: "87089990" // Dica: Envie sem os pontos para evitar rejeição
+            descricao: removerAcentos(produto.titulo).trim(),
+            sku: String(produto.referencia || produto.sku).trim(),
+            preco: precoLimpo, // Enviando como Number puro (ex: 100.5)
+            unidade: "Un",      // Conforme sua planilha
+            tipo: "S",         // "S" para Simples, conforme sua planilha
+            origem: 0
         };
 
-        console.log(`🚀 Enviando para V3: ${dadosProdutoV3.sku}`);
+        // ... no momento do axios.post ...
 
         const response = await axios.post('https://api.tiny.com.br/public-api/v3/produtos', dadosProdutoV3, {
             headers: {
@@ -1730,6 +1732,12 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
                 'Content-Type': 'application/json'
             }
         });
+
+        // A V3 retorna status 201 quando cria com sucesso
+        if (response.status === 201 || response.status === 200) {
+            console.log("✅ Produto cadastrado com sucesso!");
+            return res.json({ sucesso: true, msg: "ENVIADO COM SUCESSO!" });
+        }
 
         res.json({ sucesso: true, msg: "ENVIADO COM SUCESSO!", data: response.data });
 

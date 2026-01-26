@@ -1691,42 +1691,37 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         const id = parseInt(req.params.id);
         const produto = await prisma.produto.findUnique({ where: { id } });
 
-        // 1. GARANTIA DE TOKEN (Usa o do banco ou o manual de contingência)
-        let config = await prisma.tinyConfig.findFirst();
-        const tokenFinal = config?.accessToken?.trim(); // Adicione sua lógica de token manual aqui se precisar
-
-        if (!tokenFinal) {
-            return res.status(400).json({ erro: "Token não encontrado. Faça a autorização." });
+        // === AQUI ESTÁ A CORREÇÃO MÁGICA ===
+        // Em vez de ler o banco direto, chamamos a função que verifica validade e renova se precisar
+        let tokenFinal;
+        try {
+            tokenFinal = await getValidToken(); 
+        } catch (e) {
+            return res.status(401).json({ erro: "Token expirado ou inválido. Acesse /admin/tiny/autorizar novamente." });
         }
+        // ====================================
 
-        // 2. PREPARAÇÃO DOS VALORES (O Segredo do Preço e Estoque)
-        // Remove acentos
         const removerAcentos = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
         
-        // Converte "100,00" para 100.00 (Número puro)
+        // Formatações V3
         const precoVenda = parseFloat(String(produto.preco_novo || produto.preco || 0).replace(',', '.'));
         const precoCusto = parseFloat(String(produto.preco_custo || 0).replace(',', '.'));
         const estoqueInicial = parseInt(produto.estoque || 0);
 
-        // 3. MONTAGEM DO OBJETO V3 (Mapeamento Correto)
         const dadosProdutoV3 = {
             descricao: removerAcentos(produto.titulo).substring(0, 120).trim(),
             sku: String(produto.referencia || produto.sku || `PROD-${id}`).trim(),
-            tipo: "S",              // "S" = Simples (Conforme sua planilha)
-            unidade: "Un",          // "Un" (Conforme sua planilha)
+            tipo: "S",
+            unidade: "Un",
             origem: 0,
-            ncm: String(produto.ncm || "87089990").replace(/\./g, ""), // Remove pontos do NCM
-
-            // --- AQUI ESTÁ A CORREÇÃO DOS ZEROS ---
-            preco: precoVenda,          // Campo obrigatório da V3 (Number)
-            preco_custo: precoCusto,    // Campo de custo da V3 (Number)
-            saldo_inicial: estoqueInicial // É assim que se manda estoque na criação V3
-            // --------------------------------------
+            ncm: String(produto.ncm || "87089990").replace(/\./g, ""),
+            preco: precoVenda,
+            preco_custo: precoCusto,
+            saldo_inicial: estoqueInicial
         };
 
-        console.log(`🚀 Enviando V3: ${dadosProdutoV3.sku} | Preço: ${dadosProdutoV3.preco} | Estoque: ${dadosProdutoV3.saldo_inicial}`);
+        console.log(`🚀 Enviando V3: ${dadosProdutoV3.sku} | Token OK`);
 
-        // 4. ENVIO
         const response = await axios.post('https://api.tiny.com.br/public-api/v3/produtos', dadosProdutoV3, {
             headers: {
                 'Authorization': `Bearer ${tokenFinal}`,
@@ -1734,32 +1729,21 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             }
         });
 
-        // 5. O GRANDE FINAL: SALVAR O ID NO BANCO (Para o botão ficar verde)
         if (response.status === 201 || response.status === 200) {
-            // O ID vem dentro de data.data.id ou data.id dependendo da resposta
             const idTiny = response.data.data?.id || response.data.id;
-
-            console.log(`✅ Sucesso! ID Tiny recebido: ${idTiny}`);
-
-            // ATUALIZA O SEU BANCO DE DADOS
+            
+            // Salva o ID no banco para o botão ficar verde
             await prisma.produto.update({
                 where: { id: id },
-                data: { 
-                    tinyId: String(idTiny) // <--- ISSO MUDA A COR DO BOTÃO
-                }
+                data: { tinyId: String(idTiny) }
             });
 
-            return res.json({ 
-                sucesso: true, 
-                msg: "INTEGRADO COM SUCESSO!", 
-                tinyId: idTiny 
-            });
+            return res.json({ sucesso: true, msg: "INTEGRADO COM SUCESSO!", tinyId: idTiny });
         }
 
     } catch (error) {
         console.error("❌ Erro:", error.response?.data || error.message);
-        // Retorna o erro detalhado do Tiny se houver
-        const msgErro = error.response?.data?.detalhes?.[0]?.mensagem || "Erro ao enviar";
+        const msgErro = error.response?.data?.detalhes?.[0]?.mensagem || "Erro na API Tiny";
         res.status(500).json({ erro: "Falha no envio", detalhe: msgErro });
     }
 });

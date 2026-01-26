@@ -1719,7 +1719,7 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
             situacao: "A",
             controle_estoque: "S", // Comando explícito para ativar o Sim
             sob_encomenda: "N",
-            marca: removerAcentos(produto.marca || ""),
+            
         };
 
         console.log(`🚀 (1/3) Criando ${dadosCompletos.sku}...`);

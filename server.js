@@ -1712,17 +1712,19 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
         const tokenFinal = config?.accessToken?.trim();
         const removerAcentos = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
         
-        const dadosV3 = {
-            nome: removerAcentos(produto.titulo),
-            codigo: produto.referencia || `PROD-${id}`,
+        const dadosProdutoV3 = {
+            descricao: removerAcentos(produto.titulo), // V3 usa 'descricao' em vez de 'nome'
+            sku: produto.referencia || produto.sku || `PROD-${id}`, // V3 usa 'sku' em vez de 'codigo'
             preco: parseFloat(String(produto.preco_novo || produto.preco).replace(',', '.')),
             unidade: "UN",
-            tipo: "P",
-            ncm: "8708.99.90",
-            origem: "0"
+            tipo: "P", // Deve ser 'P' para Produto ou 'S' para Serviço
+            origem: 0,
+            ncm: "8708.99.90"
         };
 
-        const response = await axios.post('https://api.tiny.com.br/public-api/v3/produtos', dadosV3, {
+        console.log(`🚀 Enviando para V3: ${dadosProdutoV3.sku}`);
+
+        const response = await axios.post('https://api.tiny.com.br/public-api/v3/produtos', dadosProdutoV3, {
             headers: {
                 'Authorization': `Bearer ${tokenFinal}`,
                 'Content-Type': 'application/json'

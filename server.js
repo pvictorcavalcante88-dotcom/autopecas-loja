@@ -1916,6 +1916,7 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                 // -----------------------------
 
                 try {
+                    // Detalhando para pegar preço e estoque atualizados
                     const detalhe = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos/${idTiny}`, {
                         headers: { 'Authorization': `Bearer ${tokenFinal}` }
                     });
@@ -1923,18 +1924,21 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                     const corpoDetalhe = detalhe.data;
                     const p = corpoDetalhe.data || corpoDetalhe;
 
-                    // Lógica robusta de Estoque (tentando todos os campos possíveis)
-                    const novoPreco = parseFloat(p.preco) || parseFloat(item.precos?.preco) || 0;
-                    const novoEstoque = parseInt(p.saldo_fisico) || parseInt(p.saldo) || parseInt(p.saldo_estoque) || parseInt(p.estoque?.saldo) || 0;
+                    // === CORREÇÃO DE VALORES ===
+                    const novoPreco = parseFloat(p.preco) || 0;
+                    
+                    // Tentativa "Desesperada" de pegar o estoque de qualquer lugar que o Tiny mande
+                    const novoEstoque = Number(p.saldo) || Number(p.saldo_fisico) || Number(p.saldo_estoque) || Number(p.estoque?.saldo) || 0;
 
                     console.log(`   -> Processando ${sku} | Preço: ${novoPreco} | Estoque: ${novoEstoque}`);
 
-                    // Busca manual para evitar erro do Prisma
+                    // Busca manual
                     const produtoExistente = await prisma.produto.findFirst({
                         where: { sku: sku }
                     });
 
                     if (produtoExistente) {
+                        // ATUALIZAR
                         await prisma.produto.update({
                             where: { id: produtoExistente.id },
                             data: {
@@ -1946,6 +1950,7 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                         });
                         console.log(`✅ ${sku} Atualizado!`);
                     } else {
+                        // CRIAR (Aqui estava o erro do NCM)
                         await prisma.produto.create({
                             data: {
                                 titulo: p.nome || item.descricao,
@@ -1956,7 +1961,10 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                                 estoque: novoEstoque,
                                 tinyId: idTiny,
                                 categoria: p.categoria || "Geral",
-                                ncm: p.ncm || "87089990",
+                                
+                                // REMOVI A LINHA DO NCM QUE DAVA ERRO
+                                // ncm: p.ncm || "87089990", 
+                                
                                 imagem: "https://placehold.co/600x400?text=Falta+Foto"
                             }
                         });
@@ -1966,10 +1974,9 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                     processados++;
 
                 } catch (errDet) {
-                    // Se der erro 429 de novo, ele avisa mas não quebra tudo
                     if (errDet.response && errDet.response.status === 429) {
                         console.error(`🛑 Bloqueio temporário (429) no item ${sku}. Esperando 5 segundos...`);
-                        await sleep(5000); // Espera 5 segundos extra se der erro
+                        await sleep(5000); 
                     } else {
                         console.error(`❌ Erro ao salvar ${sku}:`, errDet.message);
                     }

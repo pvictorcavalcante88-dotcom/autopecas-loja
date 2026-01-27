@@ -1925,14 +1925,16 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 
                     console.log(`📦 Dados do SKU ${sku}:`, JSON.stringify(p));
 
-                    // 1. CORREÇÃO DO PREÇO (Lendo a gaveta 'precos')
+                    // 1. PREÇO DE VENDA
                     const novoPreco = parseFloat(p.precos?.preco) || parseFloat(p.preco) || 0;
                     
-                    // 2. CORREÇÃO DO ESTOQUE (Lendo a gaveta 'estoque' -> campo 'quantidade')
-                    // Adicionei p.estoque?.quantidade que é o que veio no seu JSON
+                    // 2. CORREÇÃO DO PREÇO DE CUSTO (Tiny V3 manda 'precoCusto')
+                    const novoCusto = parseFloat(p.precos?.precoCusto) || parseFloat(p.precoCusto) || parseFloat(p.precos?.preco_custo) || 0;
+
+                    // 3. ESTOQUE
                     const novoEstoque = parseInt(p.estoque?.quantidade) || parseInt(p.saldo) || parseInt(p.saldo_fisico) || 0;
 
-                    console.log(`   -> Processando ${sku} | Preço: ${novoPreco} | Estoque: ${novoEstoque}`);
+                    console.log(`   -> Processando ${sku} | Preço: ${novoPreco} | Custo: ${novoCusto} | Estoque: ${novoEstoque}`);
 
                     const produtoExistente = await prisma.produto.findFirst({
                         where: { sku: sku }
@@ -1944,9 +1946,9 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                             where: { id: produtoExistente.id },
                             data: {
                                 preco_novo: novoPreco,
+                                preco_custo: novoCusto, // Atualizando o custo corretamente
                                 estoque: novoEstoque,
                                 tinyId: idTiny
-                                // REMOVI A LINHA 'situacao' QUE DAVA ERRO
                             }
                         });
                         console.log(`✅ ${sku} Atualizado!`);
@@ -1958,12 +1960,11 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                                 sku: sku,
                                 referencia: sku,
                                 preco_novo: novoPreco,
-                                preco_custo: parseFloat(p.precos?.preco_custo) || 0,
+                                preco_custo: novoCusto, // Gravando o custo
                                 estoque: novoEstoque,
                                 tinyId: idTiny,
                                 categoria: p.categoria || "Geral",
                                 imagem: "https://placehold.co/600x400?text=Falta+Foto"
-                                // REMOVI A LINHA 'ncm' e 'situacao' PARA EVITAR ERROS
                             }
                         });
                         console.log(`✨ ${sku} Criado!`);
@@ -1973,7 +1974,7 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 
                 } catch (errDet) {
                     if (errDet.response && errDet.response.status === 429) {
-                        console.error(`🛑 Bloqueio temporário (429) no item ${sku}. Esperando 5 segundos...`);
+                        console.error(`🛑 Bloqueio temporário (429). Esperando 5s...`);
                         await sleep(5000); 
                     } else {
                         console.error(`❌ Erro ao salvar ${sku}:`, errDet.message);

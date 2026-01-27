@@ -1883,8 +1883,6 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
             });
 
 
-            totalPaginas = dados?.total_paginas || 1;
-
             const dados = response.data.data;
             const itens = dados?.itens || [];
             totalPaginas = dados?.total_paginas || 1;

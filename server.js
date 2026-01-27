@@ -1883,6 +1883,11 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 
         console.log("🔄 Iniciando Sincronização (Correção de SKU)...");
 
+        // Função de "Respiro" (Pausa de X milissegundos)
+        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+        console.log("🔄 Iniciando Sincronização com Pausa...");
+
         do {
             const response = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos?pagina=${pagina}&limite=100&situacao=A`, {
                 headers: { 'Authorization': `Bearer ${tokenFinal}` }
@@ -1898,19 +1903,19 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 
             for (const item of itens) {
                 const idTiny = String(item.id);
-                
-                // --- CORREÇÃO AQUI ---
-                // O Tiny V3 pode mandar 'sku' ou 'codigo'. Vamos pegar qualquer um que vier.
                 const sku = item.sku || item.codigo; 
-                // ---------------------
 
                 if (!sku) {
-                    console.log(`⚠️ Item ID ${idTiny} realmente não tem SKU. Ignorando.`);
+                    console.log(`⚠️ Item ID ${idTiny} ignorado (Sem SKU).`);
                     continue;
                 }
 
+                // --- O SEGREDO DO SUCESSO ---
+                // Espera 1 segundo antes de chamar o Tiny de novo para não tomar erro 429
+                await sleep(1000); 
+                // -----------------------------
+
                 try {
-                    // Detalhando para pegar preço e estoque atualizados
                     const detalhe = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos/${idTiny}`, {
                         headers: { 'Authorization': `Bearer ${tokenFinal}` }
                     });
@@ -1918,19 +1923,18 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                     const corpoDetalhe = detalhe.data;
                     const p = corpoDetalhe.data || corpoDetalhe;
 
-                    // CORREÇÃO DOS VALORES (Adicionei saldo_fisico para tentar pegar o 2)
+                    // Lógica robusta de Estoque (tentando todos os campos possíveis)
                     const novoPreco = parseFloat(p.preco) || parseFloat(item.precos?.preco) || 0;
                     const novoEstoque = parseInt(p.saldo_fisico) || parseInt(p.saldo) || parseInt(p.saldo_estoque) || parseInt(p.estoque?.saldo) || 0;
 
                     console.log(`   -> Processando ${sku} | Preço: ${novoPreco} | Estoque: ${novoEstoque}`);
 
-                    // 1. Tenta achar o produto pelo SKU (jeito manual)
+                    // Busca manual para evitar erro do Prisma
                     const produtoExistente = await prisma.produto.findFirst({
                         where: { sku: sku }
                     });
 
                     if (produtoExistente) {
-                        // SE EXISTE: Atualiza pelo ID (que é único e seguro)
                         await prisma.produto.update({
                             where: { id: produtoExistente.id },
                             data: {
@@ -1942,7 +1946,6 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                         });
                         console.log(`✅ ${sku} Atualizado!`);
                     } else {
-                        // SE NÃO EXISTE: Cria um novo
                         await prisma.produto.create({
                             data: {
                                 titulo: p.nome || item.descricao,
@@ -1963,7 +1966,13 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                     processados++;
 
                 } catch (errDet) {
-                    console.error(`❌ Erro ao salvar ${sku}:`, errDet.message);
+                    // Se der erro 429 de novo, ele avisa mas não quebra tudo
+                    if (errDet.response && errDet.response.status === 429) {
+                        console.error(`🛑 Bloqueio temporário (429) no item ${sku}. Esperando 5 segundos...`);
+                        await sleep(5000); // Espera 5 segundos extra se der erro
+                    } else {
+                        console.error(`❌ Erro ao salvar ${sku}:`, errDet.message);
+                    }
                 }
             }
 

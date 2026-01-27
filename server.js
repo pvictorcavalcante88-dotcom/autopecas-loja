@@ -1865,6 +1865,83 @@ app.get('/admin/resetar-status-tiny', authenticateToken, async (req, res) => {
     }
 });
 
+app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+
+    try {
+        const tokenFinal = await getValidToken();
+        let pagina = 1;
+        let totalPaginas = 1;
+        let processados = 0;
+
+        console.log("🔄 Iniciando Sincronização Global com Tiny...");
+
+        // Loop para percorrer todas as páginas do Tiny
+        do {
+            const response = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos?pagina=${pagina}&limite=100`, {
+                headers: { 'Authorization': `Bearer ${tokenFinal}` }
+            });
+
+            const dados = response.data.data;
+            const itens = dados?.itens || [];
+            totalPaginas = dados?.total_paginas || 1;
+
+            for (const item of itens) {
+                const idTiny = String(item.id);
+                const sku = item.codigo;
+
+                // Buscamos o detalhe para pegar Preço e Saldo de Estoque exatos
+                try {
+                    const detalhe = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos/${idTiny}`, {
+                        headers: { 'Authorization': `Bearer ${tokenFinal}` }
+                    });
+
+                    const p = detalhe.data.data;
+
+                    // UPSERT: Se o SKU existe, atualiza. Se não, cria.
+                    await prisma.produto.upsert({
+                        where: { sku: sku },
+                        update: {
+                            preco_novo: parseFloat(p.preco) || 0,
+                            preco_custo: parseFloat(p.preco_custo) || 0,
+                            estoque: parseInt(p.saldo_estoque) || 0,
+                            tinyId: idTiny
+                        },
+                        create: {
+                            titulo: p.nome,
+                            sku: sku,
+                            referencia: sku,
+                            preco_novo: parseFloat(p.preco) || 0,
+                            preco_custo: parseFloat(p.preco_custo) || 0,
+                            estoque: parseInt(p.saldo_estoque) || 0,
+                            tinyId: idTiny,
+                            categoria: p.categoria || "Geral",
+                            ncm: p.ncm || "87089990",
+                            
+                            // USANDO UMA IMAGEM PADRÃO PARA NÃO DAR ERRO
+                            imagem: "https://placehold.co/600x400?text=Adicionar+Foto" 
+                        }
+                    });
+                    processados++;
+                } catch (errDet) {
+                    console.error(`⚠️ Erro ao detalhar item ${sku}:`, errDet.message);
+                }
+            }
+            
+            pagina++;
+        } while (pagina <= totalPaginas);
+
+        res.json({ 
+            sucesso: true, 
+            msg: `Sincronização concluída! ${processados} produtos foram atualizados/criados.` 
+        });
+
+    } catch (error) {
+        console.error("❌ Erro Fatal na Importação:", error.response?.data || error.message);
+        res.status(500).json({ erro: "Falha ao sincronizar com Tiny" });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);

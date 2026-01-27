@@ -1878,9 +1878,14 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 
         // Loop para percorrer todas as páginas do Tiny
         do {
-            // Adicione "&situacao=A" para garantir que pegue os ATIVOS ou tire para ver se vem algo
-            const response = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos?pagina=${pagina}&limite=100&situacao=A`, {
-                headers: { 'Authorization': `Bearer ${tokenFinal}` }
+            // Removendo limites e forçando a situação 'A' (Ativos) na URL
+            const urlBusca = `https://api.tiny.com.br/public-api/v3/produtos?pagina=${pagina}&limite=100&situacao=A`;
+
+            const response = await axios.get(urlBusca, {
+                headers: { 
+                    'Authorization': `Bearer ${tokenFinal}`,
+                    'Content-Type': 'application/json'
+                }
             });
 
             const dados = response.data.data;

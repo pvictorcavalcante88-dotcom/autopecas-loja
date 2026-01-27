@@ -1882,8 +1882,6 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
             const response = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos?pagina=${pagina}&limite=100&situacao=A`, {
                 headers: { 'Authorization': `Bearer ${tokenFinal}` }
             });
-            
-
 
             const dados = response.data.data;
             const itens = dados?.itens || [];

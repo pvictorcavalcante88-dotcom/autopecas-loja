@@ -831,27 +831,15 @@ async function executarBusca(q, categoria) {
             return;
         }
 
-        // Definição das margens por curva (mesma lógica do servidor)
-        const margensPorCurva = {
-            'CURVA A': 0.20,
-            'CURVA B': 0.25,
-            'CURVA C': 0.30
-        };
 
         data.forEach(p => {
             // 1. Identifica a curva do produto (vem do banco/Tiny)
             const curvaRef = (p.categoria || 'CURVA A').toUpperCase();
-            const margemLoja = margensPorCurva[curvaRef] || 0.20;
+            
 
             // 2. Lógica de Preço para o Afiliado
             let precoBase = parseFloat(p.price || p.preco_novo);
-            let precoExibir = precoBase;
-
-            if (afiliadoLogado) {
-                // Se o afiliado está logado, mostramos o preço com a margem da loja
-                // O afiliado depois aplica a dele no carrinho
-                precoExibir = precoBase * (1 + margemLoja);
-            }
+            let precoExibir = precoBase
 
             // 3. Lógica de Estoque (vinda do Tiny via Sincronização)
             const temEstoque = p.estoque > 0;

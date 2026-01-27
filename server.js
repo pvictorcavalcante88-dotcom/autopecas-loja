@@ -2005,20 +2005,23 @@ app.post('/admin/tiny/teste-venda', async (req, res) => {
             pedido: {
                 data_pedido: new Date().toLocaleDateString('pt-BR'),
                 cliente: {
-                    nome: "Cliente Teste",
+                    // Removi o idContato para ele não reclamar que está zero
+                    nome: "Cliente Teste Integracao",
                     tipo_pessoa: "F",
-                    cpf_cnpj: "08801943407", // Tentaremos sem pontos
+                    cpf_cnpj: "08801943407", // Tente usar um CPF real se der erro de validação
                     endereco: "Rua Teste",
-                    numero: "1",
+                    numero: "100",
                     bairro: "Centro",
                     cep: "01001000",
                     cidade: "Sao Paulo",
-                    uf: "SP"
+                    uf: "SP",
+                    atualizar_cliente: "S" // Diz ao Tiny para criar/atualizar o contato
                 },
                 itens: [
                     {
                         item: {
-                            codigo: "BKR7ESB-D",
+                            // IMPORTANTE: O SKU deve ser exatamente igual ao do Tiny
+                            codigo: "BKR7ESB-D", 
                             quantidade: 1,
                             valor_unitario: 150
                         }

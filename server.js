@@ -1881,10 +1881,9 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                     
             console.log("🔄 Iniciando Sincronização (Somente Ativos)...");
 
-        console.log("🔄 Iniciando Sincronização (Modo Forçado)...");
+        console.log("🔄 Iniciando Sincronização (Correção de SKU)...");
 
         do {
-            // 1. Busca na API (Já filtrando Ativos na URL)
             const response = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos?pagina=${pagina}&limite=100&situacao=A`, {
                 headers: { 'Authorization': `Bearer ${tokenFinal}` }
             });
@@ -1899,18 +1898,19 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 
             for (const item of itens) {
                 const idTiny = String(item.id);
-                const sku = item.codigo;
+                
+                // --- CORREÇÃO AQUI ---
+                // O Tiny V3 pode mandar 'sku' ou 'codigo'. Vamos pegar qualquer um que vier.
+                const sku = item.sku || item.codigo; 
+                // ---------------------
 
-                // 2. Só ignora se não tiver SKU (Identidade)
                 if (!sku) {
-                    console.log(`⚠️ Item sem SKU ignorado. ID: ${idTiny}`);
+                    console.log(`⚠️ Item ID ${idTiny} realmente não tem SKU. Ignorando.`);
                     continue;
                 }
 
                 try {
-                    console.log(`🔍 Detalhando SKU: ${sku}...`);
-
-                    // 3. Busca o detalhe para pegar os valores exatos
+                    // Detalhando para pegar preço e estoque atualizados
                     const detalhe = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos/${idTiny}`, {
                         headers: { 'Authorization': `Bearer ${tokenFinal}` }
                     });
@@ -1918,13 +1918,12 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                     const corpoDetalhe = detalhe.data;
                     const p = corpoDetalhe.data || corpoDetalhe;
 
-                    // 4. Tratamento de Valores (Para garantir que 150,00 vire 150.00)
+                    // Tratamento robusto para valores
                     const novoPreco = parseFloat(p.preco) || parseFloat(item.precos?.preco) || 0;
                     const novoEstoque = parseInt(p.saldo_estoque) || parseInt(p.estoque?.saldo) || parseInt(p.saldo) || 0;
 
-                    console.log(`   -> Salvando: R$ ${novoPreco} | Estoque: ${novoEstoque}`);
+                    console.log(`   -> Sincronizando ${sku} | Preço: ${novoPreco} | Estoque: ${novoEstoque}`);
 
-                    // 5. Atualização no Banco
                     await prisma.produto.upsert({
                         where: { sku: sku },
                         update: {
@@ -1948,7 +1947,6 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                     });
                     
                     processados++;
-                    console.log(`✅ ${sku} Atualizado com Sucesso!`);
 
                 } catch (errDet) {
                     console.error(`❌ Erro ao salvar ${sku}:`, errDet.message);

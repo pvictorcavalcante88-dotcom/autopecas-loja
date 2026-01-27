@@ -1923,48 +1923,47 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                     const corpoDetalhe = detalhe.data;
                     const p = corpoDetalhe.data || corpoDetalhe;
 
-                    // === DEBUG: Mostra no log o que veio do Tiny para termos certeza ===
-                    console.log(`📦 Dados Brutos do SKU ${sku}:`, JSON.stringify(p));
+                    console.log(`📦 Dados do SKU ${sku}:`, JSON.stringify(p));
 
-                    // === CORREÇÃO: Buscando dentro das "gavetas" (precos e estoque) ===
+                    // 1. CORREÇÃO DO PREÇO (Lendo a gaveta 'precos')
+                    const novoPreco = parseFloat(p.precos?.preco) || parseFloat(p.preco) || 0;
                     
-                    // Tenta pegar na raiz OU dentro do objeto 'precos'
-                    const novoPreco = parseFloat(p.preco) || parseFloat(p.precos?.preco) || parseFloat(p.precos?.preco_promocional) || 0;
-                    
-                    // Tenta pegar na raiz OU dentro do objeto 'estoque'
-                    const novoEstoque = Number(p.saldo) || Number(p.saldo_fisico) || Number(p.estoque?.saldo) || Number(p.estoque?.saldo_fisico) || 0;
+                    // 2. CORREÇÃO DO ESTOQUE (Lendo a gaveta 'estoque' -> campo 'quantidade')
+                    // Adicionei p.estoque?.quantidade que é o que veio no seu JSON
+                    const novoEstoque = parseInt(p.estoque?.quantidade) || parseInt(p.saldo) || parseInt(p.saldo_fisico) || 0;
 
-                    console.log(`   -> Processando ${sku} | Preço Detectado: ${novoPreco} | Estoque Detectado: ${novoEstoque}`);
+                    console.log(`   -> Processando ${sku} | Preço: ${novoPreco} | Estoque: ${novoEstoque}`);
 
-                    // Busca manual
                     const produtoExistente = await prisma.produto.findFirst({
                         where: { sku: sku }
                     });
 
                     if (produtoExistente) {
+                        // ATUALIZAR
                         await prisma.produto.update({
                             where: { id: produtoExistente.id },
                             data: {
                                 preco_novo: novoPreco,
                                 estoque: novoEstoque,
-                                tinyId: idTiny,
-                                situacao: "A"
+                                tinyId: idTiny
+                                // REMOVI A LINHA 'situacao' QUE DAVA ERRO
                             }
                         });
                         console.log(`✅ ${sku} Atualizado!`);
                     } else {
+                        // CRIAR
                         await prisma.produto.create({
                             data: {
                                 titulo: p.nome || item.descricao,
                                 sku: sku,
                                 referencia: sku,
                                 preco_novo: novoPreco,
-                                preco_custo: parseFloat(p.preco_custo) || parseFloat(p.precos?.preco_custo) || 0,
+                                preco_custo: parseFloat(p.precos?.preco_custo) || 0,
                                 estoque: novoEstoque,
                                 tinyId: idTiny,
                                 categoria: p.categoria || "Geral",
-                                // ncm: p.ncm, // Comentado para evitar erro
                                 imagem: "https://placehold.co/600x400?text=Falta+Foto"
+                                // REMOVI A LINHA 'ncm' e 'situacao' PARA EVITAR ERROS
                             }
                         });
                         console.log(`✨ ${sku} Criado!`);

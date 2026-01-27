@@ -1999,7 +1999,7 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 // ROTA: TESTE DE VENDA (Envia um Pedido Fictício para o Tiny)
 app.post('/admin/tiny/teste-venda', authenticateToken, async (req, res) => {
     // Apenas admin pode testar
-    if (req.user.role !== 'admin') return res.sendStatus(403);
+    //if (req.user.role !== 'admin') return res.sendStatus(403);
 
     try {
         let tokenFinal;

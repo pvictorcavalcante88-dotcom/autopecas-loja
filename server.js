@@ -1998,82 +1998,53 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 
 // ROTA: TESTE DE VENDA (Envia um Pedido Fictício para o Tiny)
 app.post('/admin/tiny/teste-venda', async (req, res) => {
-    // Apenas admin pode testar
-    //if (req.user.role !== 'admin') return res.sendStatus(403);
-
     try {
-        let tokenFinal;
-        try { tokenFinal = await getValidToken(); } 
-        catch (e) { return res.status(401).json({ erro: "Token expirado." }); }
+        let tokenFinal = await getValidToken();
 
-        // 1. DADOS DO CLIENTE (Para NF-e precisa ser real, mas para teste use o seu)
-        // O Tiny valida CPF. Use um CPF válido de teste ou o seu próprio para não dar erro.
-        const clienteTeste = {
-            nome: "Cliente Teste Integração",
-            tipo_pessoa: "F", // Física
-            cpf_cnpj: "088.019.434-07", // <--- TROQUE POR UM CPF VÁLIDO PARA A NF SAIR!
-            endereco: "Rua dos Testes",
-            numero: "123",
-            bairro: "Centro",
-            cep: "01001-000",
-            cidade: "São Paulo",
-            uf: "SP",
-            fone: "(11) 99999-9999",
-            email: "teste@email.com"
-        };
-
-        // 2. ITENS DO PEDIDO (Vamos usar a Vela BKR7ESB-D que sabemos que existe)
-        const itensPedido = [
-            {
-                item: {
-                    codigo: "BKR7ESB-D", // O SKU tem que bater com o do Tiny
-                    descricao: "Vela de Ignição - Venda Teste",
-                    unidade: "UN",
-                    quantidade: 1,
-                    valor_unitario: 150.00
-                }
-            }
-        ];
-
-        // 3. MONTAGEM DO JSON (Padrão Tiny V3)
         const payloadPedido = {
             pedido: {
-                data_pedido: new Date().toLocaleDateString('pt-BR'), // Hoje
-                cliente: clienteTeste,
-                itens: itensPedido,
-                situacao: "aberto", // "aberto" = Pendente de aprovação/NF
-                forma_pagamento: "Cartão de Crédito",
-                obs: "Pedido criado via API do Site"
+                data_pedido: new Date().toLocaleDateString('pt-BR'),
+                cliente: {
+                    nome: "Cliente Teste",
+                    tipo_pessoa: "F",
+                    cpf_cnpj: "08801943407", // Tentaremos sem pontos
+                    endereco: "Rua Teste",
+                    numero: "1",
+                    bairro: "Centro",
+                    cep: "01001000",
+                    cidade: "Sao Paulo",
+                    uf: "SP"
+                },
+                itens: [
+                    {
+                        item: {
+                            codigo: "BKR7ESB-D",
+                            quantidade: 1,
+                            valor_unitario: 150
+                        }
+                    }
+                ],
+                situacao: "aberto"
             }
         };
 
-        console.log("🚀 Enviando Pedido de Teste para o Tiny...");
-
-        // 4. ENVIO (POST)
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/pedidos`, 
             payloadPedido,
-            {
-                headers: { 
-                    'Authorization': `Bearer ${tokenFinal}`,
-                    'Content-Type': 'application/json'
-                }
-            }
+            { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
         );
 
-        const idPedido = response.data.data?.id || response.data.id || "Sucesso";
-        console.log(`✅ Pedido Criado no Tiny! ID: ${idPedido}`);
-
-        res.json({ 
-            sucesso: true, 
-            msg: "Venda enviada ao Tiny! Agora vá em Vendas > Pedidos no Tiny para emitir a nota.",
-            id_pedido_tiny: idPedido
-        });
+        res.json({ sucesso: true, id_pedido_tiny: response.data.data?.id });
 
     } catch (error) {
-        const erroMsg = error.response?.data?.erros?.[0]?.mensagem || error.message;
-        console.error("❌ Erro ao criar pedido:", JSON.stringify(error.response?.data || error.message));
-        res.status(500).json({ erro: "Falha ao criar pedido: " + erroMsg });
+        // --- LOG FOFOQUEIRO ---
+        const detalhesDoTiny = error.response?.data;
+        console.error("❌ ERRO DETALHADO DO TINY:", JSON.stringify(detalhesDoTiny, null, 2));
+        
+        res.status(500).json({ 
+            erro: "O Tiny rejeitou o pedido", 
+            detalhes: detalhesDoTiny 
+        });
     }
 });
 

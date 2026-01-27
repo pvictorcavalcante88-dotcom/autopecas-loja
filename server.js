@@ -1879,75 +1879,75 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
         // Loop para percorrer todas as páginas do Tiny
             console.log("🔄 Iniciando Sincronização Inteligente...");
                     
-                    do {
-                        // 1. Chamada sem filtros restritivos
-                        const response = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos?pagina=${pagina}&limite=100`, {
-                            headers: { 'Authorization': `Bearer ${tokenFinal}` }
-                        });
+            console.log("🔄 Iniciando Sincronização (Somente Ativos)...");
 
-                        // 2. CORREÇÃO DA ESTRUTURA (AQUI ESTAVA O ERRO DE 0 ITENS)
-                        // O código agora tenta ler 'response.data.data' (padrão antigo) OU 'response.data' (o que veio no seu log)
-                        const corpo = response.data;
-                        const dados = corpo.data || corpo; 
-                        const itens = dados.itens || [];
-                        
-                        totalPaginas = dados.paginacao?.total_paginas || dados.total_paginas || 1;
+        do {
+            // 1. Tenta filtrar na URL (para trazer menos lixo)
+            const response = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos?pagina=${pagina}&limite=100&situacao=A`, {
+                headers: { 'Authorization': `Bearer ${tokenFinal}` }
+            });
 
-                        console.log(`Página ${pagina}: Processando ${itens.length} itens encontrados.`);
+            // 2. Leitura blindada da estrutura (mantendo a correção anterior)
+            const corpo = response.data;
+            const dados = corpo.data || corpo; 
+            const itens = dados.itens || [];
+            
+            totalPaginas = dados.paginacao?.total_paginas || dados.total_paginas || 1;
 
-                        for (const item of itens) {
-                            const idTiny = String(item.id);
-                            const sku = item.codigo;
-                            const situacao = item.situacao; // Pega o "A" ou "E"
+            console.log(`Página ${pagina}: Analisando ${itens.length} itens...`);
 
-                            // 3. FILTRO ANTI-ZUMBI
-                            // Se não tiver SKU ou se a situação for "E" (Excluído), PULA para o próximo.
-                            if (!sku || situacao === 'E') {
-                                // console.log(`⏩ Pulando item ${sku || idTiny} (Situação: ${situacao})`);
-                                continue;
-                            }
+            for (const item of itens) {
+                const idTiny = String(item.id);
+                const sku = item.codigo;
+                const situacao = item.situacao; 
 
-                            try {
-                                // Detalhe do produto (Preço e Estoque)
-                                const detalhe = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos/${idTiny}`, {
-                                    headers: { 'Authorization': `Bearer ${tokenFinal}` }
-                                });
-                                
-                                // Tratamento seguro para a resposta do detalhe também
-                                const corpoDetalhe = detalhe.data;
-                                const p = corpoDetalhe.data || corpoDetalhe;
+                // 3. PENEIRA FINA (AQUI ESTÁ A MÁGICA)
+                // Se não tiver SKU OU se a situação for diferente de "A", ignora.
+                if (!sku || situacao !== 'A') {
+                    // console.log(`⏩ Ignorando ${sku} (Situação: ${situacao})`);
+                    continue; // Pula para o próximo item imediatamente
+                }
 
-                                await prisma.produto.upsert({
-                                    where: { sku: sku },
-                                    update: {
-                                        preco_novo: parseFloat(p.preco) || parseFloat(item.precos?.preco) || 0,
-                                        preco_custo: parseFloat(p.preco_custo) || 0,
-                                        estoque: parseInt(p.saldo_estoque) || parseInt(p.estoque?.saldo) || 0,
-                                        tinyId: idTiny,
-                                        situacao: situacao // Opcional: salva se está Ativo
-                                    },
-                                    create: {
-                                        titulo: p.nome || item.descricao,
-                                        sku: sku,
-                                        referencia: sku,
-                                        preco_novo: parseFloat(p.preco) || parseFloat(item.precos?.preco) || 0,
-                                        preco_custo: parseFloat(p.preco_custo) || 0,
-                                        estoque: parseInt(p.saldo_estoque) || parseInt(p.estoque?.saldo) || 0,
-                                        tinyId: idTiny,
-                                        categoria: p.categoria || "Geral",
-                                        ncm: p.ncm || "87089990",
-                                        imagem: "https://placehold.co/600x400?text=Falta+Foto"
-                                    }
-                                });
-                                processados++;
-                                console.log(`✅ Produto ${sku} sincronizado! Preço: R$ ${p.preco}`);
-                            } catch (errDet) {
-                                console.error(`❌ Erro ao detalhar ${sku}:`, errDet.message);
-                            }
+                try {
+                    // Detalhe do produto (só detalha se passou na peneira)
+                    const detalhe = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos/${idTiny}`, {
+                        headers: { 'Authorization': `Bearer ${tokenFinal}` }
+                    });
+                    
+                    const corpoDetalhe = detalhe.data;
+                    const p = corpoDetalhe.data || corpoDetalhe;
+
+                    await prisma.produto.upsert({
+                        where: { sku: sku },
+                        update: {
+                            preco_novo: parseFloat(p.preco) || parseFloat(item.precos?.preco) || 0,
+                            preco_custo: parseFloat(p.preco_custo) || 0,
+                            estoque: parseInt(p.saldo_estoque) || parseInt(p.estoque?.saldo) || 0,
+                            tinyId: idTiny,
+                            situacao: "A"
+                        },
+                        create: {
+                            titulo: p.nome || item.descricao,
+                            sku: sku,
+                            referencia: sku,
+                            preco_novo: parseFloat(p.preco) || parseFloat(item.precos?.preco) || 0,
+                            preco_custo: parseFloat(p.preco_custo) || 0,
+                            estoque: parseInt(p.saldo_estoque) || parseInt(p.estoque?.saldo) || 0,
+                            tinyId: idTiny,
+                            categoria: p.categoria || "Geral",
+                            ncm: p.ncm || "87089990",
+                            imagem: "https://placehold.co/600x400?text=Falta+Foto"
                         }
+                    });
+                    processados++;
+                    console.log(`✅ [ATIVO] ${sku} sincronizado.`);
+                } catch (errDet) {
+                    console.error(`❌ Erro ao detalhar ${sku}:`, errDet.message);
+                }
+            }
 
-                        pagina++;
-                    } while (pagina <= totalPaginas);
+            pagina++;
+        } while (pagina <= totalPaginas);
 
         res.json({ 
             sucesso: true, 

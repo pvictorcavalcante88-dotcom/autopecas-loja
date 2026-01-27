@@ -1916,7 +1916,6 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                 // -----------------------------
 
                 try {
-                    // Detalhando para pegar preço e estoque atualizados
                     const detalhe = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos/${idTiny}`, {
                         headers: { 'Authorization': `Bearer ${tokenFinal}` }
                     });
@@ -1924,13 +1923,18 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                     const corpoDetalhe = detalhe.data;
                     const p = corpoDetalhe.data || corpoDetalhe;
 
-                    // === CORREÇÃO DE VALORES ===
-                    const novoPreco = parseFloat(p.preco) || 0;
-                    
-                    // Tentativa "Desesperada" de pegar o estoque de qualquer lugar que o Tiny mande
-                    const novoEstoque = Number(p.saldo) || Number(p.saldo_fisico) || Number(p.saldo_estoque) || Number(p.estoque?.saldo) || 0;
+                    // === DEBUG: Mostra no log o que veio do Tiny para termos certeza ===
+                    console.log(`📦 Dados Brutos do SKU ${sku}:`, JSON.stringify(p));
 
-                    console.log(`   -> Processando ${sku} | Preço: ${novoPreco} | Estoque: ${novoEstoque}`);
+                    // === CORREÇÃO: Buscando dentro das "gavetas" (precos e estoque) ===
+                    
+                    // Tenta pegar na raiz OU dentro do objeto 'precos'
+                    const novoPreco = parseFloat(p.preco) || parseFloat(p.precos?.preco) || parseFloat(p.precos?.preco_promocional) || 0;
+                    
+                    // Tenta pegar na raiz OU dentro do objeto 'estoque'
+                    const novoEstoque = Number(p.saldo) || Number(p.saldo_fisico) || Number(p.estoque?.saldo) || Number(p.estoque?.saldo_fisico) || 0;
+
+                    console.log(`   -> Processando ${sku} | Preço Detectado: ${novoPreco} | Estoque Detectado: ${novoEstoque}`);
 
                     // Busca manual
                     const produtoExistente = await prisma.produto.findFirst({
@@ -1938,7 +1942,6 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                     });
 
                     if (produtoExistente) {
-                        // ATUALIZAR
                         await prisma.produto.update({
                             where: { id: produtoExistente.id },
                             data: {
@@ -1950,21 +1953,17 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                         });
                         console.log(`✅ ${sku} Atualizado!`);
                     } else {
-                        // CRIAR (Aqui estava o erro do NCM)
                         await prisma.produto.create({
                             data: {
                                 titulo: p.nome || item.descricao,
                                 sku: sku,
                                 referencia: sku,
                                 preco_novo: novoPreco,
-                                preco_custo: parseFloat(p.preco_custo) || 0,
+                                preco_custo: parseFloat(p.preco_custo) || parseFloat(p.precos?.preco_custo) || 0,
                                 estoque: novoEstoque,
                                 tinyId: idTiny,
                                 categoria: p.categoria || "Geral",
-                                
-                                // REMOVI A LINHA DO NCM QUE DAVA ERRO
-                                // ncm: p.ncm || "87089990", 
-                                
+                                // ncm: p.ncm, // Comentado para evitar erro
                                 imagem: "https://placehold.co/600x400?text=Falta+Foto"
                             }
                         });

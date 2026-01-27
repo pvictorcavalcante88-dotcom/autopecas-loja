@@ -1687,9 +1687,9 @@ app.post('/admin/teste-v3-direto', authenticateToken, async (req, res) => {
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 
-// ROTA: ENVIAR PRODUTO DO SITE PARA O TINY (CORRIGIDA V3)
+
+// ROTA: ENVIAR PRODUTO DO SITE PARA O TINY (CORRIGIDA V3 FINAL)
 app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
-    // Função de pausa
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
     if (req.user.role !== 'admin') return res.sendStatus(403);
@@ -1700,66 +1700,61 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
 
         if (!produto) return res.status(404).json({ erro: "Produto não encontrado" });
 
-        // 1. TOKEN
         let tokenFinal;
         try { tokenFinal = await getValidToken(); } 
         catch (e) { return res.status(401).json({ erro: "Token expirado. Reautorize." }); }
 
-        // 2. PREPARAÇÃO DOS DADOS
+        // Limpeza de Strings
         const removerAcentos = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
         const precoVenda = parseFloat(String(produto.preco_novo || produto.preco || 0).replace(',', '.'));
         const precoCusto = parseFloat(String(produto.preco_custo || 0).replace(',', '.'));
         const estoque = parseInt(produto.estoque || 0);
 
-        // === CORREÇÃO CRÍTICA AQUI ===
-        // Montando as "gavetas" que a V3 exige
+        // === CORREÇÃO DOS CAMPOS E TIPOS ===
         const payloadCriacao = {
             sku: String(produto.referencia || produto.sku || `PROD-${id}`).trim(),
-            nome: removerAcentos(produto.titulo).substring(0, 120).trim(), // V3 prefere 'nome'
+            
+            // CORREÇÃO 1: O campo obrigatório é 'descricao', não 'nome'
+            descricao: removerAcentos(produto.titulo).substring(0, 120).trim(), 
+            
             tipo: "S",
             situacao: "A",
             unidade: "UN",
             origem: "0",
             ncm: String(produto.ncm || "87089990").replace(/\./g, ""),
             
-            // Gaveta de Preços
             precos: {
                 preco: precoVenda,
                 precoCusto: precoCusto,
                 precoPromocional: 0
             },
             
-            // Garantindo que o controle de estoque fique ativo
             estoque: {
-                controlar: "S",
-                sobEncomenda: "N"
+                // CORREÇÃO 2: Enviar true/false (booleano) em vez de "S"/"N"
+                controlar: true, 
+                sobEncomenda: false
             }
         };
 
         console.log(`🚀 (1/3) Criando ${payloadCriacao.sku} no Tiny...`);
 
-        // ==============================================================================
-        // PASSO 1: CRIAR PRODUTO (POST)
-        // ==============================================================================
+        // PASSO 1: POST DE CRIAÇÃO
         const response = await axios.post('https://api.tiny.com.br/public-api/v3/produtos', payloadCriacao, {
             headers: { 'Authorization': `Bearer ${tokenFinal}`, 'Content-Type': 'application/json' }
         });
 
         const idTiny = response.data.data?.id || response.data.id;
-        console.log(`✅ Criado com sucesso! ID Tiny: ${idTiny}. Aguardando 3s...`);
+        console.log(`✅ Criado! ID Tiny: ${idTiny}. Aguardando 3s...`);
         
-        await sleep(3000); // Pausa para o Tiny respirar
+        await sleep(3000); 
 
-        // ==============================================================================
-        // PASSO 2: LANÇAR ESTOQUE (Se tiver)
-        // ==============================================================================
+        // PASSO 2: LANÇAR ESTOQUE (Se houver)
         if (estoque > 0) {
             try {
-                // Montando a gaveta de lançamento de estoque
                 const payloadEstoque = {
                     estoque: {
                         quantidade: estoque,
-                        tipo: "B", // "B"alanço é mais seguro para carga inicial
+                        tipo: "B",
                         observacao: "Carga Inicial Site",
                         custoUnitario: precoCusto > 0 ? precoCusto : precoVenda
                     }
@@ -1768,29 +1763,25 @@ app.post('/admin/enviar-ao-tiny/:id', authenticateToken, async (req, res) => {
                 await axios.post(`https://api.tiny.com.br/public-api/v3/estoque/${idTiny}`, payloadEstoque, { 
                     headers: { 'Authorization': `Bearer ${tokenFinal}` } 
                 });
-                
-                console.log(`✅ Estoque de ${estoque} unidades lançado!`);
-                
+                console.log(`✅ Estoque lançado.`);
             } catch (errEstoque) {
-                console.error("⚠️ Erro ao lançar estoque (mas o produto foi criado):", errEstoque.response?.data || errEstoque.message);
+                console.error("⚠️ Erro Estoque:", errEstoque.message);
             }
         }
 
-        // ==============================================================================
-        // PASSO 3: FINALIZAR (Salvar ID no Banco)
-        // ==============================================================================
+        // PASSO 3: VINCULAR
         await prisma.produto.update({ 
             where: { id: id }, 
             data: { tinyId: String(idTiny) } 
         });
         
-        return res.json({ sucesso: true, msg: "Produto enviado e vinculado!", tinyId: idTiny });
+        return res.json({ sucesso: true, msg: "Produto enviado com sucesso!", tinyId: idTiny });
 
     } catch (error) {
-        // Log detalhado do erro
-        const erroMsg = error.response?.data?.erros?.[0]?.mensagem || error.message;
-        console.error("❌ Erro Fatal ao enviar:", JSON.stringify(error.response?.data || error.message));
-        res.status(500).json({ erro: "Falha no envio: " + erroMsg });
+        const erroMsg = error.response?.data?.erros?.[0]?.mensagem || error.response?.data?.mensagem || error.message;
+        const detalhes = JSON.stringify(error.response?.data?.detalhes || "");
+        console.error("❌ Erro ao enviar:", erroMsg, detalhes);
+        res.status(500).json({ erro: `Tiny rejeitou: ${erroMsg} ${detalhes}` });
     }
 });
 

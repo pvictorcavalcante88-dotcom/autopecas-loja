@@ -1879,14 +1879,14 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
         // Loop para percorrer todas as páginas do Tiny
         do {
             // Removendo limites e forçando a situação 'A' (Ativos) na URL
-            const urlBusca = `https://api.tiny.com.br/public-api/v3/produtos?pagina=${pagina}&limite=100&situacao=A`;
+            const skuBusca = 'BKR7ESB-D'; 
+            const urlBusca = `https://api.tiny.com.br/public-api/v3/produtos?codigo=${skuBusca}`;
 
             const response = await axios.get(urlBusca, {
-                headers: { 
-                    'Authorization': `Bearer ${tokenFinal}`,
-                    'Content-Type': 'application/json'
-                }
+                headers: { 'Authorization': `Bearer ${tokenFinal}` }
             });
+
+            console.log("RESULTADO DA BUSCA DIRETA:", JSON.stringify(response.data));
 
             const dados = response.data.data;
             const itens = dados?.itens || [];

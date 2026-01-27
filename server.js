@@ -1881,35 +1881,36 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                     
             console.log("🔄 Iniciando Sincronização (Somente Ativos)...");
 
+        console.log("🔄 Iniciando Sincronização (Modo Forçado)...");
+
         do {
-            // 1. Tenta filtrar na URL (para trazer menos lixo)
+            // 1. Busca na API (Já filtrando Ativos na URL)
             const response = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos?pagina=${pagina}&limite=100&situacao=A`, {
                 headers: { 'Authorization': `Bearer ${tokenFinal}` }
             });
 
-            // 2. Leitura blindada da estrutura (mantendo a correção anterior)
             const corpo = response.data;
             const dados = corpo.data || corpo; 
             const itens = dados.itens || [];
             
             totalPaginas = dados.paginacao?.total_paginas || dados.total_paginas || 1;
 
-            console.log(`Página ${pagina}: Analisando ${itens.length} itens...`);
+            console.log(`Página ${pagina}: Encontrei ${itens.length} itens.`);
 
             for (const item of itens) {
                 const idTiny = String(item.id);
                 const sku = item.codigo;
-                const situacao = item.situacao; 
 
-                // 3. PENEIRA FINA (AQUI ESTÁ A MÁGICA)
-                // Se não tiver SKU OU se a situação for diferente de "A", ignora.
-                if (!sku || situacao !== 'A') {
-                    // console.log(`⏩ Ignorando ${sku} (Situação: ${situacao})`);
-                    continue; // Pula para o próximo item imediatamente
+                // 2. Só ignora se não tiver SKU (Identidade)
+                if (!sku) {
+                    console.log(`⚠️ Item sem SKU ignorado. ID: ${idTiny}`);
+                    continue;
                 }
 
                 try {
-                    // Detalhe do produto (só detalha se passou na peneira)
+                    console.log(`🔍 Detalhando SKU: ${sku}...`);
+
+                    // 3. Busca o detalhe para pegar os valores exatos
                     const detalhe = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos/${idTiny}`, {
                         headers: { 'Authorization': `Bearer ${tokenFinal}` }
                     });
@@ -1917,12 +1918,18 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                     const corpoDetalhe = detalhe.data;
                     const p = corpoDetalhe.data || corpoDetalhe;
 
+                    // 4. Tratamento de Valores (Para garantir que 150,00 vire 150.00)
+                    const novoPreco = parseFloat(p.preco) || parseFloat(item.precos?.preco) || 0;
+                    const novoEstoque = parseInt(p.saldo_estoque) || parseInt(p.estoque?.saldo) || parseInt(p.saldo) || 0;
+
+                    console.log(`   -> Salvando: R$ ${novoPreco} | Estoque: ${novoEstoque}`);
+
+                    // 5. Atualização no Banco
                     await prisma.produto.upsert({
                         where: { sku: sku },
                         update: {
-                            preco_novo: parseFloat(p.preco) || parseFloat(item.precos?.preco) || 0,
-                            preco_custo: parseFloat(p.preco_custo) || 0,
-                            estoque: parseInt(p.saldo_estoque) || parseInt(p.estoque?.saldo) || 0,
+                            preco_novo: novoPreco,
+                            estoque: novoEstoque,
                             tinyId: idTiny,
                             situacao: "A"
                         },
@@ -1930,19 +1937,21 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                             titulo: p.nome || item.descricao,
                             sku: sku,
                             referencia: sku,
-                            preco_novo: parseFloat(p.preco) || parseFloat(item.precos?.preco) || 0,
+                            preco_novo: novoPreco,
                             preco_custo: parseFloat(p.preco_custo) || 0,
-                            estoque: parseInt(p.saldo_estoque) || parseInt(p.estoque?.saldo) || 0,
+                            estoque: novoEstoque,
                             tinyId: idTiny,
                             categoria: p.categoria || "Geral",
                             ncm: p.ncm || "87089990",
                             imagem: "https://placehold.co/600x400?text=Falta+Foto"
                         }
                     });
+                    
                     processados++;
-                    console.log(`✅ [ATIVO] ${sku} sincronizado.`);
+                    console.log(`✅ ${sku} Atualizado com Sucesso!`);
+
                 } catch (errDet) {
-                    console.error(`❌ Erro ao detalhar ${sku}:`, errDet.message);
+                    console.error(`❌ Erro ao salvar ${sku}:`, errDet.message);
                 }
             }
 

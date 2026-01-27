@@ -2004,30 +2004,32 @@ app.post('/admin/tiny/teste-venda', async (req, res) => {
         const payloadPedido = {
             pedido: {
                 data_pedido: new Date().toLocaleDateString('pt-BR'),
+                // Em vez de 'cliente', vamos usar a estrutura plana que a V3 aceita em alguns endpoints
+                // ou garantir que o objeto cliente não tenha campos nulos/zero.
                 cliente: {
-                    // Removi o idContato para ele não reclamar que está zero
                     nome: "Cliente Teste Integracao",
                     tipo_pessoa: "F",
-                    cpf_cnpj: "08801943407", // Tente usar um CPF real se der erro de validação
+                    cpf_cnpj: "12345678909", // USE UM CPF REAL (mesmo que fictício, mas válido)
                     endereco: "Rua Teste",
                     numero: "100",
                     bairro: "Centro",
                     cep: "01001000",
                     cidade: "Sao Paulo",
                     uf: "SP",
-                    atualizar_cliente: "S" // Diz ao Tiny para criar/atualizar o contato
+                    atualizar_cliente: "S" 
                 },
                 itens: [
                     {
                         item: {
-                            // IMPORTANTE: O SKU deve ser exatamente igual ao do Tiny
                             codigo: "BKR7ESB-D", 
                             quantidade: 1,
                             valor_unitario: 150
                         }
                     }
                 ],
-                situacao: "aberto"
+                situacao: "aberto",
+                // Forçamos o id_contato como null ou simplesmente não enviamos
+                id_contato: 0 
             }
         };
 

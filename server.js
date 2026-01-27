@@ -1882,9 +1882,14 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                 headers: { 'Authorization': `Bearer ${tokenFinal}` }
             });
 
+
+            totalPaginas = dados?.total_paginas || 1;
+
             const dados = response.data.data;
             const itens = dados?.itens || [];
             totalPaginas = dados?.total_paginas || 1;
+                        // ADICIONE ESTA LINHA ABAIXO PARA VER NO LOG DO RENDER:
+            console.log(`Página ${pagina}: Recebi ${itens.length} itens do Tiny.`, itens);
 
             for (const item of itens) {
                 const idTiny = String(item.id);

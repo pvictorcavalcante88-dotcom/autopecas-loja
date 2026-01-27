@@ -1918,33 +1918,47 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                     const corpoDetalhe = detalhe.data;
                     const p = corpoDetalhe.data || corpoDetalhe;
 
-                    // Tratamento robusto para valores
+                    // CORREÇÃO DOS VALORES (Adicionei saldo_fisico para tentar pegar o 2)
                     const novoPreco = parseFloat(p.preco) || parseFloat(item.precos?.preco) || 0;
-                    const novoEstoque = parseInt(p.saldo_estoque) || parseInt(p.estoque?.saldo) || parseInt(p.saldo) || 0;
+                    const novoEstoque = parseInt(p.saldo_fisico) || parseInt(p.saldo) || parseInt(p.saldo_estoque) || parseInt(p.estoque?.saldo) || 0;
 
-                    console.log(`   -> Sincronizando ${sku} | Preço: ${novoPreco} | Estoque: ${novoEstoque}`);
+                    console.log(`   -> Processando ${sku} | Preço: ${novoPreco} | Estoque: ${novoEstoque}`);
 
-                    await prisma.produto.upsert({
-                        where: { sku: sku },
-                        update: {
-                            preco_novo: novoPreco,
-                            estoque: novoEstoque,
-                            tinyId: idTiny,
-                            situacao: "A"
-                        },
-                        create: {
-                            titulo: p.nome || item.descricao,
-                            sku: sku,
-                            referencia: sku,
-                            preco_novo: novoPreco,
-                            preco_custo: parseFloat(p.preco_custo) || 0,
-                            estoque: novoEstoque,
-                            tinyId: idTiny,
-                            categoria: p.categoria || "Geral",
-                            ncm: p.ncm || "87089990",
-                            imagem: "https://placehold.co/600x400?text=Falta+Foto"
-                        }
+                    // 1. Tenta achar o produto pelo SKU (jeito manual)
+                    const produtoExistente = await prisma.produto.findFirst({
+                        where: { sku: sku }
                     });
+
+                    if (produtoExistente) {
+                        // SE EXISTE: Atualiza pelo ID (que é único e seguro)
+                        await prisma.produto.update({
+                            where: { id: produtoExistente.id },
+                            data: {
+                                preco_novo: novoPreco,
+                                estoque: novoEstoque,
+                                tinyId: idTiny,
+                                situacao: "A"
+                            }
+                        });
+                        console.log(`✅ ${sku} Atualizado!`);
+                    } else {
+                        // SE NÃO EXISTE: Cria um novo
+                        await prisma.produto.create({
+                            data: {
+                                titulo: p.nome || item.descricao,
+                                sku: sku,
+                                referencia: sku,
+                                preco_novo: novoPreco,
+                                preco_custo: parseFloat(p.preco_custo) || 0,
+                                estoque: novoEstoque,
+                                tinyId: idTiny,
+                                categoria: p.categoria || "Geral",
+                                ncm: p.ncm || "87089990",
+                                imagem: "https://placehold.co/600x400?text=Falta+Foto"
+                            }
+                        });
+                        console.log(`✨ ${sku} Criado!`);
+                    }
                     
                     processados++;
 

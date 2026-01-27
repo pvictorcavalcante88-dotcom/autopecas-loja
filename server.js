@@ -2004,12 +2004,15 @@ app.post('/admin/tiny/teste-venda', async (req, res) => {
         const payloadPedido = {
             pedido: {
                 data_pedido: new Date().toLocaleDateString('pt-BR'),
-                // Usando o ID do Fernando de Azevedo da sua planilha de exemplo
-                id_contato: 626419, 
+                cliente: {
+                    // COLOQUE AQUI O ID DO CLIENTE QUE VOCÊ ACABOU DE CRIAR
+                    // (Você acha esse número na URL do navegador ao abrir o cliente no Tiny)
+                    id: 890210583 
+                },
                 itens: [
                     {
                         item: {
-                            codigo: "BKR7ESB-D", // SKU da sua Vela de Ignição
+                            codigo: "BKR7ESB-D", 
                             quantidade: 1,
                             valor_unitario: 150
                         }

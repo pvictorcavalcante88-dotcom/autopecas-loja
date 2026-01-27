@@ -1877,67 +1877,77 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
         console.log("🔄 Iniciando Sincronização Global com Tiny...");
 
         // Loop para percorrer todas as páginas do Tiny
-        do {
-            // Removendo limites e forçando a situação 'A' (Ativos) na URL
-            const skuBusca = 'BKR7ESB-D'; 
-            const urlBusca = `https://api.tiny.com.br/public-api/v3/produtos?codigo=${skuBusca}`;
+            console.log("🔄 Iniciando Sincronização Inteligente...");
+                    
+                    do {
+                        // 1. Chamada sem filtros restritivos
+                        const response = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos?pagina=${pagina}&limite=100`, {
+                            headers: { 'Authorization': `Bearer ${tokenFinal}` }
+                        });
 
-            const response = await axios.get(urlBusca, {
-                headers: { 'Authorization': `Bearer ${tokenFinal}` }
-            });
+                        // 2. CORREÇÃO DA ESTRUTURA (AQUI ESTAVA O ERRO DE 0 ITENS)
+                        // O código agora tenta ler 'response.data.data' (padrão antigo) OU 'response.data' (o que veio no seu log)
+                        const corpo = response.data;
+                        const dados = corpo.data || corpo; 
+                        const itens = dados.itens || [];
+                        
+                        totalPaginas = dados.paginacao?.total_paginas || dados.total_paginas || 1;
 
-            console.log("RESULTADO DA BUSCA DIRETA:", JSON.stringify(response.data));
+                        console.log(`Página ${pagina}: Processando ${itens.length} itens encontrados.`);
 
-            const dados = response.data.data;
-            const itens = dados?.itens || [];
-            totalPaginas = dados?.total_paginas || 1;
-                        // ADICIONE ESTA LINHA ABAIXO PARA VER NO LOG DO RENDER:
-            console.log(`Página ${pagina}: Recebi ${itens.length} itens do Tiny.`, itens);
+                        for (const item of itens) {
+                            const idTiny = String(item.id);
+                            const sku = item.codigo;
+                            const situacao = item.situacao; // Pega o "A" ou "E"
 
-            for (const item of itens) {
-                const idTiny = String(item.id);
-                const sku = item.codigo;
+                            // 3. FILTRO ANTI-ZUMBI
+                            // Se não tiver SKU ou se a situação for "E" (Excluído), PULA para o próximo.
+                            if (!sku || situacao === 'E') {
+                                // console.log(`⏩ Pulando item ${sku || idTiny} (Situação: ${situacao})`);
+                                continue;
+                            }
 
-                // Buscamos o detalhe para pegar Preço e Saldo de Estoque exatos
-                try {
-                    const detalhe = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos/${idTiny}`, {
-                        headers: { 'Authorization': `Bearer ${tokenFinal}` }
-                    });
+                            try {
+                                // Detalhe do produto (Preço e Estoque)
+                                const detalhe = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos/${idTiny}`, {
+                                    headers: { 'Authorization': `Bearer ${tokenFinal}` }
+                                });
+                                
+                                // Tratamento seguro para a resposta do detalhe também
+                                const corpoDetalhe = detalhe.data;
+                                const p = corpoDetalhe.data || corpoDetalhe;
 
-                    const p = detalhe.data.data;
-
-                    // UPSERT: Se o SKU existe, atualiza. Se não, cria.
-                    await prisma.produto.upsert({
-                        where: { sku: sku },
-                        update: {
-                            preco_novo: parseFloat(p.preco) || 0,
-                            preco_custo: parseFloat(p.preco_custo) || 0,
-                            estoque: parseInt(p.saldo_estoque) || 0,
-                            tinyId: idTiny
-                        },
-                        create: {
-                            titulo: p.nome,
-                            sku: sku,
-                            referencia: sku,
-                            preco_novo: parseFloat(p.preco) || 0,
-                            preco_custo: parseFloat(p.preco_custo) || 0,
-                            estoque: parseInt(p.saldo_estoque) || 0,
-                            tinyId: idTiny,
-                            categoria: p.categoria || "Geral",
-                            ncm: p.ncm || "87089990",
-                            
-                            // USANDO UMA IMAGEM PADRÃO PARA NÃO DAR ERRO
-                            imagem: "https://placehold.co/600x400?text=Adicionar+Foto" 
+                                await prisma.produto.upsert({
+                                    where: { sku: sku },
+                                    update: {
+                                        preco_novo: parseFloat(p.preco) || parseFloat(item.precos?.preco) || 0,
+                                        preco_custo: parseFloat(p.preco_custo) || 0,
+                                        estoque: parseInt(p.saldo_estoque) || parseInt(p.estoque?.saldo) || 0,
+                                        tinyId: idTiny,
+                                        situacao: situacao // Opcional: salva se está Ativo
+                                    },
+                                    create: {
+                                        titulo: p.nome || item.descricao,
+                                        sku: sku,
+                                        referencia: sku,
+                                        preco_novo: parseFloat(p.preco) || parseFloat(item.precos?.preco) || 0,
+                                        preco_custo: parseFloat(p.preco_custo) || 0,
+                                        estoque: parseInt(p.saldo_estoque) || parseInt(p.estoque?.saldo) || 0,
+                                        tinyId: idTiny,
+                                        categoria: p.categoria || "Geral",
+                                        ncm: p.ncm || "87089990",
+                                        imagem: "https://placehold.co/600x400?text=Falta+Foto"
+                                    }
+                                });
+                                processados++;
+                                console.log(`✅ Produto ${sku} sincronizado! Preço: R$ ${p.preco}`);
+                            } catch (errDet) {
+                                console.error(`❌ Erro ao detalhar ${sku}:`, errDet.message);
+                            }
                         }
-                    });
-                    processados++;
-                } catch (errDet) {
-                    console.error(`⚠️ Erro ao detalhar item ${sku}:`, errDet.message);
-                }
-            }
-            
-            pagina++;
-        } while (pagina <= totalPaginas);
+
+                        pagina++;
+                    } while (pagina <= totalPaginas);
 
         res.json({ 
             sucesso: true, 

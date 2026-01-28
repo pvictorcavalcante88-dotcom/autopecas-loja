@@ -998,16 +998,24 @@ function calcularTotalVisual(carrinho) {
 }
 
 // 🟢 FUNÇÃO DE FINALIZAR COM ASAAS (ATUALIZADA COM SELEÇÃO DE PAGAMENTO)
+// 🟢 FUNÇÃO DE FINALIZAR COM ASAAS E TINY (ATUALIZADA)
 async function finalizarCompraAsaas() {
     // 1. PEGAR DADOS DO FORMULÁRIO
     const nome = document.getElementById('nome_cliente').value; 
-    const emailContato = document.getElementById('input-email-contato').value;
-    const telefone = document.getElementById('input-telefone').value;
+    const emailContato = document.getElementById('input-email-contato')?.value || ''; // Safe check
+    const telefone = document.getElementById('input-telefone')?.value || '';
     const endereco = document.getElementById('rua').value;
     
+    // Tenta pegar dados extras se existirem no form (para o Tiny ficar bonito)
+    const cidade = document.getElementById('input-cidade')?.value || "Não informada";
+    const numero = document.getElementById('numero')?.value || "S/N";
+    const bairro = document.getElementById('bairro')?.value || "Geral";
+    const cep = document.getElementById('cep')?.value || "00000000";
+    const uf = document.getElementById('uf')?.value || "UF";
+
     // Tenta pegar o CPF do campo de busca ou do input específico
-    let doc = document.getElementById('input-doc-cliente').value;
-    if (!doc) doc = document.getElementById('doc-busca').value;
+    let doc = document.getElementById('input-doc-cliente')?.value;
+    if (!doc) doc = document.getElementById('doc-busca')?.value;
     
     // Validações Básicas
     if (!nome || !endereco || !telefone) {
@@ -1017,7 +1025,7 @@ async function finalizarCompraAsaas() {
     if (!doc) {
         doc = prompt("CPF obrigatório para nota fiscal. Digite apenas números:");
         if(!doc) return;
-        document.getElementById('doc-busca').value = doc;
+        if(document.getElementById('doc-busca')) document.getElementById('doc-busca').value = doc;
     }
 
     // Limpa o CPF (deixa só números)
@@ -1047,9 +1055,8 @@ async function finalizarCompraAsaas() {
             };
         });
 
-        // 🔴🔴🔴 MUDANÇA IMPORTANTE: DETECTA O MÉTODO DE PAGAMENTO 🔴🔴🔴
         // Verifica se o cliente marcou a bolinha (radio button) do Cartão no HTML
-        let metodoEscolhido = 'PIX'; // Começa assumindo PIX
+        let metodoEscolhido = 'PIX'; 
         const radioCartao = document.getElementById('pagamento-cartao'); 
         
         if (radioCartao && radioCartao.checked) {
@@ -1069,7 +1076,7 @@ async function finalizarCompraAsaas() {
             itens: itensParaEnviar,
             afiliadoId: null,
             afiliadoCodigo: null,
-            metodoPagamento: metodoEscolhido // <--- ENVIA PARA O SERVIDOR CALCULAR AS TAXAS CERTAS
+            metodoPagamento: metodoEscolhido
         };
 
         // Verifica se tem afiliado logado ou código de referência
@@ -1083,8 +1090,8 @@ async function finalizarCompraAsaas() {
             payload.afiliadoCodigo = refCode;
         }
 
-        // ENVIA PARA O BACKEND
-        const API_URL = ''; // Deixe vazio se estiver no mesmo domínio
+        // ENVIA PARA O BACKEND (Pagamento)
+        const API_URL = ''; // Ajuste se necessário
         const res = await fetch(`${API_URL}/api/checkout/pix`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1094,13 +1101,43 @@ async function finalizarCompraAsaas() {
         const data = await res.json();
 
         if (res.ok) {
-            // SUCESSO! Mostra o Modal com o Link/QR Code
+            // ✅ SUCESSO NO PAGAMENTO! AGORA DISPARAMOS O TINY EM PARALELO
+            
+            // 🔥 INTEGRAÇÃO TINY AQUI 🔥
+            // Preparamos o objeto completo para a função criarPedidoNoTiny
+            const dadosClienteTiny = {
+                nome: nome,
+                documento: cpfLimpo,
+                email: emailContato,
+                telefone: telefone,
+                endereco: endereco,
+                numero: numero,
+                bairro: bairro,
+                cep: cep,
+                cidade: cidade,
+                uf: uf
+            };
+
+            // Chamamos a função sem 'await' para não travar a tela do usuário
+            // O pedido será criado no Tiny em segundo plano
+            if (typeof criarPedidoNoTiny === 'function') {
+                criarPedidoNoTiny(dadosClienteTiny, carrinho).then(tinyId => {
+                    console.log("🛒 Pedido Tiny processado. ID/Número: ", tinyId);
+                });
+            } else {
+                console.warn("Função criarPedidoNoTiny não encontrada.");
+            }
+            // 🔥 FIM DA INTEGRAÇÃO TINY 🔥
+
+
+            // Mostra o Modal com o Link/QR Code
             mostrarModalPix(data.pix, data.linkPagamento, metodoEscolhido);
             
             // Limpa o carrinho e avisa na tela
             localStorage.removeItem('nossoCarrinho');
             const containerBotoes = document.getElementById('container-botoes-dinamicos');
             if(containerBotoes) containerBotoes.innerHTML = '<p style="color:#27ae60; text-align:center; font-weight:bold;">Pedido Realizado com Sucesso!</p>';
+        
         } else {
             // ERRO DO SERVIDOR
             alert("Erro: " + (data.erro || "Falha ao processar pedido."));
@@ -1239,3 +1276,70 @@ document.addEventListener('change', (e) => {
         }
     }
 });
+
+// ============================================================
+// 🏭 INTEGRAÇÃO TINY (Envia o pedido para o ERP)
+// ============================================================
+async function criarPedidoNoTiny(dadosCliente, carrinho) {
+    console.log("📤 Enviando pedido para o Tiny...");
+
+    try {
+        // 1. Prepara os itens com o PREÇO FINAL (Com Margem)
+        const itensFormatados = carrinho.map(item => {
+            // Recalcula o preço com margem para garantir que vai o valor de venda
+            const precoBase = parseFloat(item.preco || item.preco_novo);
+            const margem = (item.customMargin !== undefined) ? item.customMargin : ((FATOR_GLOBAL - 1) * 100);
+            const precoVenda = precoBase * (1 + (margem / 100));
+
+            return {
+                id_tiny: item.id, // O ID do produto
+                quantidade: item.quantidade,
+                preco: precoVenda // O preço que vai na Nota Fiscal
+            };
+        });
+
+        // 2. Monta o pacote para o Servidor
+        const payload = {
+            cliente: {
+                nome: dadosCliente.nome,
+                cpf: dadosCliente.documento, // O servidor limpa os pontos
+                email: dadosCliente.email,
+                telefone: dadosCliente.telefone,
+                endereco: dadosCliente.endereco,
+                numero: "0", // Se tiver campo número no form, mude aqui
+                bairro: "Centro", // Se tiver campo bairro, mude aqui
+                cep: "00000000", // Ideal adicionar campo CEP no form
+                cidade: "Cidade", // Ideal adicionar campo Cidade
+                uf: "UF"
+            },
+            itensCarrinho: itensFormatados,
+            valorFrete: 0 // Se você tiver cálculo de frete, coloque a variável aqui
+        };
+
+        // 3. Chuta para o Servidor (Rota que criamos antes)
+        // Ajuste a URL se seu servidor não estiver na mesma origem
+        const API_URL = ''; // Deixe vazio se estiver no mesmo domínio ou coloque 'https://autopecas-loja.onrender.com'
+        
+        const response = await fetch(`${API_URL}/admin/tiny/criar-pedido`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const resultado = await response.json();
+
+        if (resultado.sucesso) {
+            console.log("✅ Pedido Tiny Criado: ", resultado.numero);
+            return resultado.numero;
+        } else {
+            console.error("❌ Erro Tiny:", resultado.erro);
+            return null;
+        }
+
+    } catch (error) {
+        console.error("❌ Falha na conexão com Tiny:", error);
+        return null;
+    }
+}

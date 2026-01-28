@@ -116,21 +116,44 @@
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label>Endereço</label>
-                    <input type="text" id="rua" placeholder="Rua, Número e Bairro" required>
+                <div class="form-row">
+                <div class="form-group" style="flex: 3;">
+                    <label>Endereço (Rua/Av)</label>
+                    <input type="text" id="rua" placeholder="Ex: Av. Menino Marcelo" required>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Número</label>
+                    <input type="text" id="numero" placeholder="Nº" required>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label>Bairro</label>
+                    <input type="text" id="input-bairro" placeholder="Ex: Serraria" required>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Cidade</label>
+                    <input type="text" id="input-cidade" placeholder="Ex: Maceió" required>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label>CEP</label>
+                    <input type="text" id="cep" placeholder="00000-000">
+                </div>
+                <div class="form-group" style="flex: 0.5;">
+                    <label>UF</label>
+                    <input type="text" id="uf" placeholder="AL" maxlength="2">
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group" style="flex:1">
-                        <label>Cidade</label>
-                        <input type="text" id="input-cidade" placeholder="Ex: Maceió">
-                    </div>
-                    <div class="form-group" style="flex:1">
+                <div class="form-group" style="flex:1">
                         <label>Telefone / Zap</label>
                         <input type="text" id="input-telefone" placeholder="(DD) 99999-9999">
                     </div>
-                </div>
+            </div>
+
 
                 <div style="margin-top: 30px;">
     <h2><i class="ph ph-credit-card"></i> Pagamento</h2>

@@ -2062,47 +2062,40 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
 
         console.log("🚀 Iniciando processamento de venda...");
 
-        // PASSO 1: GARANTIR O ID DO CLIENTE
         let idClienteFinal = null;
 
-        // Tenta buscar pelo CPF primeiro
+        // 1. Busca Cliente
         if (cliente.cpf) {
             idClienteFinal = await buscarClientePorCPF(cliente.cpf, tokenFinal);
         }
 
-        // Se não achou, cria um novo
+        // 😴 PAUSA DE 1 SEGUNDO PARA O TINY RESPIRAR
+        await sleep(1000); 
+
+        // 2. Se não achou, cria
         if (!idClienteFinal) {
             idClienteFinal = await criarClienteNoTiny(cliente, tokenFinal);
+            
+            // 😴 PAUSA DE 1 SEGUNDO DEPOIS DE CRIAR
+            await sleep(1000);
         }
 
         if (!idClienteFinal) {
             return res.status(500).json({ erro: "Falha fatal: Não consegui obter um ID para o cliente." });
         }
 
-        // PASSO 2: PREPARAR OS ITENS
         const itensFormatados = itensCarrinho.map(prod => ({
-            produto: {
-                id: prod.id_tiny // ID numérico do produto
-            },
+            produto: { id: prod.id_tiny },
             quantidade: prod.quantidade,
             valorUnitario: prod.preco
         }));
 
-        // PASSO 3: CRIAR O PEDIDO (Agora temos certeza que o ID existe!)
         const payloadPedido = {
             data: new Date().toISOString().split('T')[0],
-            
-            idContato: idClienteFinal, // ID confirmado
-            cliente: { 
-                id: idClienteFinal 
-            },
-
+            idContato: idClienteFinal,
+            cliente: { id: idClienteFinal },
             itens: itensFormatados,
-            
-            naturezaOperacao: {
-                id: 335900648 
-            },
-            
+            naturezaOperacao: { id: 335900648 },
             valorFrete: valorFrete || 0,
             situacao: 0
         };
@@ -2122,11 +2115,12 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
         });
 
     } catch (error) {
+        // Se der erro 429 de novo, avisamos o usuário para tentar mais tarde
+        if (error.response?.status === 429) {
+            return res.status(429).json({ erro: "Muitas requisições. Tente novamente em 1 minuto." });
+        }
         console.error("❌ ERRO NO PROCESSO:", JSON.stringify(error.response?.data || error.message, null, 2));
-        res.status(500).json({ 
-            erro: "Falha ao processar pedido", 
-            detalhes: error.response?.data 
-        });
+        res.status(500).json({ erro: "Falha ao processar pedido", detalhes: error.response?.data });
     }
 });
 

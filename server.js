@@ -1999,59 +1999,6 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 // FUNÇÕES AUXILIARES (O Robô que trabalha pra você)
 // ==========================================
 
-// 1. Busca se o cliente já existe pelo CPF
-async function buscarClientePorCPF(cpf, token) {
-    try {
-        const cpfLimpo = cpf.replace(/\D/g, '');
-        // Busca exata por CPF na V3
-        const response = await axios.get(
-            `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfLimpo}`,
-            { headers: { 'Authorization': `Bearer ${token}` } }
-        );
-        
-        // Se achou alguém, retorna o ID do primeiro da lista
-        if (response.data.data && response.data.data.length > 0) {
-            console.log(`🔎 Cliente encontrado! ID: ${response.data.data[0].id}`);
-            return response.data.data[0].id;
-        }
-        return null; // Não achou
-    } catch (e) {
-        return null; // Erro na busca = considera que não achou
-    }
-}
-
-// 2. Cria o cliente se ele não existir
-async function criarClienteNoTiny(dadosCliente, token) {
-    try {
-        const cpfLimpo = dadosCliente.cpf.replace(/\D/g, '');
-        
-        const payloadCliente = {
-            nome: dadosCliente.nome,
-            tipo_pessoa: cpfLimpo.length > 11 ? 'J' : 'F',
-            cpf_cnpj: cpfLimpo,
-            endereco: dadosCliente.endereco,
-            numero: dadosCliente.numero,
-            bairro: dadosCliente.bairro,
-            cep: dadosCliente.cep.replace(/\D/g, ''),
-            cidade: dadosCliente.cidade,
-            uf: dadosCliente.uf,
-            situacao: "A" // Ativo
-        };
-
-        console.log("🆕 Criando novo cliente no Tiny...");
-        const response = await axios.post(
-            `https://api.tiny.com.br/public-api/v3/contatos`,
-            payloadCliente,
-            { headers: { 'Authorization': `Bearer ${token}` } }
-        );
-
-        return response.data.data?.id || response.data.id;
-    } catch (error) {
-        console.error("Erro ao criar cliente:", JSON.stringify(error.response?.data || error.message));
-        throw new Error("Não foi possível cadastrar o cliente.");
-    }
-}
-
 // ==========================================
 // ROTA PRINCIPAL: CHECKOUT
 // ==========================================
@@ -2143,6 +2090,74 @@ app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
         res.status(500).send("Erro: " + (error.response?.data ? JSON.stringify(error.response.data) : error.message));
     }
 });
+
+// ==========================================
+// FUNÇÕES AUXILIARES CORRIGIDAS (V3)
+// ==========================================
+
+// Função para pausar o robô (Evita erro 429)
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function buscarClientePorCPF(cpf, token) {
+    try {
+        const cpfLimpo = cpf.replace(/\D/g, '');
+        // Na V3 a busca costuma ser via parâmetros de filtro
+        const response = await axios.get(
+            `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfLimpo}`,
+            { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+        
+        if (response.data.data && response.data.data.length > 0) {
+            console.log(`🔎 Cliente encontrado: ${response.data.data[0].nome} (ID: ${response.data.data[0].id})`);
+            return response.data.data[0].id;
+        }
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
+
+async function criarClienteNoTiny(dadosCliente, token) {
+    try {
+        const cpfLimpo = dadosCliente.cpf.replace(/\D/g, '');
+        
+        // ESTRUTURA CORRIGIDA PARA V3 (CamelCase e Objeto Endereço)
+        const payloadCliente = {
+            nome: dadosCliente.nome,
+            tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F', // CamelCase
+            cpfCnpj: cpfLimpo, // CamelCase
+            
+            // AQUI ESTAVA O ERRO: O endereço precisa ser um objeto filho
+            endereco: {
+                endereco: dadosCliente.endereco, // Nome da rua
+                numero: dadosCliente.numero,
+                bairro: dadosCliente.bairro,
+                cep: dadosCliente.cep.replace(/\D/g, ''),
+                cidade: dadosCliente.cidade,
+                uf: dadosCliente.uf,
+                pais: "Brasil" // Boa prática adicionar
+            },
+            
+            situacao: "A" // Ativo
+        };
+
+        console.log("🆕 Criando cliente com payload correto...", JSON.stringify(payloadCliente, null, 2));
+
+        const response = await axios.post(
+            `https://api.tiny.com.br/public-api/v3/contatos`,
+            payloadCliente,
+            { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+
+        console.log("✅ Cliente criado! ID:", response.data.data?.id || response.data.id);
+        return response.data.data?.id || response.data.id;
+
+    } catch (error) {
+        console.error("❌ Erro ao criar cliente:", JSON.stringify(error.response?.data || error.message));
+        // Se der erro, vamos jogar para cima para o console mostrar
+        throw error; 
+    }
+}
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

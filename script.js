@@ -1004,22 +1004,20 @@ async function finalizarCompraAsaas() {
     const nome = document.getElementById('nome_cliente').value; 
     const emailContato = document.getElementById('input-email-contato')?.value || ''; // Safe check
     const telefone = document.getElementById('input-telefone')?.value || '';
-    const endereco = document.getElementById('rua').value;
-    
-    // Tenta pegar dados extras se existirem no form (para o Tiny ficar bonito)
-    const cidade = document.getElementById('input-cidade')?.value || "Não informada";
+    const endereco = document.getElementById('rua').value; // Só o nome da rua
     const numero = document.getElementById('numero')?.value || "S/N";
-    const bairro = document.getElementById('bairro')?.value || "Geral";
-    const cep = document.getElementById('cep')?.value || "00000000";
-    const uf = document.getElementById('uf')?.value || "UF";
+    const bairro = document.getElementById('input-bairro')?.value || "Centro"; // Fallback apenas se vazio
+    const cidade = document.getElementById('input-cidade')?.value || "Maceió";
+    const cep = document.getElementById('cep')?.value || "57000000";
+    const uf = document.getElementById('uf')?.value || "AL";
 
     // Tenta pegar o CPF do campo de busca ou do input específico
     let doc = document.getElementById('input-doc-cliente')?.value;
     if (!doc) doc = document.getElementById('doc-busca')?.value;
     
     // Validações Básicas
-    if (!nome || !endereco || !telefone) {
-        return alert("Por favor, preencha Nome, Endereço e Telefone.");
+    if (!nome || !endereco || !telefone || !bairro || !numero) {
+        return alert("Por favor, preencha o endereço completo (Rua, Número e Bairro).");
     }
 
     if (!doc) {

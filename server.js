@@ -2005,8 +2005,15 @@ app.post('/admin/tiny/teste-venda', async (req, res) => {
             pedido: {
                 data_pedido: new Date().toLocaleDateString('pt-BR'),
                 cliente: {
-                    // Na V3, passar como STRING muitas vezes resolve o erro de validação
-                    id: "890210583" 
+                    nome: "PAULO VICTOR DA SILVA CAVALCANTE",
+                    tipo_pessoa: "F",
+                    cpf_cnpj: "12345678909", // Use um CPF válido para evitar rejeição
+                    endereco: "Rua de Teste",
+                    numero: "100",
+                    bairro: "Centro",
+                    cep: "01001000",
+                    cidade: "Sao Paulo",
+                    uf: "SP"
                 },
                 itens: [
                     {
@@ -2017,7 +2024,7 @@ app.post('/admin/tiny/teste-venda', async (req, res) => {
                         }
                     }
                 ],
-                // Natureza de operação conforme o seu cadastro no Tiny
+                // Natureza da operação que você viu que funciona
                 natureza_operacao: "Venda de mercadorias de terceiros para consumidor final",
                 situacao: "aberto"
             }

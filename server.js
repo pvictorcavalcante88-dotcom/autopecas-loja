@@ -2001,33 +2001,29 @@ app.post('/admin/tiny/teste-venda', async (req, res) => {
         let tokenFinal = await getValidToken();
 
         const payloadPedido = {
-            // V3 usa "data" e não "data_pedido"
-            data: new Date().toLocaleDateString('pt-BR'),
+            // CORREÇÃO 1: Formato de data internacional (YYYY-MM-DD)
+            data: new Date().toISOString().split('T')[0], 
             
             cliente: {
-                id: 890233813
+                id: 890233813 // ID do Paulo Victor
             },
             
-            // AQUI ESTAVA O MAIOR ERRO: A estrutura dos itens mudou na V3
             itens: [
                 {
                     produto: {
-                        // Tente 'sku' primeiro, pois apareceu no seu JSON de leitura.
-                        // Se der erro, trocaremos por 'codigo' ou 'id'.
-                        sku: "BKR7ESB-D"
+                        // CORREÇÃO 2: Usando o ID do produto (achado no diagnóstico)
+                        id: 337204975 
                     },
                     quantidade: 1,
-                    // CamelCase: valorUnitario (sem underline)
                     valorUnitario: 150.00
                 }
             ],
             
             naturezaOperacao: {
-                id: 335900648
+                id: 335900648 // ID da Venda Consumidor Final
             },
             
-            // CORREÇÃO: Situação deve ser Inteiro (0 = Aberto)
-            situacao: 0
+            situacao: 0 // 0 = Aberto
         };
 
         const response = await axios.post(

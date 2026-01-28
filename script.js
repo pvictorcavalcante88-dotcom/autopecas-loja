@@ -1016,8 +1016,9 @@ async function finalizarCompraAsaas() {
     if (!doc) doc = document.getElementById('doc-busca')?.value;
     
     // Validações Básicas
-    if (!nome || !endereco || !telefone || !bairro || !numero) {
-        return alert("Por favor, preencha o endereço completo (Rua, Número e Bairro).");
+    // 🔴 VALIDAÇÃO RIGOROSA (O Tiny exige isso)
+    if (!nome || !endereco || !numero || !bairro || !cidade || !uf || !telefone) {
+        return alert("⚠️ Para emitir a Nota Fiscal, precisamos do endereço completo:\n- Rua, Número, Bairro, Cidade e UF.");
     }
 
     if (!doc) {
@@ -1105,13 +1106,13 @@ async function finalizarCompraAsaas() {
             // Preparamos o objeto completo para a função criarPedidoNoTiny
             const dadosClienteTiny = {
                 nome: nome,
-                documento: cpfLimpo,
+                documento: doc.replace(/\D/g,''),
                 email: emailContato,
                 telefone: telefone,
                 endereco: endereco,
                 numero: numero,
                 bairro: bairro,
-                cep: cep,
+                cep: cep || "00000000",
                 cidade: cidade,
                 uf: uf
             };

@@ -1996,7 +1996,6 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 });
 
 
-// ROTA: TESTE DE VENDA (Envia um Pedido Fictício para o Tiny)
 app.post('/admin/tiny/teste-venda', async (req, res) => {
     try {
         let tokenFinal = await getValidToken();
@@ -2005,8 +2004,10 @@ app.post('/admin/tiny/teste-venda', async (req, res) => {
             pedido: {
                 data_pedido: new Date().toLocaleDateString('pt-BR'),
                 cliente: {
-                    // O ID CORRETO DESCOBERTO NO JSON
-                    id: 890233813
+                    // Aqui usamos o ID que descobrimos no diagnóstico
+                    id: 890233813,
+                    // TRUQUE: Mandamos também com o nome do erro para garantir
+                    idContato: 890233813 
                 },
                 itens: [
                     {
@@ -2017,7 +2018,10 @@ app.post('/admin/tiny/teste-venda', async (req, res) => {
                         }
                     }
                 ],
-                natureza_operacao: "Venda de mercadorias de terceiros para consumidor final",
+                // MUDANÇA IMPORTANTE: Usamos o ID da natureza em vez do texto
+                natureza_operacao: {
+                    id: 335900648
+                },
                 situacao: "aberto"
             }
         };
@@ -2025,14 +2029,14 @@ app.post('/admin/tiny/teste-venda', async (req, res) => {
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/pedidos`, 
             payloadPedido,
-            { headers: { 'Authorization': `Bearer ${tokenFinal}`, 'Content-Type': 'application/json' } }
+            { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
         );
 
         res.json({ sucesso: true, id_pedido_tiny: response.data.data?.id || response.data.id });
 
     } catch (error) {
         console.error("❌ ERRO TINY:", JSON.stringify(error.response?.data || error.message, null, 2));
-        res.status(500).json({ erro: error.response?.data?.mensagem || "Erro no servidor" });
+        res.status(500).json({ erro: "Tiny rejeitou", detalhes: error.response?.data });
     }
 });
 

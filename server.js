@@ -2000,35 +2000,30 @@ app.post('/admin/tiny/teste-venda', async (req, res) => {
     try {
         let tokenFinal = await getValidToken();
 
+        // MUDANÇA CRUCIAL: Removemos o wrapper "pedido". O objeto começa direto!
         const payloadPedido = {
-            pedido: {
-                data_pedido: new Date().toLocaleDateString('pt-BR'),
-                cliente: {
-                    // Aqui usamos o ID que descobrimos no diagnóstico
-                    id: 890233813,
-                    // TRUQUE: Mandamos também com o nome do erro para garantir
-                    idContato: 890233813 
-                },
-                itens: [
-                    {
-                        item: {
-                            codigo: "BKR7ESB-D",
-                            quantidade: 1,
-                            valor_unitario: 150.00
-                        }
+            data_pedido: new Date().toLocaleDateString('pt-BR'),
+            cliente: {
+                id: 890233813  // O ID que descobrimos no diagnóstico
+            },
+            itens: [
+                {
+                    item: {
+                        codigo: "BKR7ESB-D",
+                        quantidade: 1,
+                        valor_unitario: 150.00
                     }
-                ],
-                // MUDANÇA IMPORTANTE: Usamos o ID da natureza em vez do texto
-                natureza_operacao: {
-                    id: 335900648
-                },
-                situacao: "aberto"
-            }
+                }
+            ],
+            natureza_operacao: {
+                id: 335900648 // O ID da natureza que descobrimos
+            },
+            situacao: "aberto"
         };
 
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/pedidos`, 
-            payloadPedido,
+            payloadPedido, // Enviamos o objeto direto, sem { pedido: ... }
             { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
         );
 

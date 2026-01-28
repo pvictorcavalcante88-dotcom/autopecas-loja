@@ -2004,20 +2004,21 @@ app.post('/admin/tiny/teste-venda', async (req, res) => {
         const payloadPedido = {
             pedido: {
                 data_pedido: new Date().toLocaleDateString('pt-BR'),
+                // ESTRUTURA V3 PARA CLIENTE EXISTENTE
                 cliente: {
-                    // COLOQUE AQUI O ID DO CLIENTE QUE VOCÊ ACABOU DE CRIAR
-                    // (Você acha esse número na URL do navegador ao abrir o cliente no Tiny)
                     id: 890210583 
                 },
                 itens: [
                     {
                         item: {
-                            codigo: "BKR7ESB-D", 
+                            codigo: "BKR7ESB-D",
                             quantidade: 1,
                             valor_unitario: 150
                         }
                     }
                 ],
+                // A V3 pode exigir a natureza da operação (copiei do seu print)
+                natureza_operacao: "Venda de mercadorias de terceiros para consumidor final",
                 situacao: "aberto"
             }
         };
@@ -2025,20 +2026,14 @@ app.post('/admin/tiny/teste-venda', async (req, res) => {
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/pedidos`, 
             payloadPedido,
-            { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
+            { headers: { 'Authorization': `Bearer ${tokenFinal}`, 'Content-Type': 'application/json' } }
         );
 
-        res.json({ sucesso: true, id_pedido_tiny: response.data.data?.id });
+        res.json({ sucesso: true, id_pedido_tiny: response.data.data?.id || response.data.id });
 
     } catch (error) {
-        // --- LOG FOFOQUEIRO ---
-        const detalhesDoTiny = error.response?.data;
-        console.error("❌ ERRO DETALHADO DO TINY:", JSON.stringify(detalhesDoTiny, null, 2));
-        
-        res.status(500).json({ 
-            erro: "O Tiny rejeitou o pedido", 
-            detalhes: detalhesDoTiny 
-        });
+        console.error("❌ ERRO TINY:", JSON.stringify(error.response?.data || error.message, null, 2));
+        res.status(500).json({ erro: error.response?.data?.mensagem || "Erro no servidor" });
     }
 });
 

@@ -1995,58 +1995,68 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
     }
 });
 
-app.post('/admin/tiny/teste-venda', async (req, res) => {
+// ROTA OFICIAL: CRIAR PEDIDO DE VENDA (CHECKOUT)
+app.post('/admin/tiny/criar-pedido', async (req, res) => {
     try {
-        let tokenFinal = await getValidToken();
+        const tokenFinal = await getValidToken();
+        
+        // 1. Recebemos os dados do Front-end (Carrinho e Cliente)
+        const { itensCarrinho, idClienteTiny, valorFrete } = req.body;
 
+        // Validação básica
+        if (!idClienteTiny) {
+            return res.status(400).json({ erro: "ID do cliente não informado." });
+        }
+
+        // 2. Montamos os itens no formato que o Tiny V3 exige (descobrimos isso hoje!)
+        const itensFormatados = itensCarrinho.map(produto => ({
+            produto: {
+                id: produto.id_tiny // O ID do produto no Tiny (não o SKU)
+            },
+            quantidade: produto.quantidade,
+            valorUnitario: produto.preco
+        }));
+
+        // 3. Montamos o Payload Vencedor
         const payloadPedido = {
-            // CORREÇÃO 1: Data no formato ISO (AAAA-MM-DD)
-            data: new Date().toISOString().split('T')[0], 
+            data: new Date().toISOString().split('T')[0], // Data ISO
             
-            // CORREÇÃO 2: Usar o nome do campo EXATO que o erro pediu. 
-            // Em vez de "cliente: { id: ... }", mandamos direto na raiz.
-            idContato: 890233813, 
-            
-            // Mantemos o objeto cliente por garantia (algumas versões pedem ambos)
+            idContato: idClienteTiny, // ID na raiz
             cliente: { 
-                id: 890233813 
+                id: idClienteTiny     // ID dentro do objeto
             },
 
-            itens: [
-                {
-                    produto: {
-                        // CORREÇÃO 3: ID do Produto (descoberto no diagnóstico)
-                        id: 337204975 
-                    },
-                    quantidade: 1,
-                    valorUnitario: 150.00
-                }
-            ],
+            itens: itensFormatados,
             
             naturezaOperacao: {
-                id: 335900648
+                id: 335900648 // Venda Consumidor Final (Fixo por enquanto)
             },
             
-            // CORREÇÃO 4: Inteiro (0 = Aberto)
-            situacao: 0 
+            valorFrete: valorFrete || 0,
+            situacao: 0 // Aberto
         };
 
-        console.log("📤 Enviando Payload:", JSON.stringify(payloadPedido, null, 2));
+        console.log("📤 Criando pedido para cliente:", idClienteTiny);
 
+        // 4. Envio para o Tiny
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/pedidos`, 
             payloadPedido,
             { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
         );
 
-        res.json({ sucesso: true, id_pedido_tiny: response.data.data?.id || response.data.id });
+        // 5. Sucesso!
+        res.json({ 
+            sucesso: true, 
+            id_pedido: response.data.data?.id || response.data.id,
+            numero: response.data.data?.numero || response.data.numero
+        });
 
     } catch (error) {
-        console.error("❌ ERRO TINY V3:", JSON.stringify(error.response?.data || error.message, null, 2));
-        res.status(500).json({ erro: "Tiny rejeitou", detalhes: error.response?.data });
+        console.error("❌ ERRO AO CRIAR PEDIDO:", JSON.stringify(error.response?.data || error.message, null, 2));
+        res.status(500).json({ erro: "Falha ao criar pedido no Tiny", detalhes: error.response?.data });
     }
 });
-
 // ROTA: RAIO-X COMPLETO (SEM FILTROS)
 app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
     try {

@@ -2004,20 +2004,20 @@ app.post('/admin/tiny/teste-venda', async (req, res) => {
         const payloadPedido = {
             pedido: {
                 data_pedido: new Date().toLocaleDateString('pt-BR'),
-                // ESTRUTURA V3 PARA CLIENTE EXISTENTE
                 cliente: {
-                    id: 890210583 
+                    // Na V3, passar como STRING muitas vezes resolve o erro de validação
+                    id: "890210583" 
                 },
                 itens: [
                     {
                         item: {
                             codigo: "BKR7ESB-D",
                             quantidade: 1,
-                            valor_unitario: 150
+                            valor_unitario: 150.00
                         }
                     }
                 ],
-                // A V3 pode exigir a natureza da operação (copiei do seu print)
+                // Natureza de operação conforme o seu cadastro no Tiny
                 natureza_operacao: "Venda de mercadorias de terceiros para consumidor final",
                 situacao: "aberto"
             }

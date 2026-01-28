@@ -1995,52 +1995,107 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
     }
 });
 
-// ROTA OFICIAL: CRIAR PEDIDO (COM CADASTRO AUTOMÁTICO)
+// ==========================================
+// FUNÇÕES AUXILIARES (O Robô que trabalha pra você)
+// ==========================================
+
+// 1. Busca se o cliente já existe pelo CPF
+async function buscarClientePorCPF(cpf, token) {
+    try {
+        const cpfLimpo = cpf.replace(/\D/g, '');
+        // Busca exata por CPF na V3
+        const response = await axios.get(
+            `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfLimpo}`,
+            { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+        
+        // Se achou alguém, retorna o ID do primeiro da lista
+        if (response.data.data && response.data.data.length > 0) {
+            console.log(`🔎 Cliente encontrado! ID: ${response.data.data[0].id}`);
+            return response.data.data[0].id;
+        }
+        return null; // Não achou
+    } catch (e) {
+        return null; // Erro na busca = considera que não achou
+    }
+}
+
+// 2. Cria o cliente se ele não existir
+async function criarClienteNoTiny(dadosCliente, token) {
+    try {
+        const cpfLimpo = dadosCliente.cpf.replace(/\D/g, '');
+        
+        const payloadCliente = {
+            nome: dadosCliente.nome,
+            tipo_pessoa: cpfLimpo.length > 11 ? 'J' : 'F',
+            cpf_cnpj: cpfLimpo,
+            endereco: dadosCliente.endereco,
+            numero: dadosCliente.numero,
+            bairro: dadosCliente.bairro,
+            cep: dadosCliente.cep.replace(/\D/g, ''),
+            cidade: dadosCliente.cidade,
+            uf: dadosCliente.uf,
+            situacao: "A" // Ativo
+        };
+
+        console.log("🆕 Criando novo cliente no Tiny...");
+        const response = await axios.post(
+            `https://api.tiny.com.br/public-api/v3/contatos`,
+            payloadCliente,
+            { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+
+        return response.data.data?.id || response.data.id;
+    } catch (error) {
+        console.error("Erro ao criar cliente:", JSON.stringify(error.response?.data || error.message));
+        throw new Error("Não foi possível cadastrar o cliente.");
+    }
+}
+
+// ==========================================
+// ROTA PRINCIPAL: CHECKOUT
+// ==========================================
 app.post('/admin/tiny/criar-pedido', async (req, res) => {
     try {
         const tokenFinal = await getValidToken();
-        
-        // Recebemos: itens, frete e o OBJETO cliente completo
         const { itensCarrinho, cliente, valorFrete } = req.body;
 
-        // 1. Montagem dos Itens (Conversão Site -> Tiny)
+        console.log("🚀 Iniciando processamento de venda...");
+
+        // PASSO 1: GARANTIR O ID DO CLIENTE
+        let idClienteFinal = null;
+
+        // Tenta buscar pelo CPF primeiro
+        if (cliente.cpf) {
+            idClienteFinal = await buscarClientePorCPF(cliente.cpf, tokenFinal);
+        }
+
+        // Se não achou, cria um novo
+        if (!idClienteFinal) {
+            idClienteFinal = await criarClienteNoTiny(cliente, tokenFinal);
+        }
+
+        if (!idClienteFinal) {
+            return res.status(500).json({ erro: "Falha fatal: Não consegui obter um ID para o cliente." });
+        }
+
+        // PASSO 2: PREPARAR OS ITENS
         const itensFormatados = itensCarrinho.map(prod => ({
             produto: {
-                id: prod.id_tiny // Precisa ser o ID do produto no Tiny
+                id: prod.id_tiny // ID numérico do produto
             },
             quantidade: prod.quantidade,
             valorUnitario: prod.preco
         }));
 
-        // 2. Montagem do Cliente (A Lógica Inteligente)
-        let clientePayload = {};
-
-        if (cliente.id_tiny) {
-            // CASO A: Cliente já existe (temos o ID)
-            clientePayload = { id: cliente.id_tiny };
-        } else {
-            // CASO B: Cliente Novo (Enviamos tudo para o Tiny cadastrar)
-            clientePayload = {
-                nome: cliente.nome,
-                tipo_pessoa: cliente.cpf.length > 11 ? 'J' : 'F',
-                cpf_cnpj: cliente.cpf.replace(/\D/g, ''), // Remove pontos/traços
-                endereco: cliente.endereco,
-                numero: cliente.numero,
-                bairro: cliente.bairro,
-                cep: cliente.cep.replace(/\D/g, ''),
-                cidade: cliente.cidade,
-                uf: cliente.uf,
-                // Campo mágico que às vezes ajuda na V3
-                atualizar_cliente: "S" 
-            };
-        }
-
-        // 3. Montagem Final do Pedido
+        // PASSO 3: CRIAR O PEDIDO (Agora temos certeza que o ID existe!)
         const payloadPedido = {
             data: new Date().toISOString().split('T')[0],
             
-            // Aqui entra ou o ID ou os Dados Completos
-            cliente: clientePayload,
+            idContato: idClienteFinal, // ID confirmado
+            cliente: { 
+                id: idClienteFinal 
+            },
 
             itens: itensFormatados,
             
@@ -2049,10 +2104,8 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             },
             
             valorFrete: valorFrete || 0,
-            situacao: 0 // Aberto
+            situacao: 0
         };
-
-        console.log("📤 Criando pedido...", JSON.stringify(payloadPedido, null, 2));
 
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/pedidos`, 
@@ -2060,15 +2113,16 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
         );
 
+        console.log("✅ Pedido criado com sucesso: " + response.data.data?.numero);
+
         res.json({ 
             sucesso: true, 
-            msg: "Pedido Criado com Sucesso!",
-            id_pedido: response.data.data?.id || response.data.id,
-            numero: response.data.data?.numero || response.data.numero
+            id_pedido: response.data.data?.id,
+            numero: response.data.data?.numero
         });
 
     } catch (error) {
-        console.error("❌ ERRO PEDIDO:", JSON.stringify(error.response?.data || error.message, null, 2));
+        console.error("❌ ERRO NO PROCESSO:", JSON.stringify(error.response?.data || error.message, null, 2));
         res.status(500).json({ 
             erro: "Falha ao processar pedido", 
             detalhes: error.response?.data 

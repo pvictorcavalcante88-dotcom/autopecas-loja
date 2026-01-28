@@ -2044,6 +2044,27 @@ app.post('/admin/tiny/teste-venda', async (req, res) => {
     }
 });
 
+// ROTA DE DIAGNÓSTICO: RECEBER UM PEDIDO EXISTENTE
+app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
+    try {
+        let tokenFinal = await getValidToken();
+        const idPedido = req.params.id;
+
+        console.log(`🔍 Escaneando pedido ${idPedido}...`);
+
+        const response = await axios.get(
+            `https://api.tiny.com.br/public-api/v3/pedidos/${idPedido}`,
+            { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
+        );
+
+        // Retorna o JSON completo para analisarmos as "gavetas"
+        res.json(response.data.data);
+    } catch (error) {
+        console.error("Erro ao ler pedido:", error.response?.data || error.message);
+        res.status(500).json({ erro: "Não consegui ler o pedido", detalhes: error.response?.data });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);

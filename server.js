@@ -1995,68 +1995,87 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
     }
 });
 
-// ROTA OFICIAL: CRIAR PEDIDO DE VENDA (CHECKOUT)
+// ROTA OFICIAL: CRIAR PEDIDO (COM CADASTRO AUTOMÁTICO)
 app.post('/admin/tiny/criar-pedido', async (req, res) => {
     try {
         const tokenFinal = await getValidToken();
         
-        // 1. Recebemos os dados do Front-end (Carrinho e Cliente)
-        const { itensCarrinho, idClienteTiny, valorFrete } = req.body;
+        // Recebemos: itens, frete e o OBJETO cliente completo
+        const { itensCarrinho, cliente, valorFrete } = req.body;
 
-        // Validação básica
-        if (!idClienteTiny) {
-            return res.status(400).json({ erro: "ID do cliente não informado." });
-        }
-
-        // 2. Montamos os itens no formato que o Tiny V3 exige (descobrimos isso hoje!)
-        const itensFormatados = itensCarrinho.map(produto => ({
+        // 1. Montagem dos Itens (Conversão Site -> Tiny)
+        const itensFormatados = itensCarrinho.map(prod => ({
             produto: {
-                id: produto.id_tiny // O ID do produto no Tiny (não o SKU)
+                id: prod.id_tiny // Precisa ser o ID do produto no Tiny
             },
-            quantidade: produto.quantidade,
-            valorUnitario: produto.preco
+            quantidade: prod.quantidade,
+            valorUnitario: prod.preco
         }));
 
-        // 3. Montamos o Payload Vencedor
+        // 2. Montagem do Cliente (A Lógica Inteligente)
+        let clientePayload = {};
+
+        if (cliente.id_tiny) {
+            // CASO A: Cliente já existe (temos o ID)
+            clientePayload = { id: cliente.id_tiny };
+        } else {
+            // CASO B: Cliente Novo (Enviamos tudo para o Tiny cadastrar)
+            clientePayload = {
+                nome: cliente.nome,
+                tipo_pessoa: cliente.cpf.length > 11 ? 'J' : 'F',
+                cpf_cnpj: cliente.cpf.replace(/\D/g, ''), // Remove pontos/traços
+                endereco: cliente.endereco,
+                numero: cliente.numero,
+                bairro: cliente.bairro,
+                cep: cliente.cep.replace(/\D/g, ''),
+                cidade: cliente.cidade,
+                uf: cliente.uf,
+                // Campo mágico que às vezes ajuda na V3
+                atualizar_cliente: "S" 
+            };
+        }
+
+        // 3. Montagem Final do Pedido
         const payloadPedido = {
-            data: new Date().toISOString().split('T')[0], // Data ISO
+            data: new Date().toISOString().split('T')[0],
             
-            idContato: idClienteTiny, // ID na raiz
-            cliente: { 
-                id: idClienteTiny     // ID dentro do objeto
-            },
+            // Aqui entra ou o ID ou os Dados Completos
+            cliente: clientePayload,
 
             itens: itensFormatados,
             
             naturezaOperacao: {
-                id: 335900648 // Venda Consumidor Final (Fixo por enquanto)
+                id: 335900648 
             },
             
             valorFrete: valorFrete || 0,
             situacao: 0 // Aberto
         };
 
-        console.log("📤 Criando pedido para cliente:", idClienteTiny);
+        console.log("📤 Criando pedido...", JSON.stringify(payloadPedido, null, 2));
 
-        // 4. Envio para o Tiny
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/pedidos`, 
             payloadPedido,
             { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
         );
 
-        // 5. Sucesso!
         res.json({ 
             sucesso: true, 
+            msg: "Pedido Criado com Sucesso!",
             id_pedido: response.data.data?.id || response.data.id,
             numero: response.data.data?.numero || response.data.numero
         });
 
     } catch (error) {
-        console.error("❌ ERRO AO CRIAR PEDIDO:", JSON.stringify(error.response?.data || error.message, null, 2));
-        res.status(500).json({ erro: "Falha ao criar pedido no Tiny", detalhes: error.response?.data });
+        console.error("❌ ERRO PEDIDO:", JSON.stringify(error.response?.data || error.message, null, 2));
+        res.status(500).json({ 
+            erro: "Falha ao processar pedido", 
+            detalhes: error.response?.data 
+        });
     }
 });
+
 // ROTA: RAIO-X COMPLETO (SEM FILTROS)
 app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
     try {

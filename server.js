@@ -2000,37 +2000,46 @@ app.post('/admin/tiny/teste-venda', async (req, res) => {
     try {
         let tokenFinal = await getValidToken();
 
-        // MUDANÇA CRUCIAL: Removemos o wrapper "pedido". O objeto começa direto!
         const payloadPedido = {
-            data_pedido: new Date().toLocaleDateString('pt-BR'),
+            // V3 usa "data" e não "data_pedido"
+            data: new Date().toLocaleDateString('pt-BR'),
+            
             cliente: {
-                id: 890233813  // O ID que descobrimos no diagnóstico
+                id: 890233813
             },
+            
+            // AQUI ESTAVA O MAIOR ERRO: A estrutura dos itens mudou na V3
             itens: [
                 {
-                    item: {
-                        codigo: "BKR7ESB-D",
-                        quantidade: 1,
-                        valor_unitario: 150.00
-                    }
+                    produto: {
+                        // Tente 'sku' primeiro, pois apareceu no seu JSON de leitura.
+                        // Se der erro, trocaremos por 'codigo' ou 'id'.
+                        sku: "BKR7ESB-D"
+                    },
+                    quantidade: 1,
+                    // CamelCase: valorUnitario (sem underline)
+                    valorUnitario: 150.00
                 }
             ],
-            natureza_operacao: {
-                id: 335900648 // O ID da natureza que descobrimos
+            
+            naturezaOperacao: {
+                id: 335900648
             },
-            situacao: "aberto"
+            
+            // CORREÇÃO: Situação deve ser Inteiro (0 = Aberto)
+            situacao: 0
         };
 
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/pedidos`, 
-            payloadPedido, // Enviamos o objeto direto, sem { pedido: ... }
+            payloadPedido,
             { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
         );
 
         res.json({ sucesso: true, id_pedido_tiny: response.data.data?.id || response.data.id });
 
     } catch (error) {
-        console.error("❌ ERRO TINY:", JSON.stringify(error.response?.data || error.message, null, 2));
+        console.error("❌ ERRO TINY V3:", JSON.stringify(error.response?.data || error.message, null, 2));
         res.status(500).json({ erro: "Tiny rejeitou", detalhes: error.response?.data });
     }
 });

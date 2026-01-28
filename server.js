@@ -2044,8 +2044,7 @@ app.post('/admin/tiny/teste-venda', async (req, res) => {
     }
 });
 
-// ROTA DE DIAGNÓSTICO: RECEBER UM PEDIDO EXISTENTE
-// ROTA DE DIAGNÓSTICO TOTAL
+// ROTA: RAIO-X COMPLETO (SEM FILTROS)
 app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
     try {
         const tokenFinal = await getValidToken();
@@ -2056,16 +2055,12 @@ app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
             { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
         );
 
-        // Se a resposta vier dentro de .data.data (padrão V3), enviamos tudo
-        const conteudoCompleto = response.data.data || response.data;
-        
-        console.log("🔍 DNA do Pedido lido com sucesso!");
-        res.json(conteudoCompleto);
+        // Manda o RAW (Cru) para a tela e para o Log
+        console.log("📦 JSON COMPLETO DO TINY:", JSON.stringify(response.data, null, 2));
+        res.send(response.data); 
+
     } catch (error) {
-        res.status(500).json({ 
-            erro: "Erro na leitura", 
-            detalhes: error.response?.data || error.message 
-        });
+        res.status(500).send("Erro: " + (error.response?.data ? JSON.stringify(error.response.data) : error.message));
     }
 });
 

@@ -1995,23 +1995,27 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
     }
 });
 
-
 app.post('/admin/tiny/teste-venda', async (req, res) => {
     try {
         let tokenFinal = await getValidToken();
 
         const payloadPedido = {
-            // CORREÇÃO 1: Formato de data internacional (YYYY-MM-DD)
+            // CORREÇÃO 1: Data no formato ISO (AAAA-MM-DD)
             data: new Date().toISOString().split('T')[0], 
             
-            cliente: {
-                id: 890233813 // ID do Paulo Victor
-            },
+            // CORREÇÃO 2: Usar o nome do campo EXATO que o erro pediu. 
+            // Em vez de "cliente: { id: ... }", mandamos direto na raiz.
+            idContato: 890233813, 
             
+            // Mantemos o objeto cliente por garantia (algumas versões pedem ambos)
+            cliente: { 
+                id: 890233813 
+            },
+
             itens: [
                 {
                     produto: {
-                        // CORREÇÃO 2: Usando o ID do produto (achado no diagnóstico)
+                        // CORREÇÃO 3: ID do Produto (descoberto no diagnóstico)
                         id: 337204975 
                     },
                     quantidade: 1,
@@ -2020,11 +2024,14 @@ app.post('/admin/tiny/teste-venda', async (req, res) => {
             ],
             
             naturezaOperacao: {
-                id: 335900648 // ID da Venda Consumidor Final
+                id: 335900648
             },
             
-            situacao: 0 // 0 = Aberto
+            // CORREÇÃO 4: Inteiro (0 = Aberto)
+            situacao: 0 
         };
+
+        console.log("📤 Enviando Payload:", JSON.stringify(payloadPedido, null, 2));
 
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/pedidos`, 

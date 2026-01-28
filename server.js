@@ -2095,8 +2095,6 @@ app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
 // FUNÇÕES AUXILIARES CORRIGIDAS (V3)
 // ==========================================
 
-// Função para pausar o robô (Evita erro 429)
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function buscarClientePorCPF(cpf, token) {
     try {

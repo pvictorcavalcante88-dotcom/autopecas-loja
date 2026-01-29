@@ -53,24 +53,27 @@ function adicionarAoCarrinho(id, qtd) {
     let item = c.find(p => p.id == id);
     const margemInicial = parseFloat(localStorage.getItem('minhaMargem') || 0);
 
-    // 🕵️ O SEGREDO ESTÁ AQUI: Pegar o preço que aparece na tela
-    // Procure o elemento que contém o preço (ajuste o seletor .price se necessário)
-    const precoElemento = document.querySelector('.price') || document.querySelector('#preco-produto');
-    const precoTexto = precoElemento ? precoElemento.innerText : "0";
+    // 🎯 Captura o preço usando o ID exato do seu HTML
+    const elementoPreco = document.getElementById('prod-price');
     
-    // Usa a função de limpeza que conversamos antes
+    // Se o elemento existe, pegamos o texto dele, senão usamos "0"
+    const precoTexto = elementoPreco ? elementoPreco.innerText : "0";
+    
+    // Limpa o "R$" e a vírgula para transformar em número (187.50)
     const precoLimpo = limparPrecoBR(precoTexto);
+
+    console.log("🔍 Diagnóstico de Adição:");
+    console.log("   - Texto no HTML:", precoTexto);
+    console.log("   - Valor para o Banco:", precoLimpo);
 
     if (item) {
         item.quantidade = (item.quantidade || 1) + qtd;
-        // Atualiza o preço também, caso tenha mudado
-        item.preco = precoLimpo; 
+        item.preco = precoLimpo; // Atualiza o preço base
     } else {
-        // ✅ Agora salvamos o PREÇO junto com o ID
         c.push({ 
             id: parseInt(id), 
             quantidade: qtd, 
-            preco: precoLimpo, // Salva o valor numérico (ex: 150.00)
+            preco: precoLimpo, 
             customMargin: margemInicial 
         });
     }
@@ -80,14 +83,16 @@ function adicionarAoCarrinho(id, qtd) {
     alert("Adicionado ao carrinho!");
 }
 
-// ⬇️ Não esqueça de ter essa função auxiliar no seu script.js ⬇️
+// Certifique-se de que a função de limpeza está no seu arquivo:
 function limparPrecoBR(valor) {
     if (!valor) return 0;
     if (typeof valor === 'number') return valor;
+    // Remove R$, espaços não-quebráveis (&nbsp;), pontos e troca vírgula por ponto
     let limpo = valor.toString()
-                     .replace('R$', '')
-                     .replace(/\./g, '') 
-                     .replace(',', '.')  
+                     .replace(/R\$/g, '')
+                     .replace(/\u00a0/g, '') // Remove o &nbsp;
+                     .replace(/\./g, '')    // Remove ponto de milhar
+                     .replace(',', '.')     // Troca vírgula por ponto
                      .trim();
     return parseFloat(limpo) || 0;
 }

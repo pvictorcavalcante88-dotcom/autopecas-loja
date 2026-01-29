@@ -2091,31 +2091,65 @@ app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
 // ==========================================
 // FUNÇÃO DE BUSCA CORRIGIDA (TINY V3)
 // ==========================================
+// ==========================================
+// FUNÇÃO DE BUSCA TURBINADA (3 TENTATIVAS)
+// ==========================================
 async function buscarClientePorCPF(cpf, token) {
-    try {
-        const cpfLimpo = cpf.replace(/\D/g, '');
-        console.log(`🔎 Buscando no Tiny por CPF: ${cpfLimpo}`);
+    const cpfLimpo = cpf.replace(/\D/g, '');
+    
+    // Funçãozinha para formatar CPF (000.000.000-00)
+    const formatarCPF = (v) => v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+    const cpfComMascara = formatarCPF(cpfLimpo);
 
-        // NA V3, o parâmetro é cpf_cnpj
-        const response = await axios.get(
+    try {
+        console.log(`🔎 TENTATIVA 1: Buscando CPF Limpo: ${cpfLimpo}`);
+        let response = await axios.get(
             `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfLimpo}`,
             { headers: { 'Authorization': `Bearer ${token}` } }
         );
 
-        // O Tiny V3 retorna { data: [ { id: 123, ... } ] }
-        if (response.data && response.data.data && response.data.data.length > 0) {
-            const idEncontrado = response.data.data[0].id;
-            console.log(`✅ ID RECUPERADO: ${idEncontrado}`);
-            return idEncontrado;
-        }
+        if (checarSeAchou(response)) return response.data.data[0].id;
 
-        console.log("❌ Cliente não encontrado na busca (estranho, pois deu erro de duplicidade).");
+        // ---------------------------------------------------------
+        
+        console.log(`🔎 TENTATIVA 2: Buscando CPF Formatado: ${cpfComMascara}`);
+        // O Tiny às vezes só acha se mandar com ponto e traço
+        response = await axios.get(
+            `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfComMascara}`,
+            { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+
+        if (checarSeAchou(response)) return response.data.data[0].id;
+
+        // ---------------------------------------------------------
+
+        console.log(`🔎 TENTATIVA 3: Busca Genérica (Pesquisa): ${cpfLimpo}`);
+        // Tenta pelo campo de pesquisa geral (busca nome, cpf, tudo)
+        response = await axios.get(
+            `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${cpfLimpo}`,
+            { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+
+        if (checarSeAchou(response)) return response.data.data[0].id;
+
+        // ---------------------------------------------------------
+
+        console.log("❌ DESISTO: Tentei de tudo e não achei o ID, mas o Tiny diz que existe.");
         return null;
 
     } catch (e) {
-        console.error("❌ Erro técnico na busca por CPF:", e.message);
+        console.error("❌ Erro técnico na busca:", e.message);
         return null;
     }
+}
+
+// Função auxiliar para ver se o Tiny devolveu algo
+function checarSeAchou(response) {
+    if (response.data && response.data.data && response.data.data.length > 0) {
+        console.log(`✅ ACHEI! ID: ${response.data.data[0].id} - Nome: ${response.data.data[0].nome}`);
+        return true;
+    }
+    return false;
 }
 
 async function criarClienteNoTiny(dadosCliente, token) {

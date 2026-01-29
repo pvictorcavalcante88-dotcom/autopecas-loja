@@ -1000,55 +1000,25 @@ function calcularTotalVisual(carrinho) {
 // 🟢 FUNÇÃO DE FINALIZAR COM ASAAS (ATUALIZADA COM SELEÇÃO DE PAGAMENTO)
 // 🟢 FUNÇÃO DE FINALIZAR COM ASAAS E TINY (ATUALIZADA)
 async function finalizarCompraAsaas() {
-    console.log("🔍 --- INICIANDO DEBUG DO CHECKOUT ---");
-
     // 1. PEGAR DADOS DO FORMULÁRIO
-    // Vamos logar o valor BRUTO (raw) que vem do HTML para ver se tem sujeira
-    const elCidade = document.getElementById('input-cidade');
-    const elUf = document.getElementById('uf');
-    const elBairro = document.getElementById('input-bairro');
-    const elNumero = document.getElementById('numero');
-
-    console.log("ELEMENTOS ENCONTRADOS NO HTML?");
-    console.log("Input Cidade:", elCidade ? "ACHOU ✅" : "NÃO ACHOU ❌");
-    console.log("Input UF:", elUf ? "ACHOU ✅" : "NÃO ACHOU ❌");
-
-    // Captura com limpeza (Trim)
+// 1. CAPTURA DOS INPUTS (Usando IDs que conferimos antes)
     const nome = document.getElementById('nome_cliente').value.trim(); 
     const emailContato = document.getElementById('input-email-contato')?.value.trim() || '';
     const telefone = document.getElementById('input-telefone')?.value.trim() || '';
     const endereco = document.getElementById('rua').value.trim(); 
-    
-    // Captura valores específicos
-    const numeroRaw = elNumero?.value;
-    const bairroRaw = elBairro?.value;
-    const cidadeRaw = elCidade?.value;
-    const ufRaw = elUf?.value;
-    const cepRaw = document.getElementById('cep')?.value;
+    const numero = document.getElementById('numero')?.value.trim();
+    const bairro = document.getElementById('input-bairro')?.value.trim();
+    const cidadeInput = document.getElementById('input-cidade')?.value.trim();
+    const ufInput = document.getElementById('uf')?.value.trim();
+    const cep = document.getElementById('cep')?.value.trim() || "00000000";
 
-    console.log("📝 VALORES DIGITADOS (Brutos):");
-    console.log("Cidade:", cidadeRaw);
-    console.log("UF:", ufRaw);
-    console.log("Bairro:", bairroRaw);
-    console.log("Número:", numeroRaw);
+    // 🔴 LOG DE TESTE NO NAVEGADOR (Aperte F12 para ver se aparece Maceió aqui)
+    console.log("Dados capturados no site:", { cidadeInput, ufInput });
 
-    // --- APLICAÇÃO DOS FILTROS E FALLBACKS ---
-    const numero = numeroRaw?.trim() || "0";
-    const bairro = bairroRaw?.trim() || "Centro";
-    const cep = cepRaw?.trim() || "00000000";
-
-    // Proteção contra a palavra "Cidade"
-    const cidade = (cidadeRaw && cidadeRaw.trim().toLowerCase() !== "cidade" && cidadeRaw.trim() !== "") 
-                   ? cidadeRaw.trim() 
-                   : "Maceio"; // Fallback se falhar
-
-    const uf = (ufRaw && ufRaw.trim().toLowerCase() !== "uf" && ufRaw.trim() !== "") 
-               ? ufRaw.trim().toUpperCase() 
-               : "AL"; // Fallback se falhar
-
-    console.log("✨ VALORES FINAIS (Limpos e Tratados):");
-    console.log("Cidade Final:", cidade);
-    console.log("UF Final:", uf);
+    // --- PROTEÇÃO PARA NÃO ENVIAR A PALAVRA "CIDADE" ---
+    // Se o campo estiver vazio ou for a palavra "Cidade", usamos Maceio como fallback
+    const cidade = (cidadeInput && cidadeInput.toLowerCase() !== "cidade") ? cidadeInput : "Maceio";
+    const uf = (ufInput && ufInput.toLowerCase() !== "uf") ? ufInput.toUpperCase() : "AL";
     // ------------------------------------------
 
     // ... restante das validações de CPF e botões ...

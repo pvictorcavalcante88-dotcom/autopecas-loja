@@ -132,27 +132,23 @@ document.addEventListener("DOMContentLoaded", async function() {
             const itensResgatados = JSON.parse(jsonLimpo);
             
             if (Array.isArray(itensResgatados)) {
-                // ✅ CORREÇÃO: Mapeamos garantindo que o preço e nome voltem para o carrinho
                 const carrinhoParaSalvar = itensResgatados.map(item => ({
                     id: item.id,
                     quantidade: item.quantidade,
-                    customMargin: item.customMargin,
-                    preco: item.preco, // Recupera o valor que veio no link
-                    nome: item.nome    // Recupera o nome
+                    nome: item.nome,
+                    // ✅ O PREÇO VEM DO LINK
+                    preco: item.preco, 
+                    // ✅ FORÇAMOS A MARGEM EM 0% PARA NÃO SOMAR DE NOVO
+                    customMargin: 0 
                 }));
 
                 localStorage.setItem('nossoCarrinho', JSON.stringify(carrinhoParaSalvar));
+                // Define a margem global como 0 também para garantir
+                localStorage.setItem('minhaMargem', '0');
             }
-            
-            // Limpa a URL para o link não ficar gigante na barra de endereços
             window.history.replaceState({}, document.title, window.location.pathname);
-            
-            // Recarrega a página para o checkout ler o novo carrinho salvo
             window.location.reload(); 
-
-        } catch (e) { 
-            console.error("Erro ao restaurar link:", e); 
-        }
+        } catch (e) { console.error("Erro link:", e); }
     }
 
     atualizarIconeCarrinho();
@@ -835,16 +831,16 @@ function formatarMoeda(valor) {
 }
 
 function gerarPayloadUrl() {
-    // Pega os itens que estão na memória do checkout
     const itens = window.ITENS_CHECKOUT || [];
     
-    // ✅ CORREÇÃO: Adicionamos 'preco' e 'nome' ao link
     const payload = itens.map(i => ({ 
         id: i.id, 
         quantidade: i.qtd, 
-        customMargin: i.customMargin,
-        preco: i.unitario, // Valor calculado com margem que o cliente deve pagar
-        nome: i.nome       // Evita o erro "Sem Nome" no log
+        nome: i.nome,
+        // ✅ Enviamos o preço unitário já com a sua margem aplicada
+        preco: i.unitario, 
+        // ✅ Enviamos a margem como 0 para o cliente
+        customMargin: 0 
     }));
     
     return encodeURIComponent(JSON.stringify(payload));

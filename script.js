@@ -1161,12 +1161,16 @@ async function finalizarCompraAsaas() {
             alert("Erro: " + (data.erro || "Falha ao processar pedido."));
             if(btn) { btn.disabled = false; btn.innerHTML = "Tentar Novamente"; }
         }
+
+        console.log("📤 PACOTE SENDO ENVIADO PRO SERVIDOR:", JSON.stringify(itensParaEnviar, null, 2));
+
     } catch (e) {
         // ERRO DE CONEXÃO
         console.error(e);
         alert("Erro de conexão com o servidor.");
         if(btn) { btn.disabled = false; btn.innerHTML = "Tentar Novamente"; }
     }
+
 }
 
 function mostrarModalPix(pixData, linkPagamento, metodoEscolhido) {
@@ -1361,3 +1365,63 @@ async function criarPedidoNoTiny(dadosCliente, carrinho) {
         return null;
     }
 }
+
+// ======================================================
+// 🕵️ BOTÃO ESPIÃO DE DEBUG (Remover depois de corrigir)
+// ======================================================
+document.addEventListener("DOMContentLoaded", () => {
+    const btnDebug = document.createElement("button");
+    btnDebug.innerText = "🕵️ TESTAR CÁLCULO AGORA";
+    btnDebug.style.cssText = "position:fixed; bottom:20px; left:20px; z-index:9999; padding:15px; background:red; color:white; font-weight:bold; border:none; border-radius:10px; cursor:pointer;";
+    
+    btnDebug.onclick = function() {
+        console.clear();
+        console.log("🚀 === INICIANDO DIAGNÓSTICO DO CARRINHO === 🚀");
+
+        // 1. Pega os dados crus
+        const carrinhoRaw = JSON.parse(localStorage.getItem('nossoCarrinho') || '[]');
+        const margemGlobal = parseFloat(localStorage.getItem('minhaMargem') || 0);
+
+        console.log(`📊 Margem Global Configurada: ${margemGlobal}%`);
+
+        if (carrinhoRaw.length === 0) {
+            console.warn("⚠️ O carrinho está vazio!");
+            alert("Carrinho vazio! Adicione um item para testar.");
+            return;
+        }
+
+        // 2. Simula o cálculo que será enviado
+        console.log("🛒 Analisando Itens...");
+        
+        carrinhoRaw.forEach((item, index) => {
+            console.group(`📦 ITEM ${index + 1}: ${item.nome || 'Sem Nome'}`);
+            
+            // Verifica IDs
+            console.log("🆔 ID Site:", item.id);
+            console.log("🆔 TinyID (Cru):", item.tinyId, "| id_tiny:", item.id_tiny);
+
+            // Verifica Preços e Margens
+            let precoBase = parseFloat(item.preco || item.preco_novo || 0);
+            let margemItem = (item.customMargin !== undefined && item.customMargin !== null) ? parseFloat(item.customMargin) : margemGlobal;
+            
+            // O CÁLCULO REAL
+            let precoFinal = precoBase * (1 + (margemItem / 100));
+
+            console.log(`💰 Preço Base (Custo): R$ ${precoBase.toFixed(2)}`);
+            console.log(`📈 Margem Aplicada: ${margemItem}%`);
+            console.log(`🧮 FÓRMULA: ${precoBase} * (1 + ${margemItem/100})`);
+            
+            if (isNaN(precoFinal)) {
+                console.error("❌ ERRO: O Preço Final deu 'NaN' (Não é número). Verifique se o preço base tem vírgula em vez de ponto!");
+            } else {
+                console.log(`✅ PREÇO FINAL QUE SERÁ ENVIADO: R$ ${precoFinal.toFixed(2)}`);
+            }
+            console.groupEnd();
+        });
+
+        console.log("===============================================");
+        alert("Abra o Console (F12) para ver o relatório!");
+    };
+
+    document.body.appendChild(btnDebug);
+});

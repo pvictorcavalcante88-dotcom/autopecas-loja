@@ -1059,10 +1059,14 @@ async function finalizarCompraAsaas() {
             let margemFinal = (i.customMargin !== undefined && i.customMargin !== null) 
                               ? i.customMargin 
                               : margemGlobal;
+
+            let precoBase = parseFloat(i.preco || i.preco_novo || 0);
+            let precoComMargem = precoBase * (1 + (margemFinal / 100));                
             
             return { 
                 id: i.id, 
                 quantidade: i.quantidade,
+                preco: precoComMargem,
                 customMargin: parseFloat(margemFinal)
             };
         });

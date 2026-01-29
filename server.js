@@ -2089,58 +2089,59 @@ app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
 
 
 // ==========================================
-// FUNÇÃO DE BUSCA CORRIGIDA (TINY V3)
-// ==========================================
-// ==========================================
-// FUNÇÃO DE BUSCA TURBINADA (3 TENTATIVAS)
+// FUNÇÃO DE BUSCA PACIENTE (Evita erro 429)
 // ==========================================
 async function buscarClientePorCPF(cpf, token) {
     const cpfLimpo = cpf.replace(/\D/g, '');
     
-    // Funçãozinha para formatar CPF (000.000.000-00)
+    // Formata CPF: 000.000.000-00
     const formatarCPF = (v) => v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
     const cpfComMascara = formatarCPF(cpfLimpo);
 
     try {
-        console.log(`🔎 TENTATIVA 1: Buscando CPF Limpo: ${cpfLimpo}`);
-        let response = await axios.get(
-            `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfLimpo}`,
-            { headers: { 'Authorization': `Bearer ${token}` } }
-        );
+        // --- TENTATIVA 1: CPF FORMATADO (A mais provável) ---
+        console.log(`🔎 TENTATIVA 1: Buscando CPF com Máscara: ${cpfComMascara}`);
+        try {
+            let response = await axios.get(
+                `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfComMascara}`,
+                { headers: { 'Authorization': `Bearer ${token}` } }
+            );
+            if (checarSeAchou(response)) return response.data.data[0].id;
+        } catch (err) {
+            console.log("⚠️ Falha na Tentativa 1 (provável 429 ou não achou).");
+        }
 
-        if (checarSeAchou(response)) return response.data.data[0].id;
+        // 🛑 PAUSA DE 2 SEGUNDOS PARA ACALMAR O TINY 🛑
+        await sleep(2000); 
 
-        // ---------------------------------------------------------
-        
-        console.log(`🔎 TENTATIVA 2: Buscando CPF Formatado: ${cpfComMascara}`);
-        // O Tiny às vezes só acha se mandar com ponto e traço
-        response = await axios.get(
-            `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfComMascara}`,
-            { headers: { 'Authorization': `Bearer ${token}` } }
-        );
+        // --- TENTATIVA 2: CPF LIMPO ---
+        console.log(`🔎 TENTATIVA 2: Buscando CPF Limpo: ${cpfLimpo}`);
+        try {
+            let response = await axios.get(
+                `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfLimpo}`,
+                { headers: { 'Authorization': `Bearer ${token}` } }
+            );
+            if (checarSeAchou(response)) return response.data.data[0].id;
+        } catch (err) {
+            console.log("⚠️ Falha na Tentativa 2.");
+        }
 
-        if (checarSeAchou(response)) return response.data.data[0].id;
-
-        // ---------------------------------------------------------
-
-        console.log(`🔎 TENTATIVA 3: Busca Genérica (Pesquisa): ${cpfLimpo}`);
-        // Tenta pelo campo de pesquisa geral (busca nome, cpf, tudo)
-        response = await axios.get(
-            `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${cpfLimpo}`,
-            { headers: { 'Authorization': `Bearer ${token}` } }
-        );
-
-        if (checarSeAchou(response)) return response.data.data[0].id;
-
-        // ---------------------------------------------------------
-
-        console.log("❌ DESISTO: Tentei de tudo e não achei o ID, mas o Tiny diz que existe.");
+        console.log("❌ DESISTO: Tentei com e sem máscara e não retornou o ID.");
         return null;
 
     } catch (e) {
-        console.error("❌ Erro técnico na busca:", e.message);
+        console.error("❌ Erro técnico geral na busca:", e.message);
         return null;
     }
+}
+
+// Função auxiliar (mantenha ou adicione se não tiver)
+function checarSeAchou(response) {
+    if (response.data && response.data.data && response.data.data.length > 0) {
+        console.log(`✅ ACHEI! ID: ${response.data.data[0].id} - Nome: ${response.data.data[0].nome}`);
+        return true;
+    }
+    return false;
 }
 
 // Função auxiliar para ver se o Tiny devolveu algo

@@ -2108,8 +2108,26 @@ async function buscarClientePorCPF(cpf, token) {
 }
 
 async function criarClienteNoTiny(dadosCliente, token) {
+    // 1. Limpeza do CPF
     const cpfLimpo = (dadosCliente.documento || dadosCliente.cpf || '').replace(/\D/g, '');
 
+    // 2. 🛡️ FILTRO DE CORREÇÃO (O que faltava no seu servidor)
+    let cidadeLimpa = dadosCliente.cidade;
+    let ufLimpa = dadosCliente.uf;
+
+    // Se vier escrito "Cidade" ou estiver vazio -> Trocamos para Maceió
+    if (!cidadeLimpa || cidadeLimpa.trim().toLowerCase() === "cidade") {
+        console.log("🔧 MUDANÇA AUTOMÁTICA: Trocando 'Cidade' por 'Maceio'");
+        cidadeLimpa = "Maceio";
+    }
+
+    // Se vier escrito "UF" ou estiver vazio -> Trocamos para AL
+    if (!ufLimpa || ufLimpa.trim().toLowerCase() === "uf") {
+        console.log("🔧 MUDANÇA AUTOMÁTICA: Trocando 'UF' por 'AL'");
+        ufLimpa = "AL";
+    }
+
+    // 3. Montagem do Payload
     const payloadCliente = {
         "nome": dadosCliente.nome,
         "tipoPessoa": cpfLimpo.length > 11 ? 'J' : 'F',
@@ -2119,15 +2137,17 @@ async function criarClienteNoTiny(dadosCliente, token) {
             "numero": dadosCliente.numero || "0",
             "bairro": dadosCliente.bairro || "Centro",
             "cep": (dadosCliente.cep || "00000000").replace(/\D/g, ''),
-            "cidade": dadosCliente.cidade || "Maceio",
-            "uf": dadosCliente.uf || "AL",
+            "cidade": cidadeLimpa, // <--- Agora vai Maceio
+            "uf": ufLimpa,         // <--- Agora vai AL
             "pais": "Brasil"
         },
         "situacao": "A"
     };
 
     try {
-        console.log("📤 TENTANDO CRIAR CLIENTE...");
+        // MUDEI O LOG PARA VOCÊ SABER QUE ATUALIZOU
+        console.log("📤 TENTATIVA FINAL HIBRIDA - Payload:", JSON.stringify(payloadCliente.endereco, null, 2));
+        
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/contatos`,
             payloadCliente,
@@ -2137,25 +2157,16 @@ async function criarClienteNoTiny(dadosCliente, token) {
         return response.data.data?.id || response.data.id;
 
     } catch (error) {
-        // --- 🤖 AQUI ESTÁ A INTELIGÊNCIA ARTIFICIAL DO CÓDIGO ---
+        // 4. Lida com CPF Duplicado
+        const mensagemErro = JSON.stringify(error.response?.data || "").toLowerCase();
         
-        const mensagemErro = JSON.stringify(error.response?.data || "");
-        
-        // Se o erro for "JÁ EXISTE", nós buscamos o ID em vez de desistir
-        if (mensagemErro.includes("já existe") || mensagemErro.includes("ja existe")) {
-            console.log("⚠️ Cliente já existe! Buscando o ID dele...");
-            
-            // Chama a função de busca para recuperar o ID do cliente antigo
+        if (mensagemErro.includes("existe")) {
+            console.log("⚠️ Cliente já existe! Buscando ID...");
             const idResgatado = await buscarClientePorCPF(cpfLimpo, token);
-            
-            if (idResgatado) {
-                console.log("✅ ID Recuperado com sucesso:", idResgatado);
-                return idResgatado;
-            }
+            if (idResgatado) return idResgatado;
         }
 
-        // Se for outro erro (ex: CNPJ inválido), aí sim estoura o erro
-        console.error("❌ ERRO REAL NO TINY:", mensagemErro);
+        console.error("❌ ERRO TINY:", mensagemErro);
         throw error; 
     }
 }

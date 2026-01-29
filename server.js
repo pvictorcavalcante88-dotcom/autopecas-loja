@@ -2039,21 +2039,30 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             // 2. A MÁGICA: Se o ID for "Curto" (menos de 6 dígitos), é ID do Site!
             // O ID do Tiny sempre é gigante (ex: 337204975)
             if (idFinal && String(idFinal).length < 6) {
-                console.log(`   🕵️ ID ${idFinal} é curto (ID do Site). Buscando o TinyID no banco...`);
+                console.log(`   🕵️ ID ${idFinal} é curto. Buscando TinyID no banco...`);
                 
                 try {
-                    const produtoBanco = await prisma.product.findUnique({
-                        where: { id: parseInt(idFinal) }
-                    });
+                    // TENTATIVA 1: Tenta buscar como 'produto' (Portugues)
+                    // Se o seu schema for 'model Produto', isso vai funcionar
+                    let produtoBanco = null;
+                    
+                    if (prisma.produto) {
+                        produtoBanco = await prisma.produto.findUnique({ where: { id: parseInt(idFinal) } });
+                    } else if (prisma.product) {
+                        // TENTATIVA 2: Tenta buscar como 'product' (Ingles)
+                        produtoBanco = await prisma.product.findUnique({ where: { id: parseInt(idFinal) } });
+                    } else {
+                        throw new Error("Não encontrei a tabela 'produto' nem 'product' no Prisma!");
+                    }
 
                     if (produtoBanco && produtoBanco.tinyId) {
                         console.log(`   ✅ ENCONTRADO! Trocando ${idFinal} por ${produtoBanco.tinyId}`);
-                        idFinal = produtoBanco.tinyId; // <--- AQUI A GENTE CONSERTA
+                        idFinal = produtoBanco.tinyId;
                     } else {
-                        console.log(`   ❌ Produto ID ${idFinal} não tem tinyId no banco.`);
+                        console.log(`   ❌ Produto ID ${idFinal} não tem tinyId no banco ou não existe.`);
                     }
                 } catch (e) {
-                    console.error("   ❌ Erro ao consultar banco:", e.message);
+                    console.error("   ❌ Erro técnico no Prisma:", e.message);
                 }
             }
 

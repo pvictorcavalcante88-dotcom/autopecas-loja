@@ -125,13 +125,34 @@ document.addEventListener("DOMContentLoaded", async function() {
 
     const paramsURL = new URLSearchParams(window.location.search);
     const restoreData = paramsURL.get('restore'); 
+
     if (restoreData) {
         try {
             const jsonLimpo = decodeURIComponent(restoreData);
             const itensResgatados = JSON.parse(jsonLimpo);
-            if (Array.isArray(itensResgatados)) localStorage.setItem('nossoCarrinho', JSON.stringify(itensResgatados));
+            
+            if (Array.isArray(itensResgatados)) {
+                // ✅ CORREÇÃO: Mapeamos garantindo que o preço e nome voltem para o carrinho
+                const carrinhoParaSalvar = itensResgatados.map(item => ({
+                    id: item.id,
+                    quantidade: item.quantidade,
+                    customMargin: item.customMargin,
+                    preco: item.preco, // Recupera o valor que veio no link
+                    nome: item.nome    // Recupera o nome
+                }));
+
+                localStorage.setItem('nossoCarrinho', JSON.stringify(carrinhoParaSalvar));
+            }
+            
+            // Limpa a URL para o link não ficar gigante na barra de endereços
             window.history.replaceState({}, document.title, window.location.pathname);
-        } catch (e) { console.error("Erro link:", e); }
+            
+            // Recarrega a página para o checkout ler o novo carrinho salvo
+            window.location.reload(); 
+
+        } catch (e) { 
+            console.error("Erro ao restaurar link:", e); 
+        }
     }
 
     atualizarIconeCarrinho();
@@ -814,8 +835,18 @@ function formatarMoeda(valor) {
 }
 
 function gerarPayloadUrl() {
+    // Pega os itens que estão na memória do checkout
     const itens = window.ITENS_CHECKOUT || [];
-    const payload = itens.map(i => ({ id: i.id, quantidade: i.qtd, customMargin: i.customMargin }));
+    
+    // ✅ CORREÇÃO: Adicionamos 'preco' e 'nome' ao link
+    const payload = itens.map(i => ({ 
+        id: i.id, 
+        quantidade: i.qtd, 
+        customMargin: i.customMargin,
+        preco: i.unitario, // Valor calculado com margem que o cliente deve pagar
+        nome: i.nome       // Evita o erro "Sem Nome" no log
+    }));
+    
     return encodeURIComponent(JSON.stringify(payload));
 }
 

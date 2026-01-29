@@ -2001,68 +2001,79 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 
 // ==========================================
 // ROTA PRINCIPAL: CHECKOUT (ATUALIZADA)
-// ==========================================
-// ROTA INTELIGENTE: BUSCA O TINY_ID NO BANCO ANTES DE ENVIAR
 app.post('/admin/tiny/criar-pedido', async (req, res) => {
     try {
         const tokenFinal = await getValidToken();
         const { itensCarrinho, cliente, valorFrete } = req.body;
 
-        console.log("🚀 Recebido pedido do site:", cliente.nome);
+        console.log("🚀 INICIANDO PEDIDO PARA:", cliente.nome);
 
-        // 1. Busca/Cria Cliente (Seu código que já funciona)
+        // --- 1. RESOLVE O CLIENTE (Já está funcionando) ---
         let idClienteFinal = null;
         if (cliente.documento || cliente.cpf) {
-            const doc = cliente.documento || cliente.cpf;
-            idClienteFinal = await buscarClientePorCPF(doc, tokenFinal);
+            idClienteFinal = await buscarClientePorCPF(cliente.documento || cliente.cpf, tokenFinal);
         }
-        await sleep(1000);
-
+        
         if (!idClienteFinal) {
+            console.log("⚠️ Cliente não achado na busca, tentando criar...");
+            await sleep(1000);
             idClienteFinal = await criarClienteNoTiny(cliente, tokenFinal);
             await sleep(1000);
         }
 
         if (!idClienteFinal) {
-            return res.status(500).json({ erro: "Falha fatal: Não consegui obter um ID para o cliente." });
+            return res.status(500).json({ erro: "FALHA CRÍTICA: Cliente não identificado." });
         }
+        console.log("✅ Cliente resolvido ID:", idClienteFinal);
 
-        // 2. MONTAGEM DOS ITENS (AQUI ESTÁ A MÁGICA 🪄)
-        // Usamos Promise.all para buscar no banco todos os produtos ao mesmo tempo
-        const itensFormatados = await Promise.all(itensCarrinho.map(async (prod) => {
-            
-            // Passo A: Tenta ver se o ID já veio do front (caso você atualize o site depois)
-            let idParaTiny = prod.id_tiny || prod.tinyId;
 
-            // Passo B: Se não veio, BUSCA NO BANCO DE DADOS (PRISMA)
-            if (!idParaTiny) {
-                console.log(`🔎 Buscando tinyId no banco para o produto ID Site: ${prod.id}...`);
+        // --- 2. RESOLVE OS ITENS (AQUI ESTÁ O FIX) ---
+        console.log("🔎 INICIANDO TRADUÇÃO DOS ITENS...");
+
+        const itensFormatados = await Promise.all(itensCarrinho.map(async (prod, index) => {
+            console.log(`\n📦 Processando Item ${index + 1}: ${prod.nome} (ID Site: ${prod.id})`);
+
+            // Tenta pegar o ID se já vier pronto do front
+            let idFinalTiny = prod.id_tiny || prod.tinyId;
+
+            // Se não veio, busca no banco (PRISMA)
+            if (!idFinalTiny) {
+                console.log(`   🔸 ID Tiny não veio do front. Buscando no banco pelo ID ${prod.id}...`);
                 
-                // Busca no banco pelo ID do site (converte para int se precisar)
-                const produtoNoBanco = await prisma.product.findUnique({
-                    where: { id: parseInt(prod.id) } 
-                });
+                try {
+                    // IMPORTANTE: parseInt para garantir que busca número, não texto
+                    const produtoBanco = await prisma.product.findUnique({
+                        where: { id: parseInt(prod.id) }
+                    });
 
-                if (produtoNoBanco && produtoNoBanco.tinyId) {
-                    idParaTiny = produtoNoBanco.tinyId;
-                    console.log(`✅ Encontrado no banco! ID Site ${prod.id} = TinyID ${idParaTiny}`);
+                    if (produtoBanco) {
+                        console.log(`   ✅ Achei no banco! TinyID é: ${produtoBanco.tinyId}`);
+                        idFinalTiny = produtoBanco.tinyId;
+                    } else {
+                        console.log(`   ❌ Produto ID ${prod.id} NÃO EXISTE no banco de dados local.`);
+                    }
+                } catch (err) {
+                    console.error(`   ❌ Erro ao buscar no Prisma:`, err.message);
                 }
+            } else {
+                console.log(`   ✅ Veio direto do Front: ${idFinalTiny}`);
             }
 
-            // Se mesmo buscando no banco não achar, avisa o erro
-            if (!idParaTiny) {
-                console.error(`🚨 ERRO CRÍTICO: Produto ${prod.nome} (ID Site: ${prod.id}) não tem tinyId cadastrado no banco!`);
-                // Opcional: Mandar um ID genérico ou falhar
+            // SE AINDA ASSIM ESTIVER VAZIO, A GENTE TENTA UMA ÚLTIMA SALVAÇÃO
+            // (Mandar o próprio ID do site e torcer, ou falhar com log claro)
+            if (!idFinalTiny) {
+                console.warn(`   ⚠️ PERIGO: Item indo SEM ID DO TINY. O pedido vai falhar.`);
             }
 
             return {
-                produto: { id: idParaTiny }, // Agora vai o ID certo (337...)
+                produto: { id: idFinalTiny }, // Se for null/undefined aqui, o Tiny rejeita
                 quantidade: prod.quantidade,
                 valorUnitario: parseFloat(prod.preco || 0.01)
             };
         }));
 
-        // 3. Cria o Pedido
+
+        // --- 3. ENVIA O PEDIDO ---
         const payloadPedido = {
             data: new Date().toISOString().split('T')[0],
             idContato: idClienteFinal,
@@ -2073,13 +2084,14 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             situacao: 0
         };
 
+        console.log("📤 ENVIANDO PEDIDO PRO TINY...");
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/pedidos`, 
             payloadPedido,
             { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
         );
 
-        console.log("✅ Pedido Tiny criado: " + response.data.data?.numero);
+        console.log("🎉 SUCESSO! Pedido criado: " + response.data.data?.numero);
         res.json({ sucesso: true, numero: response.data.data?.numero });
 
     } catch (error) {

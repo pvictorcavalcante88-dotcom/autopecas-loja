@@ -53,47 +53,53 @@ function adicionarAoCarrinho(id, qtd) {
     let item = c.find(p => p.id == id);
     const margemInicial = parseFloat(localStorage.getItem('minhaMargem') || 0);
 
-    // 🎯 Captura o preço usando o ID exato do seu HTML
+    // 1. CAPTURA O TÍTULO (Para não ficar "Sem Nome")
+    const elementoTitulo = document.getElementById('prod-title');
+    const nomeProduto = elementoTitulo ? elementoTitulo.innerText.trim() : "Produto sem nome";
+
+    // 2. CAPTURA O PREÇO (Para não ficar R$ 0.00)
     const elementoPreco = document.getElementById('prod-price');
-    
-    // Se o elemento existe, pegamos o texto dele, senão usamos "0"
     const precoTexto = elementoPreco ? elementoPreco.innerText : "0";
     
-    // Limpa o "R$" e a vírgula para transformar em número (187.50)
+    // 3. LIMPA E CONVERTE
     const precoLimpo = limparPrecoBR(precoTexto);
 
-    console.log("🔍 Diagnóstico de Adição:");
-    console.log("   - Texto no HTML:", precoTexto);
-    console.log("   - Valor para o Banco:", precoLimpo);
+    console.log("🔍 DIAGNÓSTICO DE ADIÇÃO:");
+    console.log("   - Nome capturado:", nomeProduto);
+    console.log("   - Preço capturado:", precoTexto, " -> Limpo:", precoLimpo);
 
     if (item) {
         item.quantidade = (item.quantidade || 1) + qtd;
-        item.preco = precoLimpo; // Atualiza o preço base
+        item.preco = precoLimpo; 
+        item.nome = nomeProduto;
     } else {
         c.push({ 
             id: parseInt(id), 
             quantidade: qtd, 
             preco: precoLimpo, 
+            nome: nomeProduto,
             customMargin: margemInicial 
         });
     }
     
     localStorage.setItem('nossoCarrinho', JSON.stringify(c));
     atualizarIconeCarrinho();
-    alert("Adicionado ao carrinho!");
+    alert(`✅ ${nomeProduto} adicionado ao carrinho!`);
 }
 
 // Certifique-se de que a função de limpeza está no seu arquivo:
 function limparPrecoBR(valor) {
     if (!valor) return 0;
     if (typeof valor === 'number') return valor;
-    // Remove R$, espaços não-quebráveis (&nbsp;), pontos e troca vírgula por ponto
+    
     let limpo = valor.toString()
-                     .replace(/R\$/g, '')
-                     .replace(/\u00a0/g, '') // Remove o &nbsp;
-                     .replace(/\./g, '')    // Remove ponto de milhar
-                     .replace(',', '.')     // Troca vírgula por ponto
+                     .replace(/R\$/g, '')    // Remove o R$
+                     .replace(/\u00a0/g, '') // REMOVE O &nbsp; (O GRANDE VILÃO)
+                     .replace(/\s/g, '')     // Remove espaços comuns
+                     .replace(/\./g, '')     // Remove ponto de milhar
+                     .replace(',', '.')      // Troca vírgula por ponto
                      .trim();
+    
     return parseFloat(limpo) || 0;
 }
 

@@ -2088,21 +2088,32 @@ app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
 // ==========================================
 
 
+// ==========================================
+// FUNÇÃO DE BUSCA CORRIGIDA (TINY V3)
+// ==========================================
 async function buscarClientePorCPF(cpf, token) {
     try {
         const cpfLimpo = cpf.replace(/\D/g, '');
-        // Na V3 a busca costuma ser via parâmetros de filtro
+        console.log(`🔎 Buscando no Tiny por CPF: ${cpfLimpo}`);
+
+        // NA V3, o parâmetro é cpf_cnpj
         const response = await axios.get(
             `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfLimpo}`,
             { headers: { 'Authorization': `Bearer ${token}` } }
         );
-        
-        if (response.data.data && response.data.data.length > 0) {
-            console.log(`🔎 Cliente encontrado: ${response.data.data[0].nome} (ID: ${response.data.data[0].id})`);
-            return response.data.data[0].id;
+
+        // O Tiny V3 retorna { data: [ { id: 123, ... } ] }
+        if (response.data && response.data.data && response.data.data.length > 0) {
+            const idEncontrado = response.data.data[0].id;
+            console.log(`✅ ID RECUPERADO: ${idEncontrado}`);
+            return idEncontrado;
         }
+
+        console.log("❌ Cliente não encontrado na busca (estranho, pois deu erro de duplicidade).");
         return null;
+
     } catch (e) {
+        console.error("❌ Erro técnico na busca por CPF:", e.message);
         return null;
     }
 }
@@ -2161,12 +2172,20 @@ async function criarClienteNoTiny(dadosCliente, token) {
         const mensagemErro = JSON.stringify(error.response?.data || "").toLowerCase();
         
         if (mensagemErro.includes("existe")) {
-            console.log("⚠️ Cliente já existe! Buscando ID...");
+            console.log("⚠️ Cliente já existe! Iniciando resgate de ID...");
+            
+            // Chama a função nova que colei acima
             const idResgatado = await buscarClientePorCPF(cpfLimpo, token);
-            if (idResgatado) return idResgatado;
+            
+            if (idResgatado) {
+                console.log("🔄 ID RESGATADO COM SUCESSO! Usando ID:", idResgatado);
+                return idResgatado; // <--- AQUI O PEDIDO É SALVO!
+            } else {
+                console.log("❌ Falha crítica: O Tiny diz que existe, mas a busca não achou.");
+            }
         }
 
-        console.error("❌ ERRO TINY:", mensagemErro);
+        console.error("❌ ERRO TINY (Final):", mensagemErro);
         throw error; 
     }
 }

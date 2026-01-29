@@ -1061,12 +1061,14 @@ async function finalizarCompraAsaas() {
                               : margemGlobal;
 
             let precoBase = parseFloat(i.preco || i.preco_novo || 0);
-            let precoComMargem = precoBase * (1 + (margemFinal / 100));                
+            let precoComMargem = precoBase * (1 + (margemFinal / 100));  
+            if (precoComMargem <= 0) precoComMargem = 0.01;              
             
             return { 
                 id: i.id, 
+                id_tiny: i.id_tiny || i.id, // Garante ID do Tiny
                 quantidade: i.quantidade,
-                preco: precoComMargem,
+                preco: precoComMargem.toFixed(2),
                 customMargin: parseFloat(margemFinal)
             };
         });

@@ -2034,7 +2034,7 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
         const itensFormatados = itensCarrinho.map(prod => ({
             produto: { id: prod.id_tiny },
             quantidade: prod.quantidade,
-            valorUnitario: prod.preco
+            valorUnitario: parseFloat(prod.preco || 0.01)
         }));
 
         // 4. Cria o Pedido
@@ -2089,52 +2089,74 @@ app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
 
 
 // ==========================================
-// FUNÇÃO DE BUSCA PACIENTE (Evita erro 429)
+// FUNÇÃO DE BUSCA "VALE TUDO" (3 TENTATIVAS)
 // ==========================================
 async function buscarClientePorCPF(cpf, token) {
     const cpfLimpo = cpf.replace(/\D/g, '');
-    
-    // Formata CPF: 000.000.000-00
     const formatarCPF = (v) => v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
     const cpfComMascara = formatarCPF(cpfLimpo);
 
+    // Função interna para validar se o retorno é bom
+    const achou = (res) => (res.data && res.data.data && res.data.data.length > 0);
+
     try {
-        // --- TENTATIVA 1: CPF FORMATADO (A mais provável) ---
-        console.log(`🔎 TENTATIVA 1: Buscando CPF com Máscara: ${cpfComMascara}`);
+        // --- TENTATIVA 1: CPF COM MÁSCARA (Filtro Exato) ---
+        console.log(`🔎 TENTATIVA 1: Filtro CPF Formatado: ${cpfComMascara}`);
         try {
-            let response = await axios.get(
+            let res = await axios.get(
                 `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfComMascara}`,
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
-            if (checarSeAchou(response)) return response.data.data[0].id;
-        } catch (err) {
-            console.log("⚠️ Falha na Tentativa 1 (provável 429 ou não achou).");
-        }
+            if (achou(res)) {
+                console.log(`✅ ACHEI NA TENTATIVA 1! ID: ${res.data.data[0].id}`);
+                return res.data.data[0].id;
+            }
+        } catch (e) { console.log("⚠️ Falha tentativa 1"); }
 
-        // 🛑 PAUSA DE 2 SEGUNDOS PARA ACALMAR O TINY 🛑
-        await sleep(2000); 
+        // --- PAUSA PARA RESPIRAR (Evita 429) ---
+        await new Promise(r => setTimeout(r, 1500)); 
 
-        // --- TENTATIVA 2: CPF LIMPO ---
-        console.log(`🔎 TENTATIVA 2: Buscando CPF Limpo: ${cpfLimpo}`);
+        // --- TENTATIVA 2: CPF LIMPO (Filtro Exato) ---
+        console.log(`🔎 TENTATIVA 2: Filtro CPF Limpo: ${cpfLimpo}`);
         try {
-            let response = await axios.get(
+            let res = await axios.get(
                 `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfLimpo}`,
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
-            if (checarSeAchou(response)) return response.data.data[0].id;
-        } catch (err) {
-            console.log("⚠️ Falha na Tentativa 2.");
-        }
+            if (achou(res)) {
+                console.log(`✅ ACHEI NA TENTATIVA 2! ID: ${res.data.data[0].id}`);
+                return res.data.data[0].id;
+            }
+        } catch (e) { console.log("⚠️ Falha tentativa 2"); }
 
-        console.log("❌ DESISTO: Tentei com e sem máscara e não retornou o ID.");
+        // --- PAUSA PARA RESPIRAR ---
+        await new Promise(r => setTimeout(r, 1500));
+
+        // --- TENTATIVA 3: A ARMA SECRETA (PESQUISA GERAL) ---
+        // Aqui ele busca em TUDO (Nome, CPF, Fantasia, Obs...)
+        console.log(`🔎 TENTATIVA 3: Busca Geral (Pesquisa): ${cpfLimpo}`);
+        try {
+            let res = await axios.get(
+                `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${cpfLimpo}`,
+                { headers: { 'Authorization': `Bearer ${token}` } }
+            );
+            
+            // Na pesquisa geral, precisamos conferir se o CPF bate, pois ele pode achar pelo telefone parecido
+            if (achou(res)) {
+                const cliente = res.data.data[0];
+                console.log(`✅ ACHEI NA GERAL! ID: ${cliente.id} - Nome: ${cliente.nome}`);
+                return cliente.id;
+            }
+        } catch (e) { console.log("⚠️ Falha tentativa 3"); }
+
+        console.log("❌ DESISTO REAL: O cliente é um fantasma.");
         return null;
 
     } catch (e) {
-        console.error("❌ Erro técnico geral na busca:", e.message);
+        console.error("❌ Erro técnico:", e.message);
         return null;
     }
 }
-
 // Função auxiliar (mantenha ou adicione se não tiver)
 function checarSeAchou(response) {
     if (response.data && response.data.data && response.data.data.length > 0) {

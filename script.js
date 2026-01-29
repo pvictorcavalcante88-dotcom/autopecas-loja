@@ -26,6 +26,7 @@ const LISTA_CARROS = [
 
 ];
 
+
 // --- FUNÇÕES UTILITÁRIAS ---
 function formatarMoeda(valor) {
     if (valor == null || isNaN(valor)) return 'R$ 0,00';
@@ -52,15 +53,43 @@ function adicionarAoCarrinho(id, qtd) {
     let item = c.find(p => p.id == id);
     const margemInicial = parseFloat(localStorage.getItem('minhaMargem') || 0);
 
+    // 🕵️ O SEGREDO ESTÁ AQUI: Pegar o preço que aparece na tela
+    // Procure o elemento que contém o preço (ajuste o seletor .price se necessário)
+    const precoElemento = document.querySelector('.price') || document.querySelector('#preco-produto');
+    const precoTexto = precoElemento ? precoElemento.innerText : "0";
+    
+    // Usa a função de limpeza que conversamos antes
+    const precoLimpo = limparPrecoBR(precoTexto);
+
     if (item) {
         item.quantidade = (item.quantidade || 1) + qtd;
+        // Atualiza o preço também, caso tenha mudado
+        item.preco = precoLimpo; 
     } else {
-        c.push({ id: parseInt(id), quantidade: qtd, customMargin: margemInicial });
+        // ✅ Agora salvamos o PREÇO junto com o ID
+        c.push({ 
+            id: parseInt(id), 
+            quantidade: qtd, 
+            preco: precoLimpo, // Salva o valor numérico (ex: 150.00)
+            customMargin: margemInicial 
+        });
     }
     
     localStorage.setItem('nossoCarrinho', JSON.stringify(c));
     atualizarIconeCarrinho();
     alert("Adicionado ao carrinho!");
+}
+
+// ⬇️ Não esqueça de ter essa função auxiliar no seu script.js ⬇️
+function limparPrecoBR(valor) {
+    if (!valor) return 0;
+    if (typeof valor === 'number') return valor;
+    let limpo = valor.toString()
+                     .replace('R$', '')
+                     .replace(/\./g, '') 
+                     .replace(',', '.')  
+                     .trim();
+    return parseFloat(limpo) || 0;
 }
 
 // ==============================================================

@@ -2027,46 +2027,43 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
         console.log("✅ Cliente resolvido ID:", idClienteFinal);
 
 
-        // --- 2. RESOLVE OS ITENS (AQUI ESTÁ O FIX) ---
-        console.log("🔎 INICIANDO TRADUÇÃO DOS ITENS...");
+       // --- 2. RESOLVE OS ITENS (COM CORREÇÃO AUTOMÁTICA DE ID) ---
+        console.log("🔎 PROCESSANDO ITENS...");
 
         const itensFormatados = await Promise.all(itensCarrinho.map(async (prod, index) => {
-            console.log(`\n📦 Processando Item ${index + 1}: ${prod.nome} (ID Site: ${prod.id})`);
+            // 1. Pega o ID que veio (seja id_tiny, tinyId ou id normal)
+            let idFinal = prod.id_tiny || prod.tinyId || prod.id;
 
-            // Tenta pegar o ID se já vier pronto do front
-            let idFinalTiny = prod.id_tiny || prod.tinyId;
+            console.log(`📦 Item ${index + 1}: Recebi ID ${idFinal}`);
 
-            // Se não veio, busca no banco (PRISMA)
-            if (!idFinalTiny) {
-                console.log(`   🔸 ID Tiny não veio do front. Buscando no banco pelo ID ${prod.id}...`);
+            // 2. A MÁGICA: Se o ID for "Curto" (menos de 6 dígitos), é ID do Site!
+            // O ID do Tiny sempre é gigante (ex: 337204975)
+            if (idFinal && String(idFinal).length < 6) {
+                console.log(`   🕵️ ID ${idFinal} é curto (ID do Site). Buscando o TinyID no banco...`);
                 
                 try {
-                    // IMPORTANTE: parseInt para garantir que busca número, não texto
                     const produtoBanco = await prisma.product.findUnique({
-                        where: { id: parseInt(prod.id) }
+                        where: { id: parseInt(idFinal) }
                     });
 
-                    if (produtoBanco) {
-                        console.log(`   ✅ Achei no banco! TinyID é: ${produtoBanco.tinyId}`);
-                        idFinalTiny = produtoBanco.tinyId;
+                    if (produtoBanco && produtoBanco.tinyId) {
+                        console.log(`   ✅ ENCONTRADO! Trocando ${idFinal} por ${produtoBanco.tinyId}`);
+                        idFinal = produtoBanco.tinyId; // <--- AQUI A GENTE CONSERTA
                     } else {
-                        console.log(`   ❌ Produto ID ${prod.id} NÃO EXISTE no banco de dados local.`);
+                        console.log(`   ❌ Produto ID ${idFinal} não tem tinyId no banco.`);
                     }
-                } catch (err) {
-                    console.error(`   ❌ Erro ao buscar no Prisma:`, err.message);
+                } catch (e) {
+                    console.error("   ❌ Erro ao consultar banco:", e.message);
                 }
-            } else {
-                console.log(`   ✅ Veio direto do Front: ${idFinalTiny}`);
             }
 
-            // SE AINDA ASSIM ESTIVER VAZIO, A GENTE TENTA UMA ÚLTIMA SALVAÇÃO
-            // (Mandar o próprio ID do site e torcer, ou falhar com log claro)
-            if (!idFinalTiny) {
-                console.warn(`   ⚠️ PERIGO: Item indo SEM ID DO TINY. O pedido vai falhar.`);
+            // 3. Verifica se sobrou algum ID válido
+            if (!idFinal) {
+                console.warn("   ⚠️ PERIGO: Item sem ID. O Tiny vai rejeitar.");
             }
 
             return {
-                produto: { id: idFinalTiny }, // Se for null/undefined aqui, o Tiny rejeita
+                produto: { id: idFinal }, // Agora vai o 337...
                 quantidade: prod.quantidade,
                 valorUnitario: parseFloat(prod.preco || 0.01)
             };

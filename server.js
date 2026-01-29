@@ -2002,6 +2002,7 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 // ==========================================
 // ROTA PRINCIPAL: CHECKOUT (ATUALIZADA)
 // ==========================================
+// ROTA INTELIGENTE: BUSCA O TINY_ID NO BANCO ANTES DE ENVIAR
 app.post('/admin/tiny/criar-pedido', async (req, res) => {
     try {
         const tokenFinal = await getValidToken();
@@ -2009,19 +2010,15 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
 
         console.log("🚀 Recebido pedido do site:", cliente.nome);
 
+        // 1. Busca/Cria Cliente (Seu código que já funciona)
         let idClienteFinal = null;
-
-        // 1. Busca Cliente por CPF
         if (cliente.documento || cliente.cpf) {
             const doc = cliente.documento || cliente.cpf;
             idClienteFinal = await buscarClientePorCPF(doc, tokenFinal);
         }
+        await sleep(1000);
 
-        await sleep(1000); // Pausa para não bloquear a API
-
-        // 2. Se não achou, CRIA (Com os dados novos!)
         if (!idClienteFinal) {
-            // AQUI ESTAVA O PROBLEMA: Precisamos garantir que cidade, bairro, etc cheguem aqui
             idClienteFinal = await criarClienteNoTiny(cliente, tokenFinal);
             await sleep(1000);
         }
@@ -2030,24 +2027,42 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             return res.status(500).json({ erro: "Falha fatal: Não consegui obter um ID para o cliente." });
         }
 
-        // 3. Monta os Itens
-        // 3. Monta os Itens (COM PROTEÇÃO DE ID)
-        const itensFormatados = itensCarrinho.map(prod => {
-            // Tenta pegar o ID do Tiny de várias formas para não falhar
-            const idDoProdutoNoTiny = prod.id_tiny || prod.tinyId || prod.id;
+        // 2. MONTAGEM DOS ITENS (AQUI ESTÁ A MÁGICA 🪄)
+        // Usamos Promise.all para buscar no banco todos os produtos ao mesmo tempo
+        const itensFormatados = await Promise.all(itensCarrinho.map(async (prod) => {
+            
+            // Passo A: Tenta ver se o ID já veio do front (caso você atualize o site depois)
+            let idParaTiny = prod.id_tiny || prod.tinyId;
 
-            if (!idDoProdutoNoTiny) {
-                console.warn("⚠️ ALERTA: Produto sendo enviado sem ID para o Tiny:", prod);
+            // Passo B: Se não veio, BUSCA NO BANCO DE DADOS (PRISMA)
+            if (!idParaTiny) {
+                console.log(`🔎 Buscando tinyId no banco para o produto ID Site: ${prod.id}...`);
+                
+                // Busca no banco pelo ID do site (converte para int se precisar)
+                const produtoNoBanco = await prisma.product.findUnique({
+                    where: { id: parseInt(prod.id) } 
+                });
+
+                if (produtoNoBanco && produtoNoBanco.tinyId) {
+                    idParaTiny = produtoNoBanco.tinyId;
+                    console.log(`✅ Encontrado no banco! ID Site ${prod.id} = TinyID ${idParaTiny}`);
+                }
+            }
+
+            // Se mesmo buscando no banco não achar, avisa o erro
+            if (!idParaTiny) {
+                console.error(`🚨 ERRO CRÍTICO: Produto ${prod.nome} (ID Site: ${prod.id}) não tem tinyId cadastrado no banco!`);
+                // Opcional: Mandar um ID genérico ou falhar
             }
 
             return {
-                produto: { id: idDoProdutoNoTiny }, // Agora usa a variável segura
+                produto: { id: idParaTiny }, // Agora vai o ID certo (337...)
                 quantidade: prod.quantidade,
                 valorUnitario: parseFloat(prod.preco || 0.01)
             };
-        });
+        }));
 
-        // 4. Cria o Pedido
+        // 3. Cria o Pedido
         const payloadPedido = {
             data: new Date().toISOString().split('T')[0],
             idContato: idClienteFinal,

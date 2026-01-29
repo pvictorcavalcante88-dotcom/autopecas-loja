@@ -2111,6 +2111,20 @@ async function criarClienteNoTiny(dadosCliente, token) {
     try {
         const cpfLimpo = (dadosCliente.documento || dadosCliente.cpf || '').replace(/\D/g, '');
         
+        // --- 🛡️ FILTRO DE SEGURANÇA (NOVO) ---
+        // Se vier vazio, ou escrito "Cidade", ou "cidade", forçamos Maceió
+        let cidadeFinal = dadosCliente.cidade;
+        if (!cidadeFinal || cidadeFinal.toLowerCase() === "cidade") {
+            cidadeFinal = "Maceio"; // Força uma cidade válida
+        }
+
+        // Se vier vazio, ou escrito "UF", ou "uf", forçamos AL
+        let ufFinal = dadosCliente.uf;
+        if (!ufFinal || ufFinal.toLowerCase() === "uf") {
+            ufFinal = "AL"; // Força um estado válido
+        }
+        // -------------------------------------
+
         const payloadCliente = {
             "nome": dadosCliente.nome,
             "tipoPessoa": cpfLimpo.length > 11 ? 'J' : 'F',
@@ -2120,14 +2134,14 @@ async function criarClienteNoTiny(dadosCliente, token) {
                 "numero": dadosCliente.numero || "0",
                 "bairro": dadosCliente.bairro || "Centro",
                 "cep": (dadosCliente.cep || "00000000").replace(/\D/g, ''),
-                "cidade": dadosCliente.cidade || "Maceio", // <--- OBRIGATORIO: "cidade"
-                "uf": dadosCliente.uf || "AL",             // <--- OBRIGATORIO: "uf"
+                "cidade": cidadeFinal, // Usa a variável filtrada
+                "uf": ufFinal,         // Usa a variável filtrada
                 "pais": "Brasil"
             },
-            "situacao": "A" // <--- OBRIGATORIO: "situacao" (sem acento)
+            "situacao": "A"
         };
 
-        console.log("📤 ENVIANDO AGORA SEM ERRO:", JSON.stringify(payloadCliente, null, 2));
+        console.log("📤 PAYLOAD BLINDADO TINY:", JSON.stringify(payloadCliente, null, 2));
 
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/contatos`,

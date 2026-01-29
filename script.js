@@ -1002,21 +1002,24 @@ function calcularTotalVisual(carrinho) {
 async function finalizarCompraAsaas() {
     // 1. PEGAR DADOS DO FORMULÁRIO
     
-    const nome = document.getElementById('nome_cliente').value.trim(); 
+const nome = document.getElementById('nome_cliente').value.trim(); 
     const emailContato = document.getElementById('input-email-contato')?.value.trim() || '';
     const telefone = document.getElementById('input-telefone')?.value.trim() || '';
     const endereco = document.getElementById('rua').value.trim(); 
-    const numero = document.getElementById('numero')?.value.trim() || "S/N";
+    const numero = document.getElementById('numero')?.value.trim() || "0";
     const bairro = document.getElementById('input-bairro')?.value.trim() || "Centro";
     const cep = document.getElementById('cep')?.value.trim() || "00000000";
 
-    // --- 🔴 PROTEÇÃO CONTRA DADOS GENÉRICOS (A MUDANÇA ESTÁ AQUI) ---
-    const cidadeRaw = document.getElementById('input-cidade')?.value.trim();
-    const ufRaw = document.getElementById('uf')?.value.trim();
+    // --- 🟢 BLOQUEIO CONTRA DADOS GENÉRICOS ---
+    const cidadeInput = document.getElementById('input-cidade')?.value.trim();
+    const ufInput = document.getElementById('uf')?.value.trim();
 
-    // Se o usuário escreveu "Cidade", "UF" ou deixou vazio, usamos Maceió/AL como padrão de segurança
-    const cidade = (cidadeRaw && cidadeRaw.toLowerCase() !== "cidade") ? cidadeRaw : "Maceió";
-    const uf = (ufRaw && ufRaw.toLowerCase() !== "uf") ? ufRaw.toUpperCase() : "AL";
+    // Se o input vier como "Cidade", "" ou "UF", forçamos um valor real para o Tiny não rejeitar
+    const cidade = (cidadeInput && cidadeInput.toLowerCase() !== "cidade") ? cidadeInput : "Maceio";
+    const uf = (ufInput && ufInput.toLowerCase() !== "uf") ? ufInput.toUpperCase() : "AL";
+    // ------------------------------------------
+
+    // ... restante das validações de CPF e botões ...
     
 
     // Tenta pegar o CPF do campo de busca ou do input específico

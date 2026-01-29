@@ -2111,38 +2111,33 @@ async function criarClienteNoTiny(dadosCliente, token) {
     try {
         const cpfLimpo = (dadosCliente.documento || dadosCliente.cpf || '').replace(/\D/g, '');
         
-        // Criamos o objeto usando aspas para garantir que o JS não use nomes "espertos"
-        const enderecoObjeto = {
-            "endereco": dadosCliente.endereco || "Rua nao informada",
-            "numero": dadosCliente.numero || "0",
-            "bairro": dadosCliente.bairro || "Centro",
-            "cep": (dadosCliente.cep || "00000000").replace(/\D/g, ''),
-            "cidade": dadosCliente.cidade || "Maceio",
-            "uf": dadosCliente.uf || "AL",
-            "pais": "Brasil"
-        };
-
-        const payloadFinal = {
+        const payloadCliente = {
             "nome": dadosCliente.nome,
             "tipoPessoa": cpfLimpo.length > 11 ? 'J' : 'F',
             "cpfCnpj": cpfLimpo,
-            "endereco": enderecoObjeto,
-            "situacao": "A"
+            "endereco": {
+                "endereco": dadosCliente.endereco || "Rua nao informada",
+                "numero": dadosCliente.numero || "0",
+                "bairro": dadosCliente.bairro || "Centro",
+                "cep": (dadosCliente.cep || "00000000").replace(/\D/g, ''),
+                "cidade": dadosCliente.cidade || "Maceio", // <--- OBRIGATORIO: "cidade"
+                "uf": dadosCliente.uf || "AL",             // <--- OBRIGATORIO: "uf"
+                "pais": "Brasil"
+            },
+            "situacao": "A" // <--- OBRIGATORIO: "situacao" (sem acento)
         };
 
-        // Esse log vai te mostrar que agora NAO tem acento e NAO tem "His"
-        console.log("📤 PAYLOAD FINAL (SEM ACENTOS):", JSON.stringify(payloadFinal, null, 2));
+        console.log("📤 ENVIANDO AGORA SEM ERRO:", JSON.stringify(payloadCliente, null, 2));
 
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/contatos`,
-            payloadFinal,
+            payloadCliente,
             { headers: { 'Authorization': `Bearer ${token}` } }
         );
 
         return response.data.data?.id || response.data.id;
-
     } catch (error) {
-        console.error("❌ ERRO NO TINY:", JSON.stringify(error.response?.data || error.message));
+        console.error("❌ ERRO TINY:", JSON.stringify(error.response?.data || error.message));
         throw error; 
     }
 }

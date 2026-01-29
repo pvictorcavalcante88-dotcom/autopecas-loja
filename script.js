@@ -125,7 +125,7 @@ document.addEventListener("DOMContentLoaded", async function() {
 
     const paramsURL = new URLSearchParams(window.location.search);
     const restoreData = paramsURL.get('restore'); 
-
+    
     if (restoreData) {
         try {
             const jsonLimpo = decodeURIComponent(restoreData);
@@ -134,21 +134,25 @@ document.addEventListener("DOMContentLoaded", async function() {
             if (Array.isArray(itensResgatados)) {
                 const carrinhoParaSalvar = itensResgatados.map(item => ({
                     id: item.id,
-                    quantidade: item.quantidade,
-                    nome: item.nome,
-                    // ✅ O PREÇO VEM DO LINK
-                    preco: item.preco, 
-                    // ✅ FORÇAMOS A MARGEM EM 0% PARA NÃO SOMAR DE NOVO
-                    customMargin: 0 
+                    quantidade: item.q || item.quantidade,
+                    nome: item.n || item.nome,
+                    preco: item.p || item.preco, // ✅ Aqui ele pega o preço do link
+                    customMargin: 0 // ✅ Força margem zero para o cliente
                 }));
 
                 localStorage.setItem('nossoCarrinho', JSON.stringify(carrinhoParaSalvar));
-                // Define a margem global como 0 também para garantir
-                localStorage.setItem('minhaMargem', '0');
+                localStorage.setItem('minhaMargem', '0'); // Garante margem global zero
+                
+                console.log("✅ Carrinho Restaurado com Sucesso:", carrinhoParaSalvar);
             }
+            
+            // Limpa a URL e recarrega para aplicar as mudanças
             window.history.replaceState({}, document.title, window.location.pathname);
             window.location.reload(); 
-        } catch (e) { console.error("Erro link:", e); }
+            
+        } catch (e) { 
+            console.error("❌ Erro na restauração:", e); 
+        }
     }
 
     atualizarIconeCarrinho();
@@ -835,14 +839,13 @@ function gerarPayloadUrl() {
     
     const payload = itens.map(i => ({ 
         id: i.id, 
-        quantidade: i.qtd, 
-        nome: i.nome,
-        // ✅ Enviamos o preço unitário já com a sua margem aplicada
-        preco: i.unitario, 
-        // ✅ Enviamos a margem como 0 para o cliente
-        customMargin: 0 
+        q: i.qtd,          // Abreviei para o link não ficar gigante
+        m: 0,              // Margem zerada para o cliente não somar de novo
+        p: i.unitario,      // 'p' de Preço (Valor já com lucro)
+        n: i.nome          // 'n' de Nome
     }));
     
+    console.log("🔗 Gerando Link com estes dados:", payload);
     return encodeURIComponent(JSON.stringify(payload));
 }
 
@@ -1468,7 +1471,7 @@ document.addEventListener("DOMContentLoaded", () => {
             console.log("🆔 TinyID (Cru):", item.tinyId, "| id_tiny:", item.id_tiny);
 
             // Verifica Preços e Margens
-            let precoBase = parseFloat(item.preco || item.preco_novo || 0);
+            let precoBase = parseFloat(item.preco || 0);
             let margemItem = (item.customMargin !== undefined && item.customMargin !== null) ? parseFloat(item.customMargin) : margemGlobal;
             
             // O CÁLCULO REAL

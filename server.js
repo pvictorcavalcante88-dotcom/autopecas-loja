@@ -2107,39 +2107,31 @@ async function buscarClientePorCPF(cpf, token) {
     }
 }
 
-// ==========================================
-// FUNÇÃO DE CRIAR CLIENTE (CORRIGIDA - SEM O "His")
-// ==========================================
 async function criarClienteNoTiny(dadosCliente, token) {
     try {
         const cpfLimpo = (dadosCliente.documento || dadosCliente.cpf || '').replace(/\D/g, '');
         
-        // LOG PARA CONFERIR SE OS DADOS CHEGARAM
-        // Procure esta linha e mude o texto:
-        console.log("📝 TENTATIVA VERSÃO FINAL AGORA VAI - Dados:", dadosCliente.cidade, dadosCliente.bairro);
+        // Montando o endereço de forma ultra-limpa
+        const enderecoCompleto = {
+            endereco: dadosCliente.endereco || "Rua não informada",
+            numero: dadosCliente.numero || "S/N",
+            bairro: dadosCliente.bairro || "Centro",
+            cep: (dadosCliente.cep || "00000000").replace(/\D/g, ''),
+            cidade: dadosCliente.cidade || "Maceió", // CHAVE CORRETA: cidade
+            uf: dadosCliente.uf || "AL",
+            pais: "Brasil"
+        };
 
         const payloadCliente = {
             nome: dadosCliente.nome,
             tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
             cpfCnpj: cpfLimpo,
-            
-            endereco: {
-                endereco: dadosCliente.endereco, // Rua
-                numero: dadosCliente.numero || "S/N",
-                bairro: dadosCliente.bairro || "Centro",
-                cep: dadosCliente.cep ? dadosCliente.cep.replace(/\D/g, '') : "00000000",
-                
-                // AQUI ESTÁ A CORREÇÃO (Trocamos His por cidade)
-                cidade: dadosCliente.cidade || "Maceió", 
-                uf: dadosCliente.uf || "AL",
-                
-                pais: "Brasil"
-            },
-            
+            endereco: enderecoCompleto, // Usa o objeto que criamos acima
             situacao: "A" 
         };
 
-        console.log("📤 Enviando para Tiny:", JSON.stringify(payloadCliente, null, 2));
+        // Este log vai mostrar EXATAMENTE o que vai pro Tiny
+        console.log("📤 PAYLOAD REAL QUE VAI PRO TINY:", JSON.stringify(payloadCliente, null, 2));
 
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/contatos`,
@@ -2150,7 +2142,7 @@ async function criarClienteNoTiny(dadosCliente, token) {
         return response.data.data?.id || response.data.id;
 
     } catch (error) {
-        console.error("❌ Erro ao criar cliente:", JSON.stringify(error.response?.data || error.message));
+        console.error("❌ Erro detalhado no Tiny:", JSON.stringify(error.response?.data || error.message));
         throw error; 
     }
 }

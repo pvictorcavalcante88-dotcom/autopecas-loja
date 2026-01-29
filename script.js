@@ -1001,20 +1001,22 @@ function calcularTotalVisual(carrinho) {
 // 🟢 FUNÇÃO DE FINALIZAR COM ASAAS E TINY (ATUALIZADA)
 async function finalizarCompraAsaas() {
     // 1. PEGAR DADOS DO FORMULÁRIO
-    
-const nome = document.getElementById('nome_cliente').value.trim(); 
+// 1. CAPTURA DOS INPUTS (Usando IDs que conferimos antes)
+    const nome = document.getElementById('nome_cliente').value.trim(); 
     const emailContato = document.getElementById('input-email-contato')?.value.trim() || '';
     const telefone = document.getElementById('input-telefone')?.value.trim() || '';
     const endereco = document.getElementById('rua').value.trim(); 
-    const numero = document.getElementById('numero')?.value.trim() || "0";
-    const bairro = document.getElementById('input-bairro')?.value.trim() || "Centro";
-    const cep = document.getElementById('cep')?.value.trim() || "00000000";
-
-    // --- 🟢 BLOQUEIO CONTRA DADOS GENÉRICOS ---
+    const numero = document.getElementById('numero')?.value.trim();
+    const bairro = document.getElementById('input-bairro')?.value.trim();
     const cidadeInput = document.getElementById('input-cidade')?.value.trim();
     const ufInput = document.getElementById('uf')?.value.trim();
+    const cep = document.getElementById('cep')?.value.trim() || "00000000";
 
-    // Se o input vier como "Cidade", "" ou "UF", forçamos um valor real para o Tiny não rejeitar
+    // 🔴 LOG DE TESTE NO NAVEGADOR (Aperte F12 para ver se aparece Maceió aqui)
+    console.log("Dados capturados no site:", { cidadeInput, ufInput });
+
+    // --- PROTEÇÃO PARA NÃO ENVIAR A PALAVRA "CIDADE" ---
+    // Se o campo estiver vazio ou for a palavra "Cidade", usamos Maceio como fallback
     const cidade = (cidadeInput && cidadeInput.toLowerCase() !== "cidade") ? cidadeInput : "Maceio";
     const uf = (ufInput && ufInput.toLowerCase() !== "uf") ? ufInput.toUpperCase() : "AL";
     // ------------------------------------------
@@ -1028,8 +1030,8 @@ const nome = document.getElementById('nome_cliente').value.trim();
     
     // Validações Básicas
     // 🔴 VALIDAÇÃO RIGOROSA (O Tiny exige isso)
-    if (!nome || !endereco || !numero || !bairro || !cidade || !uf || !telefone) {
-        return alert("⚠️ Para emitir a Nota Fiscal, precisamos do endereço completo:\n- Rua, Número, Bairro, Cidade e UF.");
+    if (!nome || !endereco || !numero || !bairro || !cidadeInput || !ufInput) {
+        return alert("⚠️ Por favor, preencha o endereço completo (Rua, Número, Bairro, Cidade e UF).");
     }
 
     if (!doc) {
@@ -1121,11 +1123,11 @@ const nome = document.getElementById('nome_cliente').value.trim();
                 email: emailContato,
                 telefone: telefone,
                 endereco: endereco,
-                numero: numero,
-                bairro: bairro,
-                cep: cep || "00000000",
-                cidade: cidade,
-                uf: uf
+                numero: numero || "0",
+                bairro: bairro || "Centro",
+                cep: cep,
+                cidade: cidade, // Agora vai Maceio ou o que você digitou
+                uf: uf          // Agora vai AL ou o que você digitou
             };
 
             // Chamamos a função sem 'await' para não travar a tela do usuário

@@ -125,7 +125,7 @@ document.addEventListener("DOMContentLoaded", async function() {
 
     const paramsURL = new URLSearchParams(window.location.search);
     const restoreData = paramsURL.get('restore'); 
-    
+
     if (restoreData) {
         try {
             const jsonLimpo = decodeURIComponent(restoreData);
@@ -135,24 +135,18 @@ document.addEventListener("DOMContentLoaded", async function() {
                 const carrinhoParaSalvar = itensResgatados.map(item => ({
                     id: item.id,
                     quantidade: item.q || item.quantidade,
-                    nome: item.n || item.nome,
-                    preco: item.p || item.preco, // ✅ Aqui ele pega o preço do link
-                    customMargin: 0 // ✅ Força margem zero para o cliente
+                    nome: item.n || item.nome || "Vela de Ignição", // ✅ Garante o nome
+                    preco: item.p || item.preco,                  // ✅ Garante o preço (ex: 196.50)
+                    customMargin: 0                               // ✅ Trava a margem em 0
                 }));
 
                 localStorage.setItem('nossoCarrinho', JSON.stringify(carrinhoParaSalvar));
-                localStorage.setItem('minhaMargem', '0'); // Garante margem global zero
-                
-                console.log("✅ Carrinho Restaurado com Sucesso:", carrinhoParaSalvar);
+                localStorage.setItem('minhaMargem', '0');
             }
             
-            // Limpa a URL e recarrega para aplicar as mudanças
             window.history.replaceState({}, document.title, window.location.pathname);
             window.location.reload(); 
-            
-        } catch (e) { 
-            console.error("❌ Erro na restauração:", e); 
-        }
+        } catch (e) { console.error("Erro na restauração:", e); }
     }
 
     atualizarIconeCarrinho();

@@ -49,36 +49,44 @@ function atualizarIconeCarrinho() {
 }
 
 function adicionarAoCarrinho(id, qtd) {
-
     let c = getCarrinho();
-
     let item = c.find(p => p.id == id);
-
     const margemInicial = parseFloat(localStorage.getItem('minhaMargem') || 0);
 
+    // 1. CAPTURA O TÍTULO (Para não ficar "Sem Nome")
+    const elementoTitulo = document.getElementById('prod-title');
+    const nomeProduto = elementoTitulo ? elementoTitulo.innerText.trim() : "Produto sem nome";
 
+    // 2. CAPTURA O PREÇO (Para não ficar R$ 0.00)
+    const elementoPreco = document.getElementById('prod-price');
+    const precoTexto = elementoPreco ? elementoPreco.innerText : "0";
+    
+    // 3. LIMPA E CONVERTE
+    const precoLimpo = limparPrecoBR(precoTexto);
+
+    console.log("🔍 DIAGNÓSTICO DE ADIÇÃO:");
+    console.log("   - Nome capturado:", nomeProduto);
+    console.log("   - Preço capturado:", precoTexto, " -> Limpo:", precoLimpo);
 
     if (item) {
-
         item.quantidade = (item.quantidade || 1) + qtd;
-
+        item.preco = precoLimpo; 
+        item.nome = nomeProduto;
     } else {
-
-        c.push({ id: parseInt(id), quantidade: qtd, customMargin: margemInicial });
-
+        c.push({ 
+            id: parseInt(id), 
+            quantidade: qtd, 
+            preco: precoLimpo, 
+            nome: nomeProduto,
+            customMargin: margemInicial 
+        });
     }
-
-   
-
+    
     localStorage.setItem('nossoCarrinho', JSON.stringify(c));
-
     atualizarIconeCarrinho();
-
-    alert("Adicionado ao carrinho!");
-
+    alert(`✅ ${nomeProduto} adicionado ao carrinho!`);
 }
 
-// Certifique-se de que a função de limpeza está no seu arquivo:
 function limparPrecoBR(valor) {
     if (!valor) return 0;
     if (typeof valor === 'number') return valor;
@@ -93,6 +101,7 @@ function limparPrecoBR(valor) {
     
     return parseFloat(limpo) || 0;
 }
+
 
 // ==============================================================
 // 🏁 INICIALIZAÇÃO

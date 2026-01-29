@@ -2115,7 +2115,8 @@ async function criarClienteNoTiny(dadosCliente, token) {
         const cpfLimpo = (dadosCliente.documento || dadosCliente.cpf || '').replace(/\D/g, '');
         
         // LOG PARA CONFERIR SE OS DADOS CHEGARAM
-        console.log("📝 Dados chegando para cadastro:", dadosCliente.cidade, dadosCliente.bairro);
+        // Procure esta linha e mude o texto:
+        console.log("📝 TENTATIVA VERSÃO FINAL AGORA VAI - Dados:", dadosCliente.cidade, dadosCliente.bairro);
 
         const payloadCliente = {
             nome: dadosCliente.nome,

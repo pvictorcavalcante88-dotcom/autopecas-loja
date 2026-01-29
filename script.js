@@ -1001,16 +1001,22 @@ function calcularTotalVisual(carrinho) {
 // 🟢 FUNÇÃO DE FINALIZAR COM ASAAS E TINY (ATUALIZADA)
 async function finalizarCompraAsaas() {
     // 1. PEGAR DADOS DO FORMULÁRIO
-    const nome = document.getElementById('nome_cliente').value; 
-    const emailContato = document.getElementById('input-email-contato')?.value || ''; // Safe check
-    const telefone = document.getElementById('input-telefone')?.value || '';
-    const endereco = document.getElementById('rua').value; 
-    // Mude isso no seu script.js
-    const cidade = document.getElementById('input-cidade')?.value || "Maceió"; // Força Maceió se falhar
-    const uf = document.getElementById('uf')?.value || "AL";             // Força AL se falhar
-    const bairro = document.getElementById('input-bairro')?.value || "Serraria";
-    const numero = document.getElementById('numero')?.value || "123";
-    const cep = document.getElementById('cep')?.value;
+    
+    const nome = document.getElementById('nome_cliente').value.trim(); 
+    const emailContato = document.getElementById('input-email-contato')?.value.trim() || '';
+    const telefone = document.getElementById('input-telefone')?.value.trim() || '';
+    const endereco = document.getElementById('rua').value.trim(); 
+    const numero = document.getElementById('numero')?.value.trim() || "S/N";
+    const bairro = document.getElementById('input-bairro')?.value.trim() || "Centro";
+    const cep = document.getElementById('cep')?.value.trim() || "00000000";
+
+    // --- 🔴 PROTEÇÃO CONTRA DADOS GENÉRICOS (A MUDANÇA ESTÁ AQUI) ---
+    const cidadeRaw = document.getElementById('input-cidade')?.value.trim();
+    const ufRaw = document.getElementById('uf')?.value.trim();
+
+    // Se o usuário escreveu "Cidade", "UF" ou deixou vazio, usamos Maceió/AL como padrão de segurança
+    const cidade = (cidadeRaw && cidadeRaw.toLowerCase() !== "cidade") ? cidadeRaw : "Maceió";
+    const uf = (ufRaw && ufRaw.toLowerCase() !== "uf") ? ufRaw.toUpperCase() : "AL";
     
 
     // Tenta pegar o CPF do campo de busca ou do input específico

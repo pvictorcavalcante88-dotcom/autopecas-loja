@@ -2108,41 +2108,26 @@ async function buscarClientePorCPF(cpf, token) {
 }
 
 async function criarClienteNoTiny(dadosCliente, token) {
+    const cpfLimpo = (dadosCliente.documento || dadosCliente.cpf || '').replace(/\D/g, '');
+
+    const payloadCliente = {
+        "nome": dadosCliente.nome,
+        "tipoPessoa": cpfLimpo.length > 11 ? 'J' : 'F',
+        "cpfCnpj": cpfLimpo,
+        "endereco": {
+            "endereco": dadosCliente.endereco || "Rua nao informada",
+            "numero": dadosCliente.numero || "0",
+            "bairro": dadosCliente.bairro || "Centro",
+            "cep": (dadosCliente.cep || "00000000").replace(/\D/g, ''),
+            "cidade": dadosCliente.cidade || "Maceio",
+            "uf": dadosCliente.uf || "AL",
+            "pais": "Brasil"
+        },
+        "situacao": "A"
+    };
+
     try {
-        const cpfLimpo = (dadosCliente.documento || dadosCliente.cpf || '').replace(/\D/g, '');
-        
-        // --- 🛡️ FILTRO DE SEGURANÇA (NOVO) ---
-        // Se vier vazio, ou escrito "Cidade", ou "cidade", forçamos Maceió
-        let cidadeFinal = dadosCliente.cidade;
-        if (!cidadeFinal || cidadeFinal.toLowerCase() === "cidade") {
-            cidadeFinal = "Maceio"; // Força uma cidade válida
-        }
-
-        // Se vier vazio, ou escrito "UF", ou "uf", forçamos AL
-        let ufFinal = dadosCliente.uf;
-        if (!ufFinal || ufFinal.toLowerCase() === "uf") {
-            ufFinal = "AL"; // Força um estado válido
-        }
-        // -------------------------------------
-
-        const payloadCliente = {
-            "nome": dadosCliente.nome,
-            "tipoPessoa": cpfLimpo.length > 11 ? 'J' : 'F',
-            "cpfCnpj": cpfLimpo,
-            "endereco": {
-                "endereco": dadosCliente.endereco || "Rua nao informada",
-                "numero": dadosCliente.numero || "0",
-                "bairro": dadosCliente.bairro || "Centro",
-                "cep": (dadosCliente.cep || "00000000").replace(/\D/g, ''),
-                "cidade": cidadeFinal, // Usa a variável filtrada
-                "uf": ufFinal,         // Usa a variável filtrada
-                "pais": "Brasil"
-            },
-            "situacao": "A"
-        };
-
-        console.log("📤 PAYLOAD BLINDADO TINY:", JSON.stringify(payloadCliente, null, 2));
-
+        console.log("📤 TENTANDO CRIAR CLIENTE...");
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/contatos`,
             payloadCliente,
@@ -2150,8 +2135,27 @@ async function criarClienteNoTiny(dadosCliente, token) {
         );
 
         return response.data.data?.id || response.data.id;
+
     } catch (error) {
-        console.error("❌ ERRO TINY:", JSON.stringify(error.response?.data || error.message));
+        // --- 🤖 AQUI ESTÁ A INTELIGÊNCIA ARTIFICIAL DO CÓDIGO ---
+        
+        const mensagemErro = JSON.stringify(error.response?.data || "");
+        
+        // Se o erro for "JÁ EXISTE", nós buscamos o ID em vez de desistir
+        if (mensagemErro.includes("já existe") || mensagemErro.includes("ja existe")) {
+            console.log("⚠️ Cliente já existe! Buscando o ID dele...");
+            
+            // Chama a função de busca para recuperar o ID do cliente antigo
+            const idResgatado = await buscarClientePorCPF(cpfLimpo, token);
+            
+            if (idResgatado) {
+                console.log("✅ ID Recuperado com sucesso:", idResgatado);
+                return idResgatado;
+            }
+        }
+
+        // Se for outro erro (ex: CNPJ inválido), aí sim estoura o erro
+        console.error("❌ ERRO REAL NO TINY:", mensagemErro);
         throw error; 
     }
 }

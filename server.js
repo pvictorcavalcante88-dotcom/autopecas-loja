@@ -2000,30 +2000,29 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 // ==========================================
 
 // ==========================================
-// ROTA PRINCIPAL: CHECKOUT
+// ROTA PRINCIPAL: CHECKOUT (ATUALIZADA)
 // ==========================================
 app.post('/admin/tiny/criar-pedido', async (req, res) => {
     try {
         const tokenFinal = await getValidToken();
         const { itensCarrinho, cliente, valorFrete } = req.body;
 
-        console.log("🚀 Iniciando processamento de venda...");
+        console.log("🚀 Recebido pedido do site:", cliente.nome);
 
         let idClienteFinal = null;
 
-        // 1. Busca Cliente
-        if (cliente.cpf) {
-            idClienteFinal = await buscarClientePorCPF(cliente.cpf, tokenFinal);
+        // 1. Busca Cliente por CPF
+        if (cliente.documento || cliente.cpf) {
+            const doc = cliente.documento || cliente.cpf;
+            idClienteFinal = await buscarClientePorCPF(doc, tokenFinal);
         }
 
-        // 😴 PAUSA DE 1 SEGUNDO PARA O TINY RESPIRAR
-        await sleep(1000); 
+        await sleep(1000); // Pausa para não bloquear a API
 
-        // 2. Se não achou, cria
+        // 2. Se não achou, CRIA (Com os dados novos!)
         if (!idClienteFinal) {
+            // AQUI ESTAVA O PROBLEMA: Precisamos garantir que cidade, bairro, etc cheguem aqui
             idClienteFinal = await criarClienteNoTiny(cliente, tokenFinal);
-            
-            // 😴 PAUSA DE 1 SEGUNDO DEPOIS DE CRIAR
             await sleep(1000);
         }
 
@@ -2031,12 +2030,14 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             return res.status(500).json({ erro: "Falha fatal: Não consegui obter um ID para o cliente." });
         }
 
+        // 3. Monta os Itens
         const itensFormatados = itensCarrinho.map(prod => ({
             produto: { id: prod.id_tiny },
             quantidade: prod.quantidade,
             valorUnitario: prod.preco
         }));
 
+        // 4. Cria o Pedido
         const payloadPedido = {
             data: new Date().toISOString().split('T')[0],
             idContato: idClienteFinal,
@@ -2053,21 +2054,12 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
         );
 
-        console.log("✅ Pedido criado com sucesso: " + response.data.data?.numero);
-
-        res.json({ 
-            sucesso: true, 
-            id_pedido: response.data.data?.id,
-            numero: response.data.data?.numero
-        });
+        console.log("✅ Pedido Tiny criado: " + response.data.data?.numero);
+        res.json({ sucesso: true, numero: response.data.data?.numero });
 
     } catch (error) {
-        // Se der erro 429 de novo, avisamos o usuário para tentar mais tarde
-        if (error.response?.status === 429) {
-            return res.status(429).json({ erro: "Muitas requisições. Tente novamente em 1 minuto." });
-        }
-        console.error("❌ ERRO NO PROCESSO:", JSON.stringify(error.response?.data || error.message, null, 2));
-        res.status(500).json({ erro: "Falha ao processar pedido", detalhes: error.response?.data });
+        console.error("❌ ERRO NO SERVER:", JSON.stringify(error.response?.data || error.message));
+        res.status(500).json({ erro: "Erro ao processar", detalhes: error.response?.data });
     }
 });
 
@@ -2115,23 +2107,28 @@ async function buscarClientePorCPF(cpf, token) {
     }
 }
 
+// ==========================================
+// FUNÇÃO DE CRIAR CLIENTE (CORRIGIDA - SEM O "His")
+// ==========================================
 async function criarClienteNoTiny(dadosCliente, token) {
     try {
-        const cpfLimpo = dadosCliente.cpf ? dadosCliente.cpf.replace(/\D/g, '') : dadosCliente.documento.replace(/\D/g, '');
+        const cpfLimpo = (dadosCliente.documento || dadosCliente.cpf || '').replace(/\D/g, '');
         
-        // ESTRUTURA CORRIGIDA PARA V3
+        // LOG PARA CONFERIR SE OS DADOS CHEGARAM
+        console.log("📝 Dados chegando para cadastro:", dadosCliente.cidade, dadosCliente.bairro);
+
         const payloadCliente = {
             nome: dadosCliente.nome,
             tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
             cpfCnpj: cpfLimpo,
             
             endereco: {
-                endereco: dadosCliente.endereco, 
-                numero: dadosCliente.numero || "S/N", // Garante que não vai vazio
+                endereco: dadosCliente.endereco, // Rua
+                numero: dadosCliente.numero || "S/N",
                 bairro: dadosCliente.bairro || "Centro",
                 cep: dadosCliente.cep ? dadosCliente.cep.replace(/\D/g, '') : "00000000",
                 
-                // AQUI ESTAVA O ERRO "His"
+                // AQUI ESTÁ A CORREÇÃO (Trocamos His por cidade)
                 cidade: dadosCliente.cidade || "Maceió", 
                 uf: dadosCliente.uf || "AL",
                 
@@ -2141,7 +2138,7 @@ async function criarClienteNoTiny(dadosCliente, token) {
             situacao: "A" 
         };
 
-        console.log("🆕 Criando cliente no Tiny:", JSON.stringify(payloadCliente, null, 2));
+        console.log("📤 Enviando para Tiny:", JSON.stringify(payloadCliente, null, 2));
 
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/contatos`,

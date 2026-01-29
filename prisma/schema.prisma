@@ -81,6 +81,11 @@ model Pedido {
   clienteNome     String
   clienteEmail    String
   clienteEndereco String
+  clienteNumero   String?  // Novo
+  clienteBairro   String?  // Novo
+  clienteCidade   String?  // Novo
+  clienteUf       String?  // Novo
+  clienteCep      String?  // Novo
   clienteTelefone String?
   clienteDoc      String?
   valorTotal      Float

@@ -1004,12 +1004,12 @@ async function finalizarCompraAsaas() {
     const nome = document.getElementById('nome_cliente').value; 
     const emailContato = document.getElementById('input-email-contato')?.value || ''; // Safe check
     const telefone = document.getElementById('input-telefone')?.value || '';
-    const endereco = document.getElementById('rua').value; // Só o nome da rua
-    const numero = document.getElementById('numero')?.value || "S/N";
-    const bairro = document.getElementById('input-bairro')?.value || "Centro"; // Fallback apenas se vazio
-    const cidade = document.getElementById('input-cidade')?.value || "Maceió";
-    const cep = document.getElementById('cep')?.value || "57000000";
-    const uf = document.getElementById('uf')?.value || "AL";
+    const endereco = document.getElementById('rua').value; 
+    const numero = document.getElementById('numero')?.value;
+    const bairro = document.getElementById('input-bairro')?.value;
+    const cidade = document.getElementById('input-cidade')?.value;
+    const cep = document.getElementById('cep')?.value;
+    const uf = document.getElementById('uf')?.value;
 
     // Tenta pegar o CPF do campo de busca ou do input específico
     let doc = document.getElementById('input-doc-cliente')?.value;

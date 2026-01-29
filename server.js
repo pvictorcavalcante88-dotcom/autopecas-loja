@@ -2117,29 +2117,31 @@ async function buscarClientePorCPF(cpf, token) {
 
 async function criarClienteNoTiny(dadosCliente, token) {
     try {
-        const cpfLimpo = dadosCliente.cpf.replace(/\D/g, '');
+        const cpfLimpo = dadosCliente.cpf ? dadosCliente.cpf.replace(/\D/g, '') : dadosCliente.documento.replace(/\D/g, '');
         
-        // ESTRUTURA CORRIGIDA PARA V3 (CamelCase e Objeto Endereço)
+        // ESTRUTURA CORRIGIDA PARA V3
         const payloadCliente = {
             nome: dadosCliente.nome,
-            tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F', // CamelCase
-            cpfCnpj: cpfLimpo, // CamelCase
+            tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
+            cpfCnpj: cpfLimpo,
             
-            // AQUI ESTAVA O ERRO: O endereço precisa ser um objeto filho
             endereco: {
-                endereco: dadosCliente.endereco, // Nome da rua
-                numero: dadosCliente.numero,
-                bairro: dadosCliente.bairro,
-                cep: dadosCliente.cep.replace(/\D/g, ''),
-                cidade: dadosCliente.cidade,
-                uf: dadosCliente.uf,
-                pais: "Brasil" // Boa prática adicionar
+                endereco: dadosCliente.endereco, 
+                numero: dadosCliente.numero || "S/N", // Garante que não vai vazio
+                bairro: dadosCliente.bairro || "Centro",
+                cep: dadosCliente.cep ? dadosCliente.cep.replace(/\D/g, '') : "00000000",
+                
+                // AQUI ESTAVA O ERRO "His"
+                cidade: dadosCliente.cidade || "Maceió", 
+                uf: dadosCliente.uf || "AL",
+                
+                pais: "Brasil"
             },
             
-            situacao: "A" // Ativo
+            situacao: "A" 
         };
 
-        console.log("🆕 Criando cliente com payload correto...", JSON.stringify(payloadCliente, null, 2));
+        console.log("🆕 Criando cliente no Tiny:", JSON.stringify(payloadCliente, null, 2));
 
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/contatos`,
@@ -2147,12 +2149,10 @@ async function criarClienteNoTiny(dadosCliente, token) {
             { headers: { 'Authorization': `Bearer ${token}` } }
         );
 
-        console.log("✅ Cliente criado! ID:", response.data.data?.id || response.data.id);
         return response.data.data?.id || response.data.id;
 
     } catch (error) {
         console.error("❌ Erro ao criar cliente:", JSON.stringify(error.response?.data || error.message));
-        // Se der erro, vamos jogar para cima para o console mostrar
         throw error; 
     }
 }

@@ -2031,11 +2031,21 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
         }
 
         // 3. Monta os Itens
-        const itensFormatados = itensCarrinho.map(prod => ({
-            produto: { id: prod.id_tiny },
-            quantidade: prod.quantidade,
-            valorUnitario: parseFloat(prod.preco || 0.01)
-        }));
+        // 3. Monta os Itens (COM PROTEÇÃO DE ID)
+        const itensFormatados = itensCarrinho.map(prod => {
+            // Tenta pegar o ID do Tiny de várias formas para não falhar
+            const idDoProdutoNoTiny = prod.id_tiny || prod.tinyId || prod.id;
+
+            if (!idDoProdutoNoTiny) {
+                console.warn("⚠️ ALERTA: Produto sendo enviado sem ID para o Tiny:", prod);
+            }
+
+            return {
+                produto: { id: idDoProdutoNoTiny }, // Agora usa a variável segura
+                quantidade: prod.quantidade,
+                valorUnitario: parseFloat(prod.preco || 0.01)
+            };
+        });
 
         // 4. Cria o Pedido
         const payloadPedido = {
@@ -2089,71 +2099,61 @@ app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
 
 
 // ==========================================
-// FUNÇÃO DE BUSCA "VALE TUDO" (3 TENTATIVAS)
+// FUNÇÃO DE BUSCA "RAIO-X" (Busca até Inativos)
 // ==========================================
 async function buscarClientePorCPF(cpf, token) {
     const cpfLimpo = cpf.replace(/\D/g, '');
     const formatarCPF = (v) => v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
     const cpfComMascara = formatarCPF(cpfLimpo);
-
-    // Função interna para validar se o retorno é bom
     const achou = (res) => (res.data && res.data.data && res.data.data.length > 0);
 
     try {
-        // --- TENTATIVA 1: CPF COM MÁSCARA (Filtro Exato) ---
-        console.log(`🔎 TENTATIVA 1: Filtro CPF Formatado: ${cpfComMascara}`);
+        // --- TENTATIVA 1: CPF FORMATADO + SITUAÇÃO GERAL ---
+        console.log(`🔎 TENTATIVA 1: CPF Formatado (${cpfComMascara}) em TODOS os status...`);
         try {
+            // ADICIONEI &situacao=T PARA PEGAR CLIENTES INATIVOS/ARQUIVADOS
             let res = await axios.get(
-                `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfComMascara}`,
+                `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfComMascara}&situacao=T`,
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
             if (achou(res)) {
-                console.log(`✅ ACHEI NA TENTATIVA 1! ID: ${res.data.data[0].id}`);
+                console.log(`✅ ACHEI (Status T)! ID: ${res.data.data[0].id}`);
                 return res.data.data[0].id;
             }
         } catch (e) { console.log("⚠️ Falha tentativa 1"); }
 
-        // --- PAUSA PARA RESPIRAR (Evita 429) ---
+        // --- PAUSA ---
         await new Promise(r => setTimeout(r, 1500)); 
 
-        // --- TENTATIVA 2: CPF LIMPO (Filtro Exato) ---
-        console.log(`🔎 TENTATIVA 2: Filtro CPF Limpo: ${cpfLimpo}`);
+        // --- TENTATIVA 2: CPF LIMPO + SITUAÇÃO GERAL ---
+        console.log(`🔎 TENTATIVA 2: CPF Limpo (${cpfLimpo}) em TODOS os status...`);
         try {
             let res = await axios.get(
-                `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfLimpo}`,
+                `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfLimpo}&situacao=T`,
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
             if (achou(res)) {
-                console.log(`✅ ACHEI NA TENTATIVA 2! ID: ${res.data.data[0].id}`);
+                console.log(`✅ ACHEI (Status T)! ID: ${res.data.data[0].id}`);
                 return res.data.data[0].id;
             }
         } catch (e) { console.log("⚠️ Falha tentativa 2"); }
 
-        // --- PAUSA PARA RESPIRAR ---
-        await new Promise(r => setTimeout(r, 1500));
-
-        // --- TENTATIVA 3: A ARMA SECRETA (PESQUISA GERAL) ---
-        // Aqui ele busca em TUDO (Nome, CPF, Fantasia, Obs...)
-        console.log(`🔎 TENTATIVA 3: Busca Geral (Pesquisa): ${cpfLimpo}`);
+        // --- TENTATIVA 3: PESQUISA GERAL (Último Recurso) ---
+        console.log(`🔎 TENTATIVA 3: Pesquisa Geral...`);
         try {
             let res = await axios.get(
-                `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${cpfLimpo}`,
+                `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${cpfLimpo}&situacao=T`,
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
-            
-            // Na pesquisa geral, precisamos conferir se o CPF bate, pois ele pode achar pelo telefone parecido
             if (achou(res)) {
-                const cliente = res.data.data[0];
-                console.log(`✅ ACHEI NA GERAL! ID: ${cliente.id} - Nome: ${cliente.nome}`);
-                return cliente.id;
+                console.log(`✅ ACHEI NA PESQUISA! ID: ${res.data.data[0].id}`);
+                return res.data.data[0].id;
             }
         } catch (e) { console.log("⚠️ Falha tentativa 3"); }
 
-        console.log("❌ DESISTO REAL: O cliente é um fantasma.");
         return null;
-
     } catch (e) {
-        console.error("❌ Erro técnico:", e.message);
+        console.error("❌ Erro técnico busca:", e.message);
         return null;
     }
 }

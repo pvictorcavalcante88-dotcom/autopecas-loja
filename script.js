@@ -1066,7 +1066,7 @@ async function finalizarCompraAsaas() {
             
             return { 
                 id: i.id, 
-                id_tiny: i.id_tiny || i.id, // Garante ID do Tiny
+                id_tiny: i.id_tiny || i.id_tiny, // Garante ID do Tiny
                 quantidade: i.quantidade,
                 preco: precoComMargem.toFixed(2),
                 customMargin: parseFloat(margemFinal)

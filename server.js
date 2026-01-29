@@ -2111,38 +2111,38 @@ async function criarClienteNoTiny(dadosCliente, token) {
     try {
         const cpfLimpo = (dadosCliente.documento || dadosCliente.cpf || '').replace(/\D/g, '');
         
-        // Montando o endereço de forma ultra-limpa
-        const enderecoCompleto = {
-            endereco: dadosCliente.endereco || "Rua não informada",
-            numero: dadosCliente.numero || "S/N",
-            bairro: dadosCliente.bairro || "Centro",
-            cep: (dadosCliente.cep || "00000000").replace(/\D/g, ''),
-            cidade: dadosCliente.cidade || "Maceió", // CHAVE CORRETA: cidade
-            uf: dadosCliente.uf || "AL",
-            pais: "Brasil"
+        // Criamos o objeto usando aspas para garantir que o JS não use nomes "espertos"
+        const enderecoObjeto = {
+            "endereco": dadosCliente.endereco || "Rua nao informada",
+            "numero": dadosCliente.numero || "0",
+            "bairro": dadosCliente.bairro || "Centro",
+            "cep": (dadosCliente.cep || "00000000").replace(/\D/g, ''),
+            "cidade": dadosCliente.cidade || "Maceio",
+            "uf": dadosCliente.uf || "AL",
+            "pais": "Brasil"
         };
 
-        const payloadCliente = {
-            nome: dadosCliente.nome,
-            tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
-            cpfCnpj: cpfLimpo,
-            endereco: enderecoCompleto, // Usa o objeto que criamos acima
-            situacao: "A" 
+        const payloadFinal = {
+            "nome": dadosCliente.nome,
+            "tipoPessoa": cpfLimpo.length > 11 ? 'J' : 'F',
+            "cpfCnpj": cpfLimpo,
+            "endereco": enderecoObjeto,
+            "situacao": "A"
         };
 
-        // Este log vai mostrar EXATAMENTE o que vai pro Tiny
-        console.log("📤 PAYLOAD REAL QUE VAI PRO TINY:", JSON.stringify(payloadCliente, null, 2));
+        // Esse log vai te mostrar que agora NAO tem acento e NAO tem "His"
+        console.log("📤 PAYLOAD FINAL (SEM ACENTOS):", JSON.stringify(payloadFinal, null, 2));
 
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/contatos`,
-            payloadCliente,
+            payloadFinal,
             { headers: { 'Authorization': `Bearer ${token}` } }
         );
 
         return response.data.data?.id || response.data.id;
 
     } catch (error) {
-        console.error("❌ Erro detalhado no Tiny:", JSON.stringify(error.response?.data || error.message));
+        console.error("❌ ERRO NO TINY:", JSON.stringify(error.response?.data || error.message));
         throw error; 
     }
 }

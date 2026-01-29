@@ -489,7 +489,7 @@ async function carregarPaginaCheckout() {
             if (!response.ok) continue;
             
             const p = await response.json();
-            const precoBase = parseFloat(p.price || p.preco_novo);
+            const precoBase = parseFloat(item.preco || p.price || p.preco_novo);
             
             // Se tem margem customizada no item, usa. Se não, usa a global.
             let margem = (item.customMargin !== undefined) ? item.customMargin : ((FATOR_GLOBAL - 1) * 100);

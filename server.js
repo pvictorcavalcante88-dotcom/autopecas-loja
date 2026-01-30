@@ -2128,22 +2128,19 @@ app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
 
 
 // ==========================================
-// FUNÇÃO DE BUSCA UNIVERSAL (A "Google" do Tiny)
+// FUNÇÃO DE BUSCA: MODELO API V3 OFICIAL
 // ==========================================
 async function buscarClientePorCPF(cpf, token, nomeCompleto = "") {
+    // 1. Prepara o CPF Formatado (Obrigatório segundo seus testes visuais)
     const cpfLimpo = cpf.replace(/\D/g, '');
     const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
     
-    // Função auxiliar para varrer a lista de resultados
     const garimparID = (lista, origem) => {
         if (!lista || !Array.isArray(lista)) return null;
-
-        // Procura alguém com o CPF igual (Lendo cpfCnpj OU cpf_cnpj)
         const achou = lista.find(c => {
             const cpfNoTiny = (c.cpfCnpj || c.cpf_cnpj || '').replace(/\D/g, '');
             return cpfNoTiny === cpfLimpo;
         });
-
         if (achou) {
             console.log(`✅ ACHEI VIA ${origem}: ${achou.nome} (ID: ${achou.id})`);
             return achou.id;
@@ -2152,47 +2149,41 @@ async function buscarClientePorCPF(cpf, token, nomeCompleto = "") {
     };
 
     try {
-        // TENTATIVA 1: PESQUISA GERAL COM CPF FORMATADO (Prioridade, pois está assim no JSON)
-        console.log(`🔎 Buscando CPF Formatado na Geral: ${cpfFormatado}`);
+        // TENTATIVA 1: USANDO O PARÂMETRO OFICIAL 'cpfCnpj'
+        // Documentação diz: "Pesquisa por CPF ou CNPJ"
+        console.log(`🔎 Buscando parâmetro cpfCnpj: ${cpfFormatado}`);
         try {
             const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
-                params: { pesquisa: cpfFormatado }, // SEM situacao=T para não bugar a busca geral
+                params: { 
+                    cpfCnpj: cpfFormatado, // Parâmetro exato da documentação
+                    // REMOVIDO 'situacao' POIS 'T' É INVÁLIDO. 
+                    // Sem enviar, ele busca os ativos (A e B).
+                }, 
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            const id = garimparID(res.data.data, "CPF FORMATADO");
+            const id = garimparID(res.data.data, "API CPF FORMATADO");
             if (id) return id;
-        } catch (e) { console.log(`⚠️ Falha busca formatada: ${e.message}`); }
+        } catch (e) { console.log(`⚠️ Falha busca cpfCnpj: ${e.message}`); }
 
-        // TENTATIVA 2: PESQUISA GERAL COM CPF LIMPO
-        console.log(`🔎 Buscando CPF Limpo na Geral: ${cpfLimpo}`);
-        try {
-            const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
-                params: { pesquisa: cpfLimpo },
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const id = garimparID(res.data.data, "CPF LIMPO");
-            if (id) return id;
-        } catch (e) {}
-
-        // TENTATIVA 3: BUSCA PELO PRIMEIRO NOME (Se tiver nome)
+        // TENTATIVA 2: USANDO O PARÂMETRO 'nome' (Se CPF falhar)
+        // Documentação diz: "Pesquisa por nome parcial ou completo"
         if (nomeCompleto) {
-            const primeiroNome = nomeCompleto.split(' ')[0].trim();
-            if (primeiroNome.length > 2) {
-                console.log(`☢️ MODO NUCLEAR: Pesquisando nome "${primeiroNome}"...`);
-                try {
-                    const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
-                        params: { pesquisa: primeiroNome },
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    
-                    const id = garimparID(res.data.data, "PRIMEIRO NOME");
-                    if (id) return id;
-
-                    console.log(`⚠️ Tiny retornou ${res.data.data?.length || 0} pessoas com nome "${primeiroNome}", mas CPF não bateu.`);
-                } catch (e) {
-                    // Aqui imprimimos o erro real para saber se foi erro de conexão
-                    console.log("❌ Falha na busca por nome:", e.message);
-                }
+            // Removemos acentos para evitar conflitos de encoding
+            const nomeBusca = nomeCompleto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            console.log(`☢️ MODO NOME: Buscando parâmetro nome: "${nomeBusca}"`);
+            
+            try {
+                const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
+                    params: { 
+                        nome: nomeBusca // Parâmetro exato da documentação
+                    },
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                const id = garimparID(res.data.data, "API NOME");
+                if (id) return id;
+            } catch (e) {
+                console.log("❌ Falha na busca por nome.");
             }
         }
 

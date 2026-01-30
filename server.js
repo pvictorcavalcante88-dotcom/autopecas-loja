@@ -2321,6 +2321,47 @@ async function criarClienteNoTiny(dadosCliente, token) {
     }
 }
 
+// ROTA DE DIAGNÓSTICO: VAMOS VER COMO O TINY ESTÁ GUARDANDO ESSE CLIENTE
+app.get('/admin/diagnostico-cliente/:id', authenticateToken, async (req, res) => {
+    // Só admin pode usar
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+
+    const idTiny = req.params.id;
+    const token = await getValidToken();
+
+    try {
+        console.log(`🕵️ DIAGNÓSTICO: Buscando cliente ID ${idTiny} direto pelo ID...`);
+        
+        // Busca direta pelo ID (Isso nunca falha se o ID existir)
+        const response = await axios.get(
+            `https://api.tiny.com.br/public-api/v3/contatos/${idTiny}`,
+            { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+
+        const cliente = response.data.data || response.data;
+
+        // VAMOS IMPRIMIR TUDO NO CONSOLE PARA VOCÊ VER
+        console.log("\n========================================");
+        console.log("📄 FICHA TÉCNICA DO CLIENTE NO TINY");
+        console.log("========================================");
+        console.log(`🆔 ID: ${cliente.id}`);
+        console.log(`👤 Nome: '${cliente.nome}'`); // Aspas para ver se tem espaço
+        console.log(`🔢 CPF/CNPJ (Como está gravado): '${cliente.cpf_cnpj}'`);
+        console.log(`📧 Email: '${cliente.email}'`);
+        console.log(`🚦 Situação: '${cliente.situacao}'`); // A = Ativo, I = Inativo, E = Excluído
+        console.log("========================================\n");
+
+        res.json({ 
+            mensagem: "Olhe o terminal do seu servidor (VS Code) para ver o resultado!",
+            dados_tiny: cliente 
+        });
+
+    } catch (error) {
+        console.error("❌ Erro no diagnóstico:", error.response?.data || error.message);
+        res.status(500).json(error.response?.data);
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);

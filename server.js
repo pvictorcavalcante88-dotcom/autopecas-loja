@@ -2134,55 +2134,58 @@ app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
 // ==========================================
 // FUNÇÃO DE BUSCA "RAIO-X" (Busca até Inativos)
 // ==========================================
+// ==========================================
+// FUNÇÃO DE BUSCA: MODO "IMITAR HUMANO" (PESQUISA GERAL)
+// ==========================================
 async function buscarClientePorCPF(cpf, token) {
     const cpfLimpo = cpf.replace(/\D/g, '');
-    const formatarCPF = (v) => v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
-    const cpfComMascara = formatarCPF(cpfLimpo);
-    const achou = (res) => (res.data && res.data.data && res.data.data.length > 0);
+    
+    // Função para verificar se achou
+    const verificarRetorno = (res, tipoBusca) => {
+        if (res.data && res.data.data && res.data.data.length > 0) {
+            // O Tiny pode retornar uma lista. Vamos ver se algum bate o CPF.
+            const clienteCerto = res.data.data.find(c => {
+                const cCpf = (c.cpf_cnpj || '').replace(/\D/g, '');
+                // Se o CPF bater OU se não tiver CPF na busca (ex: busca por nome único), aceitamos
+                return cCpf === cpfLimpo || (!cpfLimpo && c.id); 
+            });
+
+            if (clienteCerto) {
+                console.log(`✅ ACHEI NA BUSCA (${tipoBusca}): ${clienteCerto.nome} (ID: ${clienteCerto.id})`);
+                return clienteCerto.id;
+            }
+        }
+        return null;
+    };
 
     try {
-        // --- TENTATIVA 1: CPF FORMATADO + SITUAÇÃO GERAL ---
-        console.log(`🔎 TENTATIVA 1: CPF Formatado (${cpfComMascara}) em TODOS os status...`);
+        // --- TENTATIVA 1: JOGAR O CPF PURO NA PESQUISA GERAL ---
+        // (Igual digitar o CPF na barra de busca do Tiny)
+        console.log(`🔎 TENTATIVA 1: Pesquisando CPF Limpo (${cpfLimpo})...`);
         try {
-            // ADICIONEI &situacao=T PARA PEGAR CLIENTES INATIVOS/ARQUIVADOS
+            // Removi 'situacao=T' e 'cpf_cnpj='. Usamos apenas 'pesquisa'.
             let res = await axios.get(
-                `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfComMascara}&situacao=T`,
+                `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${cpfLimpo}`,
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
-            if (achou(res)) {
-                console.log(`✅ ACHEI (Status T)! ID: ${res.data.data[0].id}`);
-                return res.data.data[0].id;
-            }
+            const id = verificarRetorno(res, "GERAL_CPF");
+            if (id) return id;
         } catch (e) { console.log("⚠️ Falha tentativa 1"); }
 
-        // --- PAUSA ---
-        await new Promise(r => setTimeout(r, 1500)); 
+        // --- PAUSA RÁPIDA ---
+        await new Promise(r => setTimeout(r, 1000)); 
 
-        // --- TENTATIVA 2: CPF LIMPO + SITUAÇÃO GERAL ---
-        console.log(`🔎 TENTATIVA 2: CPF Limpo (${cpfLimpo}) em TODOS os status...`);
+        // --- TENTATIVA 2: JOGAR CPF COM PONTO E TRAÇO ---
+        const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+        console.log(`🔎 TENTATIVA 2: Pesquisando CPF Formatado (${cpfFormatado})...`);
         try {
             let res = await axios.get(
-                `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfLimpo}&situacao=T`,
+                `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(cpfFormatado)}`,
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
-            if (achou(res)) {
-                console.log(`✅ ACHEI (Status T)! ID: ${res.data.data[0].id}`);
-                return res.data.data[0].id;
-            }
+            const id = verificarRetorno(res, "GERAL_FORMATADO");
+            if (id) return id;
         } catch (e) { console.log("⚠️ Falha tentativa 2"); }
-
-        // --- TENTATIVA 3: PESQUISA GERAL (Último Recurso) ---
-        console.log(`🔎 TENTATIVA 3: Pesquisa Geral...`);
-        try {
-            let res = await axios.get(
-                `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${cpfLimpo}&situacao=T`,
-                { headers: { 'Authorization': `Bearer ${token}` } }
-            );
-            if (achou(res)) {
-                console.log(`✅ ACHEI NA PESQUISA! ID: ${res.data.data[0].id}`);
-                return res.data.data[0].id;
-            }
-        } catch (e) { console.log("⚠️ Falha tentativa 3"); }
 
         return null;
     } catch (e) {
@@ -2266,24 +2269,20 @@ async function criarClienteNoTiny(dadosCliente, token) {
             await new Promise(r => setTimeout(r, 2000)); 
 
             // 2. BUSCA POR E-MAIL (A CAMADA QUE FALTAVA)
-            if (emailCliente && emailCliente.includes("@")) {
-                console.log(`📧 TENTATIVA EMAIL: Buscando por "${emailCliente}"...`);
+                        if (emailCliente && emailCliente.includes("@")) {
+                console.log(`📧 Buscando email na Pesquisa Geral: ${emailCliente}`);
                 try {
+                    // Usamos 'pesquisa=' em vez de filtro específico
                     const resEmail = await axios.get(
-                        `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(emailCliente)}`,
+                        `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(emailCliente)}`, 
                         { headers: { 'Authorization': `Bearer ${token}` } }
                     );
-
-                    if (resEmail.data && resEmail.data.data) {
-                        const achouEmail = resEmail.data.data[0];
-                        if (achouEmail) {
-                            console.log(`✅ ACHEI PELO EMAIL! ID: ${achouEmail.id}`);
-                            return achouEmail.id;
-                        }
+                    
+                    if (resEmail.data?.data?.[0]?.id) {
+                         console.log(`✅ ACHEI POR EMAIL! ID: ${resEmail.data.data[0].id}`);
+                         return resEmail.data.data[0].id;
                     }
-                } catch (eEmail) { 
-                    console.log("❌ Falha na busca por email."); 
-                }
+                } catch (eEmail) { console.log("❌ Falha busca email."); }
             }
 
             // 3. BUSCA POR NOME CURTO

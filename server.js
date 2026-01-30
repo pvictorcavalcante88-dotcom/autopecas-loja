@@ -2212,12 +2212,11 @@ function checarSeAchou(response) {
 // FUNÇÃO BLINDADA: TENTA CRIAR, SE JÁ EXISTIR, ESPERA E BUSCA
 // ==========================================
 async function criarClienteNoTiny(dadosCliente, token) {
-    // 1. Limpeza dos dados
     const cpfLimpo = (dadosCliente.documento || dadosCliente.cpf || '').replace(/\D/g, '');
     
+    // Tratamento de Cidade/UF
     let cidadeLimpa = dadosCliente.cidade;
     let ufLimpa = dadosCliente.uf;
-
     if (!cidadeLimpa || cidadeLimpa.trim().toLowerCase() === "cidade") cidadeLimpa = "Maceio";
     if (!ufLimpa || ufLimpa.trim().toLowerCase() === "uf") ufLimpa = "AL";
 
@@ -2239,46 +2238,69 @@ async function criarClienteNoTiny(dadosCliente, token) {
 
     try {
         console.log("📤 TENTATIVA DE CRIAÇÃO...");
-        
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/contatos`,
             payloadCliente,
             { headers: { 'Authorization': `Bearer ${token}` } }
         );
-
         return response.data.data?.id || response.data.id;
 
     } catch (error) {
-        // Pega a mensagem de erro do Tiny (ex: "Registro já existe")
-        const mensagemErro = JSON.stringify(error.response?.data || "").toLowerCase();
+        // Converte todo o erro para texto para podermos ler
+        const erroCompleto = JSON.stringify(error.response?.data || "");
+        const mensagemErro = erroCompleto.toLowerCase();
         
-        // 🚨 DETECTA SE O ERRO É "JÁ EXISTE" OU DUPLICIDADE
-        if (mensagemErro.includes("existe") || mensagemErro.includes("duplicado")) {
+        // 🚨 CENÁRIO: CLIENTE JÁ EXISTE
+        if (mensagemErro.includes("existe") || mensagemErro.includes("duplicado") || mensagemErro.includes("cadastrado")) {
             console.log("⚠️ TINY AVISOU: Cliente já existe!");
+
+            // 🕵️ ESTRATÉGIA 1: TENTAR LER O ID DENTRO DA MENSAGEM DE ERRO
+            // O Tiny as vezes manda: "já está cadastrado para o contato X (id: 123456)"
+            const matchId = erroCompleto.match(/id[:\s]+(\d+)/i);
             
-            // 🛑 AQUI ESTÁ O SEGREDO: PAUSA DE 2 SEGUNDOS
-            // Isso evita que o Tiny bloqueie a próxima busca por "muitas requisições"
-            console.log("⏳ Esperando 2 segundos para o Tiny respirar...");
-            await sleep(2000); 
+            if (matchId && matchId[1]) {
+                console.log(`✅ ID ENCONTRADO NA MENSAGEM DE ERRO: ${matchId[1]}`);
+                return matchId[1];
+            }
+
+            console.log("⏳ ID não estava no erro. Esperando 2s para busca profunda...");
+            await new Promise(r => setTimeout(r, 2000)); 
             
-            console.log("🔄 Retomando busca do ID pelo CPF...");
-            
-            // Agora fazemos a busca com calma
-            const idResgatado = await buscarClientePorCPF(cpfLimpo, token);
-            
-            if (idResgatado) {
-                console.log("✅ ID RESGATADO COM SUCESSO:", idResgatado);
-                return idResgatado;
-            } else {
-                console.log("❌ Falha crítica: Cliente existe mas a busca não retornou ID.");
-                // Se falhar, retornamos NULL para o script principal avisar
-                return null;
+            // 🕵️ ESTRATÉGIA 2: BUSCA PELO CPF NOVAMENTE
+            console.log("🔄 Tentando busca pelo CPF...");
+            let idResgatado = await buscarClientePorCPF(cpfLimpo, token);
+            if (idResgatado) return idResgatado;
+
+            // 🕵️ ESTRATÉGIA 3 (NUCLEAR): BUSCA PELO NOME
+            // Se o CPF falhou, buscamos pelo NOME e conferimos se o CPF bate
+            console.log(`☢️ MODO NUCLEAR: Buscando por NOME: "${dadosCliente.nome}"`);
+            try {
+                const resNome = await axios.get(
+                    `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(dadosCliente.nome)}&situacao=T`,
+                    { headers: { 'Authorization': `Bearer ${token}` } }
+                );
+
+                if (resNome.data && resNome.data.data) {
+                    // Filtra nos resultados alguém que tenha o mesmo CPF (mesmo que mal formatado)
+                    const clienteCerto = resNome.data.data.find(c => {
+                        const cpfTiny = (c.cpf_cnpj || '').replace(/\D/g, '');
+                        return cpfTiny === cpfLimpo;
+                    });
+
+                    if (clienteCerto) {
+                        console.log(`✅ ACHEI PELO NOME! ID: ${clienteCerto.id}`);
+                        return clienteCerto.id;
+                    }
+                }
+            } catch (eNome) {
+                console.log("❌ Falha na busca por nome.");
             }
         }
 
-        // Se for outro erro (ex: CPF inválido), mostra no log
-        console.error("❌ ERRO TINY (Não foi duplicidade):", mensagemErro);
-        throw error; 
+        console.error("❌ ERRO TINY IRRECUPERÁVEL:", mensagemErro);
+        // Se tudo falhar, retorna NULL para não travar o servidor, 
+        // mas o pedido vai falhar no passo seguinte.
+        return null; 
     }
 }
 

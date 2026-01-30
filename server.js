@@ -1995,85 +1995,79 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
     }
 });
 
-// ==========================================
-// FUNÇÕES AUXILIARES (O Robô que trabalha pra você)
-// ==========================================
-
-// ==========================================
-// ROTA PRINCIPAL: CHECKOUT (ATUALIZADA)
 app.post('/admin/tiny/criar-pedido', async (req, res) => {
     try {
         const tokenFinal = await getValidToken();
-        // 1. Corrigido: Pegando os nomes corretos do req.body
         const { itensCarrinho, cliente, valorFrete } = req.body;
 
-        console.log("🚀 INICIANDO PEDIDO PARA:", cliente.nome);
+        const cpfLimpo = (cliente.documento || cliente.cpf || '').replace(/\D/g, '');
+        let idClienteFinal = null;
+        let nomeParaExibicao = cliente.nome;
 
-        // --- 1. RESOLVE O CLIENTE ---
-        // Alterado: Usando a função 'resolverClienteParaVenda' que criamos
-        // Ela já faz a busca, a criação e o resgate do ID se der erro.
-        const idClienteFinal = await resolverClienteParaVenda(cliente, tokenFinal);
+        console.log("🚀 PROCESSANDO PEDIDO:", cliente.nome);
 
-        if (!idClienteFinal) {
-            console.error("❌ FALHA CRÍTICA: Cliente não identificado.");
-            return res.status(400).json({ erro: "Não foi possível identificar ou criar o cliente no Tiny." });
-        }
-        
-        console.log("✅ Cliente resolvido ID:", idClienteFinal);
-
-        // --- 2. RESOLVE OS ITENS ---
-        console.log("🔎 PROCESSANDO ITENS...");
-
-        const itensFormatados = await Promise.all(itensCarrinho.map(async (prod, index) => {
-            let idFinal = prod.id_tiny || prod.tinyId || prod.id;
-
-            // Se o ID for do site (curto), busca o do Tiny no Prisma
-            if (idFinal && String(idFinal).length < 6) {
-                try {
-                    const tabela = prisma.produto || prisma.product;
-                    if (tabela) {
-                        const produtoBanco = await tabela.findUnique({ where: { id: parseInt(idFinal) } });
-                        if (produtoBanco?.tinyId) idFinal = produtoBanco.tinyId;
-                    }
-                } catch (e) {
-                    console.error("❌ Erro Prisma Item " + index, e.message);
-                }
+        // --- 1. TENTATIVA DE CRIAÇÃO/IDENTIFICAÇÃO ---
+        try {
+            // Tenta criar o cliente de forma limpa
+            const resCriar = await axios.post(
+                `https://api.tiny.com.br/public-api/v3/contatos`,
+                {
+                    nome: cliente.nome,
+                    cpfCnpj: cpfLimpo,
+                    tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
+                    situacao: "A"
+                },
+                { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
+            );
+            idClienteFinal = resCriar.data.data?.id || resCriar.data.id;
+            console.log("✅ Novo cliente criado ID:", idClienteFinal);
+        } catch (error) {
+            const msgErro = JSON.stringify(error.response?.data || "");
+            
+            // SE JÁ EXISTIR (O caso da Rafaela)
+            if (msgErro.includes("existe") || msgErro.includes("cadastrado") || error.response?.status === 400) {
+                console.log("⚠️ Cliente já existe no Tiny. Aplicando Estratégia do Nome + CPF.");
+                // Mudamos o nome para você identificar no manual depois
+                nomeParaExibicao = `${cliente.nome} cpf ${cpfLimpo}`;
+                idClienteFinal = null; // Deixamos null para enviar como contato rápido
+            } else {
+                console.error("❌ Erro desconhecido na criação:", msgErro);
             }
+        }
 
-            return {
-                produto: { id: idFinal },
-                quantidade: prod.quantidade,
-                valorUnitario: parseFloat(prod.preco || 0.01)
-            };
+        // --- 2. FORMATAÇÃO DOS ITENS ---
+        const itensFormatados = itensCarrinho.map(prod => ({
+            produto: { id: prod.id_tiny || prod.tinyId || prod.id },
+            quantidade: prod.quantidade,
+            valorUnitario: parseFloat(prod.preco || 0)
         }));
 
-        // --- 3. ENVIA O PEDIDO ---
-        // Estrutura corrigida para API V3
+        // --- 3. ENVIO DO PEDIDO ---
         const payloadPedido = {
             data: new Date().toISOString().split('T')[0],
-            idContato: idClienteFinal, // O ID que pescamos (ex: 890236518)
+            cliente: idClienteFinal ? { id: idClienteFinal } : {
+                nome: nomeParaExibicao,
+                tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
+                cpfCnpj: "" // Vazio para não dar erro de duplicidade no pedido
+            },
             itens: itensFormatados,
             naturezaOperacao: { id: 335900648 },
             valorFrete: parseFloat(valorFrete || 0),
             situacao: 0
         };
 
-        console.log("📤 ENVIANDO PEDIDO PRO TINY...");
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/pedidos`, 
             payloadPedido,
             { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
         );
 
-        console.log("🎉 SUCESSO! Pedido criado!");
-        res.json({ sucesso: true, numero: response.data.data?.numero || "Criado" });
+        console.log("🎉 Pedido Criado:", response.data.data?.numero);
+        res.json({ sucesso: true, numero: response.data.data?.numero });
 
     } catch (error) {
-        console.error("❌ ERRO NO SERVER:", JSON.stringify(error.response?.data || error.message));
-        res.status(500).json({ 
-            erro: "Erro ao processar pedido", 
-            detalhes: error.response?.data || error.message 
-        });
+        console.error("❌ FALHA NO PEDIDO:", error.response?.data || error.message);
+        res.status(500).json({ erro: "Erro ao processar", detalhes: error.response?.data });
     }
 });
 // ROTA: RAIO-X COMPLETO (SEM FILTROS)

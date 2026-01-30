@@ -1367,66 +1367,67 @@ document.addEventListener('change', (e) => {
 // 🏭 INTEGRAÇÃO TINY (Envia o pedido para o ERP)
 // ============================================================
 async function criarPedidoNoTiny(dadosCliente, carrinho) {
-    console.log("📤 Enviando pedido para o Tiny...");
+    console.log("📤 Sincronizando valor de venda com o Tiny...");
 
     try {
-        // 1. Prepara os itens com o PREÇO FINAL (Com Margem)
+        const margemGlobal = parseFloat(localStorage.getItem('minhaMargem') || 0);
+
         const itensFormatados = carrinho.map(item => {
-            // Recalcula o preço com margem para garantir que vai o valor de venda
-            const precoBase = parseFloat(item.preco || item.preco_novo);
-            const margem = (item.customMargin !== undefined) ? item.customMargin : ((FATOR_GLOBAL - 1) * 100);
-            //const precoVenda = precoBase * (1 + (margem / 100));
-            const precoVendaFinal = parseFloat(item.preco || item.preco_novo || 0);
+            // 1. Pega o preço base (Custo/Loja)
+            const precoBase = parseFloat(item.preco || item.preco_novo || 0);
+            
+            // 2. Define a margem (prioriza a do item, senão usa a global)
+            const margemFinal = (item.customMargin !== undefined && item.customMargin !== null) 
+                                ? parseFloat(item.customMargin) 
+                                : margemGlobal;
+
+            // 3. CALCULA O PREÇO DE VENDA (O mesmo do Asaas)
+            let precoVendaFinal = precoBase * (1 + (margemFinal / 100));
+            
+            // Proteção para nunca enviar valor zero ou negativo
+            if (precoVendaFinal <= 0) precoVendaFinal = 0.01;
 
             return {
-                id_tiny: item.id, // O ID do produto
+                id_tiny: item.id,
                 quantidade: item.quantidade,
-                preco: precoVendaFinal// O preço que vai na Nota Fiscal
+                // ✅ Envia o preço já com o lucro do afiliado embutido
+                preco: precoVendaFinal.toFixed(2) 
             };
         });
 
-        // 2. Monta o pacote para o Servidor
         const payload = {
             cliente: {
                 nome: dadosCliente.nome,
-                cpf: dadosCliente.documento, // O servidor limpa os pontos
+                cpf: dadosCliente.documento,
                 email: dadosCliente.email,
                 telefone: dadosCliente.telefone,
                 endereco: dadosCliente.endereco,
-                numero: "0", // Se tiver campo número no form, mude aqui
-                bairro: "Centro", // Se tiver campo bairro, mude aqui
-                cep: "00000000", // Ideal adicionar campo CEP no form
-                cidade: "Cidade", // Ideal adicionar campo Cidade
-                uf: "UF"
+                numero: dadosCliente.numero || "0",
+                bairro: dadosCliente.bairro || "Centro",
+                cep: dadosCliente.cep || "00000000",
+                cidade: dadosCliente.cidade,
+                uf: dadosCliente.uf
             },
             itensCarrinho: itensFormatados,
-            valorFrete: 0 // Se você tiver cálculo de frete, coloque a variável aqui
+            valorFrete: 0 
         };
 
-        // 3. Chuta para o Servidor (Rota que criamos antes)
-        // Ajuste a URL se seu servidor não estiver na mesma origem
-        const API_URL = ''; // Deixe vazio se estiver no mesmo domínio ou coloque 'https://autopecas-loja.onrender.com'
-        
         const response = await fetch(`${API_URL}/admin/tiny/criar-pedido`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
 
         const resultado = await response.json();
-
+        
         if (resultado.sucesso) {
-            console.log("✅ Pedido Tiny Criado: ", resultado.numero);
+            console.log("✅ Preço sincronizado no Tiny!");
             return resultado.numero;
-        } else {
-            console.error("❌ Erro Tiny:", resultado.erro);
-            return null;
         }
+        return null;
 
     } catch (error) {
-        console.error("❌ Falha na conexão com Tiny:", error);
+        console.error("❌ Erro ao enviar preço calculado para o Tiny:", error);
         return null;
     }
 }

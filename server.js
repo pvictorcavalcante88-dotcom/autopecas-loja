@@ -2285,96 +2285,75 @@ async function criarClienteNoTiny(dadosCliente, token) {
 // ==========================================================
 // 🧪 LABORATÓRIO DE PESQUISA TINY (TESTA VÁRIOS MÉTODOS)
 // ==========================================================
-app.get('/teste-laboratorio/:cpf', async (req, res) => {
-    const cpfRecebido = req.params.cpf;
-    const cpfLimpo = cpfRecebido.replace(/\D/g, '');
+// ==========================================================
+// 🧪 TIRA-TEIMA: DESCOBRINDO O NOME CERTO DO PARÂMETRO
+// ==========================================================
+app.get('/teste-parametro/:cpf', async (req, res) => {
+    const cpfRaw = req.params.cpf;
+    const cpfLimpo = cpfRaw.replace(/\D/g, '');
     const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
 
-    const relatorio = {
-        cpf_testado: { limpo: cpfLimpo, formatado: cpfFormatado },
-        vencedor: "NENHUM",
-        testes: []
-    };
+    const resultados = [];
 
     try {
-        console.log(`\n🧪 INICIANDO LABORATÓRIO PARA CPF: ${cpfFormatado}`);
         const token = await getValidToken();
+        console.log(`\n🕵️ INVESTIGANDO CPF: ${cpfFormatado}`);
 
-        // DEFININDO OS 4 MÉTODOS DE ATAQUE
-        const cenarios = [
-            {
-                nome: "1. Pesquisa Geral + CPF Formatado",
-                params: { pesquisa: cpfFormatado }
-            },
-            {
-                nome: "2. Pesquisa Geral + CPF Limpo",
-                params: { pesquisa: cpfLimpo }
-            },
-            {
-                nome: "3. Campo Técnico (cpfCnpj) + CPF Formatado",
-                params: { cpfCnpj: cpfFormatado } // Sem situacao
-            },
-            {
-                nome: "4. Campo Técnico (cpfCnpj) + CPF Limpo",
-                params: { cpfCnpj: cpfLimpo }
-            }
+        // LISTA DE SUSPEITOS (Nomes de parâmetros possíveis)
+        const tentativas = [
+            { nome: "cpf_cnpj (Snake Case)", param: { cpf_cnpj: cpfFormatado } }, // O clássico
+            { nome: "cpfCnpj (Camel Case)", param: { cpfCnpj: cpfFormatado } },   // O da documentação nova
+            { nome: "cpf (Simples)", param: { cpf: cpfFormatado } },              // Possibilidade
+            { nome: "pesquisa (Geral)", param: { pesquisa: cpfFormatado } }       // Fallback
         ];
 
-        // EXECUTA OS TESTES UM POR UM
-        for (const cenario of cenarios) {
-            let resultado = { metodo: cenario.nome, sucesso: false, msg: "", id_encontrado: null, nome_encontrado: null };
-            
+        for (const t of tentativas) {
+            let status = "FALHOU ❌";
+            let id = null;
+
             try {
-                // Pausa de 1 segundo entre testes para evitar erro 429
-                await new Promise(r => setTimeout(r, 1000)); 
+                // Delay anti-429
+                await new Promise(r => setTimeout(r, 1000));
 
                 const response = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
-                    params: cenario.params,
+                    params: t.param,
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
-                const dados = response.data.data || response.data; // Tiny v3 varia as vezes
+                const lista = response.data.data || [];
                 
-                // Verifica se achou alguém
-                if (dados && Array.isArray(dados) && dados.length > 0) {
-                    // Filtra para garantir que não é falso positivo
-                    const cliente = dados.find(c => {
-                        const cDoc = (c.cpfCnpj || c.cpf_cnpj || '').replace(/\D/g, '');
-                        return cDoc === cpfLimpo;
+                // Verifica se retornou ALGUÉM
+                if (Array.isArray(lista) && lista.length > 0) {
+                    // Confere se é o CPF certo
+                    const achou = lista.find(c => {
+                         const doc = (c.cpfCnpj || c.cpf_cnpj || '').replace(/\D/g, '');
+                         return doc === cpfLimpo;
                     });
 
-                    if (cliente) {
-                        resultado.sucesso = true;
-                        resultado.msg = "✅ ENCONTRADO!";
-                        resultado.id_encontrado = cliente.id;
-                        resultado.nome_encontrado = cliente.nome;
-                        
-                        // Se achou, marca como vencedor (se ainda não tiver um)
-                        if (relatorio.vencedor === "NENHUM") {
-                            relatorio.vencedor = cenario.nome;
-                        }
+                    if (achou) {
+                        status = "SUCESSO ✅";
+                        id = achou.id;
                     } else {
-                        resultado.msg = `⚠️ Retornou ${dados.length} registros, mas CPF não bateu.`;
-                        resultado.nomes_retornados = dados.map(d => d.nome);
+                        status = "RETORNOU (Mas CPF não bateu) ⚠️";
                     }
-                } else {
-                    resultado.msg = "❌ Nenhum registro retornado.";
                 }
 
-            } catch (erro) {
-                resultado.msg = `🔥 Erro na Requisição: ${erro.response?.status || erro.message}`;
-                if (erro.response?.data) resultado.detalhe_erro = erro.response.data;
+            } catch (e) {
+                status = `ERRO (${e.response?.status || e.message}) 🔥`;
             }
 
-            relatorio.testes.push(resultado);
-            console.log(`[${cenario.nome}] -> ${resultado.msg}`);
+            console.log(`👉 Testando [${t.nome}]: ${status}`);
+            resultados.push({ metodo: t.nome, status, id_encontrado: id });
         }
 
-        // RETORNA O RELATÓRIO COMPLETO NA TELA
-        res.json(relatorio);
+        res.json({
+            cpf_alvo: cpfFormatado,
+            conclusao: "Veja qual método ficou VERDE acima",
+            resultados
+        });
 
     } catch (error) {
-        res.status(500).json({ erro_geral: error.message });
+        res.status(500).json({ erro: error.message });
     }
 });
 

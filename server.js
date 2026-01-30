@@ -2004,95 +2004,57 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 app.post('/admin/tiny/criar-pedido', async (req, res) => {
     try {
         const tokenFinal = await getValidToken();
+        // 1. Corrigido: Pegando os nomes corretos do req.body
         const { itensCarrinho, cliente, valorFrete } = req.body;
-        const idClienteTiny = await resolverClienteParaVenda(dadosCliente, token);
 
         console.log("🚀 INICIANDO PEDIDO PARA:", cliente.nome);
 
-        // --- 1. RESOLVE O CLIENTE (Já está funcionando) ---
-        let idClienteFinal = null;
-        if (cliente.documento || cliente.cpf) {
-            idClienteFinal = await buscarClientePorCPF(cliente.documento || cliente.cpf, tokenFinal);
-        }
+        // --- 1. RESOLVE O CLIENTE ---
+        // Alterado: Usando a função 'resolverClienteParaVenda' que criamos
+        // Ela já faz a busca, a criação e o resgate do ID se der erro.
+        const idClienteFinal = await resolverClienteParaVenda(cliente, tokenFinal);
 
-        if (!idClienteTiny) {
+        if (!idClienteFinal) {
+            console.error("❌ FALHA CRÍTICA: Cliente não identificado.");
             return res.status(400).json({ erro: "Não foi possível identificar ou criar o cliente no Tiny." });
         }
         
-        if (!idClienteFinal) {
-            console.log("⚠️ Cliente não achado na busca, tentando criar...");
-            await sleep(1000);
-            idClienteFinal = await criarClienteNoTiny(cliente, tokenFinal);
-            await sleep(1000);
-        }
-
-        if (!idClienteFinal) {
-            return res.status(500).json({ erro: "FALHA CRÍTICA: Cliente não identificado." });
-        }
         console.log("✅ Cliente resolvido ID:", idClienteFinal);
 
-
-       // --- 2. RESOLVE OS ITENS (COM CORREÇÃO AUTOMÁTICA DE ID) ---
+        // --- 2. RESOLVE OS ITENS ---
         console.log("🔎 PROCESSANDO ITENS...");
 
         const itensFormatados = await Promise.all(itensCarrinho.map(async (prod, index) => {
-            // 1. Pega o ID que veio (seja id_tiny, tinyId ou id normal)
             let idFinal = prod.id_tiny || prod.tinyId || prod.id;
 
-            console.log(`📦 Item ${index + 1}: Recebi ID ${idFinal}`);
-
-            // 2. A MÁGICA: Se o ID for "Curto" (menos de 6 dígitos), é ID do Site!
-            // O ID do Tiny sempre é gigante (ex: 337204975)
+            // Se o ID for do site (curto), busca o do Tiny no Prisma
             if (idFinal && String(idFinal).length < 6) {
-                console.log(`   🕵️ ID ${idFinal} é curto. Buscando TinyID no banco...`);
-                
                 try {
-                    // TENTATIVA 1: Tenta buscar como 'produto' (Portugues)
-                    // Se o seu schema for 'model Produto', isso vai funcionar
-                    let produtoBanco = null;
-                    
-                    if (prisma.produto) {
-                        produtoBanco = await prisma.produto.findUnique({ where: { id: parseInt(idFinal) } });
-                    } else if (prisma.product) {
-                        // TENTATIVA 2: Tenta buscar como 'product' (Ingles)
-                        produtoBanco = await prisma.product.findUnique({ where: { id: parseInt(idFinal) } });
-                    } else {
-                        throw new Error("Não encontrei a tabela 'produto' nem 'product' no Prisma!");
-                    }
-
-                    if (produtoBanco && produtoBanco.tinyId) {
-                        console.log(`   ✅ ENCONTRADO! Trocando ${idFinal} por ${produtoBanco.tinyId}`);
-                        idFinal = produtoBanco.tinyId;
-                    } else {
-                        console.log(`   ❌ Produto ID ${idFinal} não tem tinyId no banco ou não existe.`);
+                    const tabela = prisma.produto || prisma.product;
+                    if (tabela) {
+                        const produtoBanco = await tabela.findUnique({ where: { id: parseInt(idFinal) } });
+                        if (produtoBanco?.tinyId) idFinal = produtoBanco.tinyId;
                     }
                 } catch (e) {
-                    console.error("   ❌ Erro técnico no Prisma:", e.message);
+                    console.error("❌ Erro Prisma Item " + index, e.message);
                 }
             }
 
-            // 3. Verifica se sobrou algum ID válido
-            if (!idFinal) {
-                console.warn("   ⚠️ PERIGO: Item sem ID. O Tiny vai rejeitar.");
-            }
-
             return {
-                produto: { id: idFinal }, // Agora vai o 337...
+                produto: { id: idFinal },
                 quantidade: prod.quantidade,
                 valorUnitario: parseFloat(prod.preco || 0.01)
             };
         }));
 
-
         // --- 3. ENVIA O PEDIDO ---
+        // Estrutura corrigida para API V3
         const payloadPedido = {
             data: new Date().toISOString().split('T')[0],
-        
-            idContato: idClienteFinal,
-            cliente: { id: idClienteTiny },
+            idContato: idClienteFinal, // O ID que pescamos (ex: 890236518)
             itens: itensFormatados,
             naturezaOperacao: { id: 335900648 },
-            valorFrete: valorFrete || 0,
+            valorFrete: parseFloat(valorFrete || 0),
             situacao: 0
         };
 
@@ -2103,15 +2065,17 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
         );
 
-        console.log("🎉 SUCESSO! Pedido criado: " + response.data.data?.numero);
-        res.json({ sucesso: true, numero: response.data.data?.numero });
+        console.log("🎉 SUCESSO! Pedido criado!");
+        res.json({ sucesso: true, numero: response.data.data?.numero || "Criado" });
 
     } catch (error) {
         console.error("❌ ERRO NO SERVER:", JSON.stringify(error.response?.data || error.message));
-        res.status(500).json({ erro: "Erro ao processar", detalhes: error.response?.data });
+        res.status(500).json({ 
+            erro: "Erro ao processar pedido", 
+            detalhes: error.response?.data || error.message 
+        });
     }
 });
-
 // ROTA: RAIO-X COMPLETO (SEM FILTROS)
 app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
     try {
@@ -2230,57 +2194,59 @@ async function resolverClienteParaVenda(dadosCliente, token) {
 // CRIAR CLIENTE (COM DELAY AUMENTADO)
 // ==========================================
 async function criarClienteNoTiny(dadosCliente, token) {
+    // Proteção contra o erro que você recebeu:
+    if (!dadosCliente) {
+        console.error("❌ Erro: dadosCliente chegou vazio na função!");
+        return null;
+    }
+
     const cpfLimpo = (dadosCliente.documento || dadosCliente.cpf || '').replace(/\D/g, '');
     
-    const payloadCliente = {
-        "nome": dadosCliente.nome,
-        "tipoPessoa": cpfLimpo.length > 11 ? 'J' : 'F',
-        "cpfCnpj": cpfLimpo,
-        "endereco": {
-            "endereco": dadosCliente.endereco || "Rua nao informada",
-            "bairro": dadosCliente.bairro || "Centro",
-            "cidade": dadosCliente.cidade || "Maceio",
-            "uf": dadosCliente.uf || "AL"
-        },
-        "situacao": "A"
+    const payload = {
+        nome: dadosCliente.nome,
+        cpfCnpj: cpfLimpo,
+        tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
+        situacao: "A"
+        // adicione endereco se necessário...
     };
 
     try {
-        console.log("📤 Tentando criar cliente...");
+        console.log("📤 Tentando criar cliente no Tiny...");
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/contatos`,
-            payloadCliente,
+            payload,
             { headers: { 'Authorization': `Bearer ${token}` } }
         );
         return response.data.data?.id || response.data.id;
 
     } catch (error) {
-        const dadosErro = error.response?.data;
-        const msgErro = JSON.stringify(dadosErro);
-        console.log("⚠️ Resposta do Tiny no erro:", msgErro);
+        const respostaTiny = JSON.stringify(error.response?.data || "");
+        
+        // 🔎 O PULO DO GATO: Se o cliente existe, o Tiny V3 retorna erro 400 
+        // com uma mensagem tipo: "O contato 890236518 já está cadastrado."
+        if (respostaTiny.includes("existe") || respostaTiny.includes("cadastrado") || error.response?.status === 400) {
+            console.log("⚠️ Cliente já cadastrado. Pescando ID na resposta...");
 
-        // 🔎 ESTRATÉGIA 1: PESCAR O ID NO TEXTO DO ERRO
-        // O Tiny costuma mandar algo como: "O contato 890236518 já existe"
-        const matchId = msgErro.match(/(\d{9,})/); 
-        if (matchId && matchId[1]) {
-            console.log(`✅ ID PESCADO COM SUCESSO: ${matchId[1]}`);
-            return matchId[1];
-        }
+            // Expressão regular para pegar qualquer sequência de 9 dígitos (o ID)
+            const matchId = respostaTiny.match(/(\d{9,})/);
+            
+            if (matchId && matchId[1]) {
+                console.log(`✅ ID PESCADO: ${matchId[1]}`);
+                return matchId[1];
+            }
 
-        // 🔎 ESTRATÉGIA 2: SE NÃO PESCOU, BUSCA POR NOME COMPLETO
-        // Vamos tentar o nome EXATO que está no seu banco (Rafaela souza)
-        console.log("🕵️ ID não encontrado no erro. Tentando busca por nome exato...");
-        try {
-            const resNome = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
-                params: { pesquisa: "Rafaela souza" }, // Use o nome que vimos no diagnóstico
+            // Se não pescou no erro, tenta a última cartada: buscar pelo nome EXATO
+            console.log("🕵️ ID não estava na mensagem. Tentando busca por nome exato...");
+            const resNome = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(dadosCliente.nome)}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const lista = resNome.data.data || [];
-            const achou = lista.find(c => c.nome.toLowerCase().includes("rafaela"));
-            if (achou) return achou.id;
-        } catch (e) { console.log("Falha no resgate por nome"); }
+            const achou = lista.find(c => (c.cpfCnpj || "").replace(/\D/g, '') === cpfLimpo);
+            return achou ? achou.id : null;
+        }
 
-        return null; 
+        console.error("❌ Erro técnico no Tiny:", respostaTiny);
+        return null;
     }
 }
 

@@ -126,7 +126,7 @@ document.addEventListener("DOMContentLoaded", async function() {
     const paramsURL = new URLSearchParams(window.location.search);
     const restoreData = paramsURL.get('restore'); 
 
-    // No início do seu script.js
+    // No topo do script.js
     if (restoreData) {
         try {
             const jsonLimpo = decodeURIComponent(restoreData);
@@ -137,14 +137,13 @@ document.addEventListener("DOMContentLoaded", async function() {
                     id: item.id,
                     quantidade: item.q || item.quantidade,
                     nome: item.n || item.nome,
-                    // ✅ IMPORTANTE: Salva o preço que já vem com lucro (item.p)
-                    preco: item.p || item.preco, 
-                    // ✅ Trava em 0 para não somar margem em cima de margem no checkout
-                    customMargin: 0 
+                    // ✅ Voltamos para o preço de Custo (150.00)
+                    preco: item.pc || item.preco, 
+                    // ✅ Devolvemos a margem original (25)
+                    customMargin: item.m || 0 
                 }));
 
                 localStorage.setItem('nossoCarrinho', JSON.stringify(carrinhoParaSalvar));
-                localStorage.setItem('minhaMargem', '0'); // Garante que a global não interfira
             }
             window.history.replaceState({}, document.title, window.location.pathname);
             window.location.reload(); 
@@ -835,13 +834,12 @@ function gerarPayloadUrl() {
     
     const payload = itens.map(i => ({ 
         id: i.id, 
-        q: i.qtd,          // Abreviei para o link não ficar gigante
-        m: 0,              // Margem zerada para o cliente não somar de novo
-        p: i.unitario,      // 'p' de Preço (Valor já com lucro)
-        n: i.nome          // 'n' de Nome
+        q: i.qtd,
+        n: i.nome,
+        m: i.customMargin,     // ✅ Enviamos a MARGEM real (ex: 25)
+        pc: (i.unitario / (1 + (i.customMargin / 100))).toFixed(2) // ✅ Preço de Custo (150.00)
     }));
     
-    console.log("🔗 Gerando Link com estes dados:", payload);
     return encodeURIComponent(JSON.stringify(payload));
 }
 

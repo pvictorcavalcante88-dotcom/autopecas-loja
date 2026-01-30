@@ -2128,19 +2128,21 @@ app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
 
 
 // ==========================================
-// FUNÇÃO DE BUSCA: MODELO API V3 OFICIAL
+// FUNÇÃO DE BUSCA: MODELO ANTI-BLOQUEIO (429)
 // ==========================================
 async function buscarClientePorCPF(cpf, token, nomeCompleto = "") {
-    // 1. Prepara o CPF Formatado (Obrigatório segundo seus testes visuais)
     const cpfLimpo = cpf.replace(/\D/g, '');
     const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
     
+    // Função auxiliar que filtra a lista (Lê cpfCnpj e cpf_cnpj)
     const garimparID = (lista, origem) => {
         if (!lista || !Array.isArray(lista)) return null;
+        
         const achou = lista.find(c => {
             const cpfNoTiny = (c.cpfCnpj || c.cpf_cnpj || '').replace(/\D/g, '');
             return cpfNoTiny === cpfLimpo;
         });
+
         if (achou) {
             console.log(`✅ ACHEI VIA ${origem}: ${achou.nome} (ID: ${achou.id})`);
             return achou.id;
@@ -2149,48 +2151,45 @@ async function buscarClientePorCPF(cpf, token, nomeCompleto = "") {
     };
 
     try {
-        // TENTATIVA 1: USANDO O PARÂMETRO OFICIAL 'cpfCnpj'
-        // Documentação diz: "Pesquisa por CPF ou CNPJ"
-        console.log(`🔎 Buscando parâmetro cpfCnpj: ${cpfFormatado}`);
+        // TENTATIVA 1: CPF FORMATADO (A mais precisa)
+        console.log(`🔎 Buscando cpfCnpj: ${cpfFormatado}`);
         try {
             const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
-                params: { 
-                    cpfCnpj: cpfFormatado, // Parâmetro exato da documentação
-                    // REMOVIDO 'situacao' POIS 'T' É INVÁLIDO. 
-                    // Sem enviar, ele busca os ativos (A e B).
-                }, 
+                params: { cpfCnpj: cpfFormatado }, 
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const id = garimparID(res.data.data, "API CPF FORMATADO");
             if (id) return id;
-        } catch (e) { console.log(`⚠️ Falha busca cpfCnpj: ${e.message}`); }
+        } catch (e) { console.log(`⚠️ Falha busca cpfCnpj (pode ser 429 ou 404): ${e.response?.status || e.message}`); }
 
-        // TENTATIVA 2: USANDO O PARÂMETRO 'nome' (Se CPF falhar)
-        // Documentação diz: "Pesquisa por nome parcial ou completo"
+        // TENTATIVA 2: BUSCA PELO PRIMEIRO NOME (A "Rede de Arrastão")
+        // Se o CPF falhar (ou der 429), esperamos um pouco e tentamos pelo primeiro nome.
         if (nomeCompleto) {
-            // Removemos acentos para evitar conflitos de encoding
-            const nomeBusca = nomeCompleto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            console.log(`☢️ MODO NOME: Buscando parâmetro nome: "${nomeBusca}"`);
+            // Pega só "RAFAELA"
+            const primeiroNome = nomeCompleto.split(' ')[0].trim();
             
-            try {
-                const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
-                    params: { 
-                        nome: nomeBusca // Parâmetro exato da documentação
-                    },
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+            if (primeiroNome.length > 2) {
+                console.log(`☢️ MODO NOME: Buscando apenas primeiro nome: "${primeiroNome}"...`);
                 
-                const id = garimparID(res.data.data, "API NOME");
-                if (id) return id;
-            } catch (e) {
-                console.log("❌ Falha na busca por nome.");
+                try {
+                    const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
+                        params: { nome: primeiroNome }, // Busca genérica
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    
+                    const id = garimparID(res.data.data, "PRIMEIRO NOME");
+                    if (id) return id;
+                    
+                    console.log(`⚠️ Baixei a lista de "${primeiroNome}" mas o CPF não estava lá.`);
+                } catch (e) {
+                    console.log(`❌ Falha na busca por nome: ${e.message}`);
+                }
             }
         }
 
         return null;
 
     } catch (e) {
-        console.error("❌ Erro técnico busca:", e.message);
         return null;
     }
 }
@@ -2212,9 +2211,11 @@ function checarSeAchou(response) {
     return false;
 }
 
+// ==========================================
+// CRIAR CLIENTE (COM DELAY AUMENTADO)
+// ==========================================
 async function criarClienteNoTiny(dadosCliente, token) {
     const cpfLimpo = (dadosCliente.documento || dadosCliente.cpf || '').replace(/\D/g, '');
-    const emailCliente = dadosCliente.email || ""; 
     
     // Tratamento de Cidade/UF
     let cidadeLimpa = dadosCliente.cidade;
@@ -2235,7 +2236,7 @@ async function criarClienteNoTiny(dadosCliente, token) {
             "uf": ufLimpa,
             "pais": "Brasil"
         },
-        "email": emailCliente, 
+        "email": dadosCliente.email || "", 
         "situacao": "A"
     };
 
@@ -2262,32 +2263,13 @@ async function criarClienteNoTiny(dadosCliente, token) {
                 return matchId[1];
             }
 
-            console.log("⏳ Esperando 2s...");
-            await new Promise(r => setTimeout(r, 2000)); 
+            // 🛑 AQUI ESTÁ A CORREÇÃO DO ERRO 429
+            // Aumentamos para 5 segundos para o Tiny "esfriar a cabeça"
+            console.log("⏳ Esperando 5s para evitar bloqueio 429...");
+            await new Promise(r => setTimeout(r, 5000)); 
 
-            // 2. BUSCA POR E-MAIL (Pesquisa Geral)
-            if (emailCliente && emailCliente.includes("@")) {
-                console.log(`📧 TENTATIVA EMAIL: ${emailCliente}`);
-                try {
-                    const resEmail = await axios.get(
-                        `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(emailCliente)}`,
-                        { headers: { 'Authorization': `Bearer ${token}` } }
-                    );
-
-                    if (resEmail.data && resEmail.data.data) {
-                        // Pega o primeiro e confia (E-mail é único)
-                        const achouEmail = resEmail.data.data[0];
-                        if (achouEmail) {
-                            console.log(`✅ ACHEI PELO EMAIL! ID: ${achouEmail.id}`);
-                            return achouEmail.id;
-                        }
-                    }
-                } catch (e) {}
-            }
-
-            // 3. BUSCA AVANÇADA POR CPF + NOME
-            console.log("🔄 Iniciando Busca Avançada (CPF/Nome)...");
-            // Passamos o nome também para ativar o Modo Nuclear se precisar
+            // 2. BUSCA AVANÇADA (Agora com delay seguro)
+            console.log("🔄 Tentando busca de resgate...");
             const idCpf = await buscarClientePorCPF(cpfLimpo, token, dadosCliente.nome);
             if (idCpf) return idCpf;
         }

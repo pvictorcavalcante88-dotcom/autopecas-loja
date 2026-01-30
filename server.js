@@ -2214,7 +2214,6 @@ function checarSeAchou(response) {
 async function criarClienteNoTiny(dadosCliente, token) {
     const cpfLimpo = (dadosCliente.documento || dadosCliente.cpf || '').replace(/\D/g, '');
     
-    // Tratamento de Cidade/UF
     let cidadeLimpa = dadosCliente.cidade;
     let ufLimpa = dadosCliente.uf;
     if (!cidadeLimpa || cidadeLimpa.trim().toLowerCase() === "cidade") cidadeLimpa = "Maceio";
@@ -2246,60 +2245,60 @@ async function criarClienteNoTiny(dadosCliente, token) {
         return response.data.data?.id || response.data.id;
 
     } catch (error) {
-        // Converte todo o erro para texto para podermos ler
         const erroCompleto = JSON.stringify(error.response?.data || "");
         const mensagemErro = erroCompleto.toLowerCase();
         
-        // 🚨 CENÁRIO: CLIENTE JÁ EXISTE
-        if (mensagemErro.includes("existe") || mensagemErro.includes("duplicado") || mensagemErro.includes("cadastrado")) {
-            console.log("⚠️ TINY AVISOU: Cliente já existe!");
+        // 🚨 CENÁRIO: JÁ EXISTE
+        if (mensagemErro.includes("existe") || mensagemErro.includes("duplicado") || mensagemErro.includes("cnpj")) {
+            console.log("⚠️ TINY AVISOU: Cliente já existe! Iniciando protocolo de busca avançada...");
 
-            // 🕵️ ESTRATÉGIA 1: TENTAR LER O ID DENTRO DA MENSAGEM DE ERRO
-            // O Tiny as vezes manda: "já está cadastrado para o contato X (id: 123456)"
-            const matchId = erroCompleto.match(/id[:\s]+(\d+)/i);
-            
+            // 1. TENTA LER ID NO ERRO (Regex melhorada para pegar varios formatos)
+            const matchId = erroCompleto.match(/id["\s:]+(\d+)/i) || erroCompleto.match(/\((\d+)\)/);
             if (matchId && matchId[1]) {
                 console.log(`✅ ID ENCONTRADO NA MENSAGEM DE ERRO: ${matchId[1]}`);
                 return matchId[1];
             }
 
-            console.log("⏳ ID não estava no erro. Esperando 2s para busca profunda...");
+            console.log("⏳ Esperando 2s...");
             await new Promise(r => setTimeout(r, 2000)); 
-            
-            // 🕵️ ESTRATÉGIA 2: BUSCA PELO CPF NOVAMENTE
-            console.log("🔄 Tentando busca pelo CPF...");
+
+            // 2. TENTA BUSCAR PELO CPF (Limpo)
+            console.log("🔄 Tentando busca direta pelo CPF...");
             let idResgatado = await buscarClientePorCPF(cpfLimpo, token);
             if (idResgatado) return idResgatado;
 
-            // 🕵️ ESTRATÉGIA 3 (NUCLEAR): BUSCA PELO NOME
-            // Se o CPF falhou, buscamos pelo NOME e conferimos se o CPF bate
-            console.log(`☢️ MODO NUCLEAR: Buscando por NOME: "${dadosCliente.nome}"`);
+            // 3. ESTRATÉGIA MESTRA: BUSCA POR "NOME CURTO"
+            // Se o nome for "RAFAELA SOUZA DOS SANTOS", buscamos só "RAFAELA SOUZA"
+            const partesNome = dadosCliente.nome.trim().split(' ');
+            let nomeBusca = partesNome[0];
+            if (partesNome.length > 1) nomeBusca += " " + partesNome[1];
+
+            console.log(`☢️ MODO INTELIGENTE: Buscando por nome curto: "${nomeBusca}"`);
+            
             try {
                 const resNome = await axios.get(
-                    `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(dadosCliente.nome)}&situacao=T`,
+                    `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(nomeBusca)}&situacao=T`,
                     { headers: { 'Authorization': `Bearer ${token}` } }
                 );
 
                 if (resNome.data && resNome.data.data) {
-                    // Filtra nos resultados alguém que tenha o mesmo CPF (mesmo que mal formatado)
+                    // Filtra na memória quem tem o MESMO CPF
                     const clienteCerto = resNome.data.data.find(c => {
                         const cpfTiny = (c.cpf_cnpj || '').replace(/\D/g, '');
                         return cpfTiny === cpfLimpo;
                     });
 
                     if (clienteCerto) {
-                        console.log(`✅ ACHEI PELO NOME! ID: ${clienteCerto.id}`);
+                        console.log(`✅ ACHEI PELO NOME CURTO! ID: ${clienteCerto.id} (Nome Tiny: ${clienteCerto.nome})`);
                         return clienteCerto.id;
                     }
                 }
             } catch (eNome) {
-                console.log("❌ Falha na busca por nome.");
+                console.log("❌ Falha na busca por nome curto.");
             }
         }
 
-        console.error("❌ ERRO TINY IRRECUPERÁVEL:", mensagemErro);
-        // Se tudo falhar, retorna NULL para não travar o servidor, 
-        // mas o pedido vai falhar no passo seguinte.
+        console.error("❌ ERRO TINY FINAL:", mensagemErro);
         return null; 
     }
 }

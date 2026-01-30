@@ -2130,62 +2130,78 @@ app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
 // ==========================================
 // FUNÇÃO DE BUSCA: CORRIGIDA (Lê cpfCnpj E cpf_cnpj)
 // ==========================================
-async function buscarClientePorCPF(cpf, token) {
+// ==========================================
+// FUNÇÃO DE BUSCA: ESTRATÉGIA "FORÇA BRUTA"
+// ==========================================
+async function buscarClientePorCPF(cpf, token, nomeCompleto = "") {
     const cpfLimpo = cpf.replace(/\D/g, '');
+    const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
     
-    // Função para verificar se achou
-    const verificarRetorno = (res, tipoBusca) => {
-        if (res.data && res.data.data && res.data.data.length > 0) {
-            // O Tiny V3 as vezes retorna array, as vezes objeto direto
-            const lista = Array.isArray(res.data.data) ? res.data.data : [res.data.data];
-            
-            const achou = lista.find(c => {
-                // 🚨 O PULO DO GATO ESTÁ AQUI:
-                // O Tiny pode mandar 'cpfCnpj' ou 'cpf_cnpj'. Lemos os dois!
-                const cpfNoTiny = c.cpfCnpj || c.cpf_cnpj || ''; 
-                const cpfTinyLimpo = cpfNoTiny.replace(/\D/g, '');
-                
-                // Compara apenas os números
-                return cpfTinyLimpo === cpfLimpo; 
-            });
+    // Função que verifica se o CPF bate (Lê cpfCnpj E cpf_cnpj)
+    const encontrarNaLista = (lista, origem) => {
+        if (!lista || !Array.isArray(lista)) return null;
 
-            if (achou) {
-                console.log(`✅ ACHEI NA BUSCA (${tipoBusca}): ${achou.nome} (ID: ${achou.id})`);
-                return achou.id;
-            }
+        const achou = lista.find(c => {
+            const cpfNoTiny = c.cpfCnpj || c.cpf_cnpj || ''; 
+            const cpfTinyLimpo = cpfNoTiny.replace(/\D/g, '');
+            return cpfTinyLimpo === cpfLimpo; 
+        });
+
+        if (achou) {
+            console.log(`✅ ACHEI VIA ${origem}: ${achou.nome} (ID: ${achou.id})`);
+            return achou.id;
         }
         return null;
     };
 
     try {
-        // TENTATIVA 1: PESQUISA GERAL (Igual à lupa do site)
-        // É a mais garantida porque varre tudo
-        console.log(`🔎 Buscando na Pesquisa Geral: ${cpfLimpo}`);
+        // 1. BUSCA TÉCNICA (Parâmetro cpf_cnpj)
+        // É a mais rápida. Tenta formatado e limpo.
+        console.log(`🔎 Buscando CPF exato via API...`);
         try {
-            const res = await axios.get(
-                `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${cpfLimpo}`, 
-                { headers: { 'Authorization': `Bearer ${token}` } }
-            );
-            const id = verificarRetorno(res, "GERAL");
+            const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
+                params: { cpf_cnpj: cpfFormatado, situacao: 'T' }, // Traz até excluídos
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const id = encontrarNaLista(res.data.data, "CPF FORMATADO");
             if (id) return id;
-        } catch (e) { console.log("⚠️ Falha tentativa geral"); }
+        } catch (e) {}
 
-        // TENTATIVA 2: PESQUISA FORMATADA
-        const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
-        console.log(`🔎 Buscando CPF Formatado: ${cpfFormatado}`);
         try {
-            const res = await axios.get(
-                `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(cpfFormatado)}`, 
-                { headers: { 'Authorization': `Bearer ${token}` } }
-            );
-            const id = verificarRetorno(res, "FORMATADO");
+            const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
+                params: { cpf_cnpj: cpfLimpo, situacao: 'T' },
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const id = encontrarNaLista(res.data.data, "CPF LIMPO");
             if (id) return id;
-        } catch (e) { console.log("⚠️ Falha tentativa formatada"); }
+        } catch (e) {}
+
+        // 2. A ESTRATÉGIA NUCLEAR: BUSCA PELO PRIMEIRO NOME
+        // Se o CPF falhou, baixamos todo mundo com esse nome e filtramos na mão.
+        if (nomeCompleto) {
+            const primeiroNome = nomeCompleto.split(' ')[0].trim();
+            if (primeiroNome.length > 2) {
+                console.log(`☢️ MODO NUCLEAR: Baixando todos com nome "${primeiroNome}" para conferir CPF...`);
+                try {
+                    const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
+                        params: { pesquisa: primeiroNome, situacao: 'T' },
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    
+                    const id = encontrarNaLista(res.data.data, "PRIMEIRO NOME");
+                    if (id) return id;
+                    
+                    console.log(`⚠️ Baixei ${res.data.data?.length || 0} pessoas chamadas "${primeiroNome}", mas nenhum CPF bateu.`);
+                } catch (e) {
+                    console.log("❌ Falha na busca por nome.");
+                }
+            }
+        }
 
         return null;
 
     } catch (e) {
-        console.error("❌ Erro técnico busca CPF:", e.message);
+        console.error("❌ Erro técnico busca:", e.message);
         return null;
     }
 }
@@ -2280,9 +2296,10 @@ async function criarClienteNoTiny(dadosCliente, token) {
                 } catch (e) {}
             }
 
-            // 3. BUSCA POR CPF (Usando a nova função corrigida)
-            console.log("🔄 Buscando por CPF...");
-            const idCpf = await buscarClientePorCPF(cpfLimpo, token);
+            // 3. BUSCA AVANÇADA POR CPF + NOME
+            console.log("🔄 Iniciando Busca Avançada (CPF/Nome)...");
+            // Passamos o nome também para ativar o Modo Nuclear se precisar
+            const idCpf = await buscarClientePorCPF(cpfLimpo, token, dadosCliente.nome);
             if (idCpf) return idCpf;
         }
         

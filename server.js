@@ -2283,73 +2283,82 @@ async function criarClienteNoTiny(dadosCliente, token) {
 // ROTA DE DIAGNÓSTICO PÚBLICA (SEM SENHA)
 // ==========================================
 // ==========================================================
-// 🧪 LABORATÓRIO DE PESQUISA TINY (TESTA VÁRIOS MÉTODOS)
-// ==========================================================
-// ==========================================================
-// 🧪 TIRA-TEIMA: DESCOBRINDO O NOME CERTO DO PARÂMETRO
+// 🧪 LABORATÓRIO: TESTA CPF, PARÂMETROS E BUSCA POR NOME
 // ==========================================================
 app.get('/teste-parametro/:cpf', async (req, res) => {
     const cpfRaw = req.params.cpf;
     const cpfLimpo = cpfRaw.replace(/\D/g, '');
     const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+    
+    // Pega o nome da URL (?nome=Rafaela) ou usa um padrão para teste
+    const nomeTeste = req.query.nome || "Rafaela"; 
 
     const resultados = [];
+    const token = await getValidToken();
 
-    try {
-        const token = await getValidToken();
-        console.log(`\n🕵️ INVESTIGANDO CPF: ${cpfFormatado}`);
+    console.log(`\n🧪 INICIANDO LABORATÓRIO...`);
+    console.log(`🎯 CPF Alvo: ${cpfFormatado}`);
+    console.log(`👤 Nome Alvo: ${nomeTeste}`);
 
-        // LISTA DE SUSPEITOS (Nomes de parâmetros possíveis)
-        const tentativas = [
-            { nome: "cpf_cnpj (Snake Case)", param: { cpf_cnpj: cpfFormatado } }, // O clássico
-            { nome: "cpfCnpj (Camel Case)", param: { cpfCnpj: cpfFormatado } },   // O da documentação nova
-            { nome: "cpf (Simples)", param: { cpf: cpfFormatado } },              // Possibilidade
-            { nome: "pesquisa (Geral)", param: { pesquisa: cpfFormatado } }       // Fallback
-        ];
+    // FUNÇÃO AUXILIAR DE TESTE
+    const testarMetodo = async (titulo, params) => {
+        let status = "❌ FALHOU";
+        let detalhe = "Zero resultados";
+        let id = null;
 
-        for (const t of tentativas) {
-            let status = "FALHOU ❌";
-            let id = null;
+        try {
+            // Delay pequeno para não travar a API
+            await new Promise(r => setTimeout(r, 500));
 
-            try {
-                // Delay anti-429
-                await new Promise(r => setTimeout(r, 1000));
+            const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
+                params: params,
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
 
-                const response = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
-                    params: t.param,
-                    headers: { 'Authorization': `Bearer ${token}` }
+            const lista = res.data.data || [];
+            
+            if (Array.isArray(lista) && lista.length > 0) {
+                // Procura o CPF na lista retornada
+                const achou = lista.find(c => {
+                    const doc = (c.cpfCnpj || c.cpf_cnpj || '').replace(/\D/g, '');
+                    return doc === cpfLimpo;
                 });
 
-                const lista = response.data.data || [];
-                
-                // Verifica se retornou ALGUÉM
-                if (Array.isArray(lista) && lista.length > 0) {
-                    // Confere se é o CPF certo
-                    const achou = lista.find(c => {
-                         const doc = (c.cpfCnpj || c.cpf_cnpj || '').replace(/\D/g, '');
-                         return doc === cpfLimpo;
-                    });
-
-                    if (achou) {
-                        status = "SUCESSO ✅";
-                        id = achou.id;
-                    } else {
-                        status = "RETORNOU (Mas CPF não bateu) ⚠️";
-                    }
+                if (achou) {
+                    status = "✅ SUCESSO";
+                    detalhe = `Encontrado ID: ${achou.id} (${achou.nome})`;
+                    id = achou.id;
+                } else {
+                    status = "⚠️ INCONCLUSIVO";
+                    detalhe = `Trouxe ${lista.length} nomes, mas CPF não bateu.`;
                 }
-
-            } catch (e) {
-                status = `ERRO (${e.response?.status || e.message}) 🔥`;
             }
-
-            console.log(`👉 Testando [${t.nome}]: ${status}`);
-            resultados.push({ metodo: t.nome, status, id_encontrado: id });
+        } catch (e) {
+            status = "🔥 ERRO API";
+            detalhe = e.response?.status || e.message;
         }
 
+        resultados.push({ metodo: titulo, status, detalhe, id_encontrado: id });
+        console.log(`👉 [${titulo}]: ${status}`);
+    };
+
+    try {
+        // 1. TESTE: CPF FORMATADO (Parâmetro cpf_cnpj snake_case)
+        await testarMetodo("1. CPF (cpf_cnpj)", { cpf_cnpj: cpfFormatado });
+
+        // 2. TESTE: CPF FORMATADO (Parâmetro cpfCnpj camelCase)
+        await testarMetodo("2. CPF (cpfCnpj)", { cpfCnpj: cpfFormatado });
+
+        // 3. TESTE: PESQUISA GERAL (CPF)
+        await testarMetodo("3. Pesquisa Geral (CPF)", { pesquisa: cpfFormatado });
+
+        // 4. TESTE: BUSCA POR NOME (A ESTRATÉGIA "PENEIRA")
+        // Aqui buscamos pelo nome e o código tenta achar o CPF dentro
+        await testarMetodo(`4. Busca por Nome (${nomeTeste})`, { pesquisa: nomeTeste });
+
         res.json({
-            cpf_alvo: cpfFormatado,
-            conclusao: "Veja qual método ficou VERDE acima",
-            resultados
+            alvo: { cpf: cpfFormatado, nome_pesquisado: nomeTeste },
+            resultados: resultados
         });
 
     } catch (error) {

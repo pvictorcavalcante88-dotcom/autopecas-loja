@@ -2005,6 +2005,7 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
     try {
         const tokenFinal = await getValidToken();
         const { itensCarrinho, cliente, valorFrete } = req.body;
+        const idClienteTiny = await resolverClienteParaVenda(dadosCliente, token);
 
         console.log("🚀 INICIANDO PEDIDO PARA:", cliente.nome);
 
@@ -2012,6 +2013,10 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
         let idClienteFinal = null;
         if (cliente.documento || cliente.cpf) {
             idClienteFinal = await buscarClientePorCPF(cliente.documento || cliente.cpf, tokenFinal);
+        }
+
+        if (!idClienteTiny) {
+            return res.status(400).json({ erro: "Não foi possível identificar ou criar o cliente no Tiny." });
         }
         
         if (!idClienteFinal) {
@@ -2082,8 +2087,9 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
         // --- 3. ENVIA O PEDIDO ---
         const payloadPedido = {
             data: new Date().toISOString().split('T')[0],
+        
             idContato: idClienteFinal,
-            cliente: { id: idClienteFinal },
+            cliente: { id: idClienteTiny },
             itens: itensFormatados,
             naturezaOperacao: { id: 335900648 },
             valorFrete: valorFrete || 0,
@@ -2127,71 +2133,27 @@ app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
 });
 
 
-// ==========================================
-// FUNÇÃO DE BUSCA: MODELO ANTI-BLOQUEIO (429)
-// ==========================================
-async function buscarClientePorCPF(cpf, token, nomeCompleto = "") {
+async function buscarClienteCerteiro(cpf, token) {
     const cpfLimpo = cpf.replace(/\D/g, '');
     const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
-    
-    // Função auxiliar que filtra a lista (Lê cpfCnpj e cpf_cnpj)
-    const garimparID = (lista, origem) => {
-        if (!lista || !Array.isArray(lista)) return null;
-        
-        const achou = lista.find(c => {
-            const cpfNoTiny = (c.cpfCnpj || c.cpf_cnpj || '').replace(/\D/g, '');
-            return cpfNoTiny === cpfLimpo;
-        });
-
-        if (achou) {
-            console.log(`✅ ACHEI VIA ${origem}: ${achou.nome} (ID: ${achou.id})`);
-            return achou.id;
-        }
-        return null;
-    };
 
     try {
-        // TENTATIVA 1: CPF FORMATADO (A mais precisa)
-        console.log(`🔎 Buscando cpfCnpj: ${cpfFormatado}`);
-        try {
-            const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
-                params: { cpfCnpj: cpfFormatado }, 
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const id = garimparID(res.data.data, "API CPF FORMATADO");
-            if (id) return id;
-        } catch (e) { console.log(`⚠️ Falha busca cpfCnpj (pode ser 429 ou 404): ${e.response?.status || e.message}`); }
+        // Usamos o parâmetro pesquisa que você confirmou que funciona no site
+        const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
+            params: { pesquisa: cpfFormatado },
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
 
-        // TENTATIVA 2: BUSCA PELO PRIMEIRO NOME (A "Rede de Arrastão")
-        // Se o CPF falhar (ou der 429), esperamos um pouco e tentamos pelo primeiro nome.
-        if (nomeCompleto) {
-            // Pega só "RAFAELA"
-            const primeiroNome = nomeCompleto.split(' ')[0].trim();
-            
-            if (primeiroNome.length > 2) {
-                console.log(`☢️ MODO NOME: Buscando apenas primeiro nome: "${primeiroNome}"...`);
-                
-                try {
-                    const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
-                        params: { nome: primeiroNome }, // Busca genérica
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    
-                    const id = garimparID(res.data.data, "PRIMEIRO NOME");
-                    if (id) return id;
-                    
-                    console.log(`⚠️ Baixei a lista de "${primeiroNome}" mas o CPF não estava lá.`);
-                } catch (e) {
-                    console.log(`❌ Falha na busca por nome: ${e.message}`);
-                }
-            }
+        const lista = res.data.data || [];
+        if (Array.isArray(lista) && lista.length > 0) {
+            // Conferência de segurança
+            const achou = lista.find(c => (c.cpfCnpj || c.cpf_cnpj || '').replace(/\D/g, '') === cpfLimpo);
+            return achou ? achou.id : null;
         }
-
-        return null;
-
     } catch (e) {
-        return null;
+        console.log("⚠️ Erro na busca rápida:", e.message);
     }
+    return null;
 }
 // Função auxiliar (mantenha ou adicione se não tiver)
 function checarSeAchou(response) {
@@ -2209,6 +2171,59 @@ function checarSeAchou(response) {
         return true;
     }
     return false;
+}
+
+async function resolverClienteParaVenda(dadosCliente, token) {
+    const cpfLimpo = (dadosCliente.documento || dadosCliente.cpf || '').replace(/\D/g, '');
+
+    // 1. TENTATIVA RÁPIDA DE BUSCA (Para economizar tempo)
+    let idExistente = await buscarClienteCerteiro(cpfLimpo, token);
+    if (idExistente) {
+        console.log(`✅ Cliente já identificado pelo CPF: ${idExistente}`);
+        return idExistente;
+    }
+
+    // 2. SE NÃO ACHOU, TENTA CRIAR
+    try {
+        console.log("📤 Cliente novo? Tentando cadastrar...");
+        const response = await axios.post(
+            `https://api.tiny.com.br/public-api/v3/contatos`,
+            {
+                nome: dadosCliente.nome,
+                tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
+                cpfCnpj: cpfLimpo,
+                endereco: {
+                    endereco: dadosCliente.endereco || "Rua nao informada",
+                    bairro: dadosCliente.bairro || "Centro",
+                    cidade: dadosCliente.cidade || "Maceio",
+                    uf: dadosCliente.uf || "AL"
+                },
+                situacao: "A"
+            },
+            { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+        return response.data.data?.id || response.data.id;
+    } catch (error) {
+        const erroMsg = JSON.stringify(error.response?.data || "");
+        
+        // 3. SE DER ERRO DE "JÁ EXISTE" NO MOMENTO DA CRIAÇÃO
+        if (erroMsg.includes("existe") || erroMsg.includes("duplicado")) {
+            console.log("⚠️ Tiny confirmou que existe. Capturando ID no erro...");
+            const matchId = erroMsg.match(/(\d{9,})/);
+            if (matchId) return matchId[1];
+
+            // Se o ID não veio no erro, esperamos 3s e tentamos a busca final por nome
+            await new Promise(r => setTimeout(r, 3000));
+            const primeiroNome = dadosCliente.nome.split(' ')[0];
+            const resNome = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${primeiroNome}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const lista = resNome.data.data || [];
+            const final = lista.find(c => (c.cpfCnpj || c.cpf_cnpj || '').replace(/\D/g, '') === cpfLimpo);
+            return final ? final.id : null;
+        }
+    }
+    return null;
 }
 
 // ==========================================

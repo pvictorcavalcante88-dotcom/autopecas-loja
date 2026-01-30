@@ -2128,23 +2128,20 @@ app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
 
 
 // ==========================================
-// FUNÇÃO DE BUSCA: CORRIGIDA (Lê cpfCnpj E cpf_cnpj)
-// ==========================================
-// ==========================================
-// FUNÇÃO DE BUSCA: ESTRATÉGIA "FORÇA BRUTA"
+// FUNÇÃO DE BUSCA UNIVERSAL (A "Google" do Tiny)
 // ==========================================
 async function buscarClientePorCPF(cpf, token, nomeCompleto = "") {
     const cpfLimpo = cpf.replace(/\D/g, '');
     const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
     
-    // Função que verifica se o CPF bate (Lê cpfCnpj E cpf_cnpj)
-    const encontrarNaLista = (lista, origem) => {
+    // Função auxiliar para varrer a lista de resultados
+    const garimparID = (lista, origem) => {
         if (!lista || !Array.isArray(lista)) return null;
 
+        // Procura alguém com o CPF igual (Lendo cpfCnpj OU cpf_cnpj)
         const achou = lista.find(c => {
-            const cpfNoTiny = c.cpfCnpj || c.cpf_cnpj || ''; 
-            const cpfTinyLimpo = cpfNoTiny.replace(/\D/g, '');
-            return cpfTinyLimpo === cpfLimpo; 
+            const cpfNoTiny = (c.cpfCnpj || c.cpf_cnpj || '').replace(/\D/g, '');
+            return cpfNoTiny === cpfLimpo;
         });
 
         if (achou) {
@@ -2155,45 +2152,46 @@ async function buscarClientePorCPF(cpf, token, nomeCompleto = "") {
     };
 
     try {
-        // 1. BUSCA TÉCNICA (Parâmetro cpf_cnpj)
-        // É a mais rápida. Tenta formatado e limpo.
-        console.log(`🔎 Buscando CPF exato via API...`);
+        // TENTATIVA 1: PESQUISA GERAL COM CPF FORMATADO (Prioridade, pois está assim no JSON)
+        console.log(`🔎 Buscando CPF Formatado na Geral: ${cpfFormatado}`);
         try {
             const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
-                params: { cpf_cnpj: cpfFormatado, situacao: 'T' }, // Traz até excluídos
+                params: { pesquisa: cpfFormatado }, // SEM situacao=T para não bugar a busca geral
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            const id = encontrarNaLista(res.data.data, "CPF FORMATADO");
+            const id = garimparID(res.data.data, "CPF FORMATADO");
+            if (id) return id;
+        } catch (e) { console.log(`⚠️ Falha busca formatada: ${e.message}`); }
+
+        // TENTATIVA 2: PESQUISA GERAL COM CPF LIMPO
+        console.log(`🔎 Buscando CPF Limpo na Geral: ${cpfLimpo}`);
+        try {
+            const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
+                params: { pesquisa: cpfLimpo },
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const id = garimparID(res.data.data, "CPF LIMPO");
             if (id) return id;
         } catch (e) {}
 
-        try {
-            const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
-                params: { cpf_cnpj: cpfLimpo, situacao: 'T' },
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const id = encontrarNaLista(res.data.data, "CPF LIMPO");
-            if (id) return id;
-        } catch (e) {}
-
-        // 2. A ESTRATÉGIA NUCLEAR: BUSCA PELO PRIMEIRO NOME
-        // Se o CPF falhou, baixamos todo mundo com esse nome e filtramos na mão.
+        // TENTATIVA 3: BUSCA PELO PRIMEIRO NOME (Se tiver nome)
         if (nomeCompleto) {
             const primeiroNome = nomeCompleto.split(' ')[0].trim();
             if (primeiroNome.length > 2) {
-                console.log(`☢️ MODO NUCLEAR: Baixando todos com nome "${primeiroNome}" para conferir CPF...`);
+                console.log(`☢️ MODO NUCLEAR: Pesquisando nome "${primeiroNome}"...`);
                 try {
                     const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
-                        params: { pesquisa: primeiroNome, situacao: 'T' },
+                        params: { pesquisa: primeiroNome },
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
                     
-                    const id = encontrarNaLista(res.data.data, "PRIMEIRO NOME");
+                    const id = garimparID(res.data.data, "PRIMEIRO NOME");
                     if (id) return id;
-                    
-                    console.log(`⚠️ Baixei ${res.data.data?.length || 0} pessoas chamadas "${primeiroNome}", mas nenhum CPF bateu.`);
+
+                    console.log(`⚠️ Tiny retornou ${res.data.data?.length || 0} pessoas com nome "${primeiroNome}", mas CPF não bateu.`);
                 } catch (e) {
-                    console.log("❌ Falha na busca por nome.");
+                    // Aqui imprimimos o erro real para saber se foi erro de conexão
+                    console.log("❌ Falha na busca por nome:", e.message);
                 }
             }
         }

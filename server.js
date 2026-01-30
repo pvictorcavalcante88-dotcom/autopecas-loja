@@ -2208,8 +2208,11 @@ function checarSeAchou(response) {
     return false;
 }
 
+// ==========================================
+// FUNÇÃO BLINDADA: TENTA CRIAR, SE JÁ EXISTIR, ESPERA E BUSCA
+// ==========================================
 async function criarClienteNoTiny(dadosCliente, token) {
-    // 1. Limpeza e Filtros (Isso aqui já está funcionando)
+    // 1. Limpeza dos dados
     const cpfLimpo = (dadosCliente.documento || dadosCliente.cpf || '').replace(/\D/g, '');
     
     let cidadeLimpa = dadosCliente.cidade;
@@ -2235,7 +2238,7 @@ async function criarClienteNoTiny(dadosCliente, token) {
     };
 
     try {
-        console.log("📤 TENTATIVA (Com Pausa) - Payload:", JSON.stringify(payloadCliente.endereco, null, 2));
+        console.log("📤 TENTATIVA DE CRIAÇÃO...");
         
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/contatos`,
@@ -2246,29 +2249,35 @@ async function criarClienteNoTiny(dadosCliente, token) {
         return response.data.data?.id || response.data.id;
 
     } catch (error) {
+        // Pega a mensagem de erro do Tiny (ex: "Registro já existe")
         const mensagemErro = JSON.stringify(error.response?.data || "").toLowerCase();
         
-        // SE DER ERRO DE DUPLICIDADE
-        if (mensagemErro.includes("existe")) {
-            console.log("⚠️ Cliente já existe! O Tiny bloqueou.");
-            console.log("⏳ Esperando 3 segundos para evitar erro 429 e buscar o ID...");
+        // 🚨 DETECTA SE O ERRO É "JÁ EXISTE" OU DUPLICIDADE
+        if (mensagemErro.includes("existe") || mensagemErro.includes("duplicado")) {
+            console.log("⚠️ TINY AVISOU: Cliente já existe!");
             
-            // --- A MÁGICA ESTÁ AQUI: ESPERA 3 SEGUNDOS ---
-            await sleep(3000); 
-            // ---------------------------------------------
-
-            console.log("🔄 Retomando busca do ID...");
+            // 🛑 AQUI ESTÁ O SEGREDO: PAUSA DE 2 SEGUNDOS
+            // Isso evita que o Tiny bloqueie a próxima busca por "muitas requisições"
+            console.log("⏳ Esperando 2 segundos para o Tiny respirar...");
+            await sleep(2000); 
+            
+            console.log("🔄 Retomando busca do ID pelo CPF...");
+            
+            // Agora fazemos a busca com calma
             const idResgatado = await buscarClientePorCPF(cpfLimpo, token);
             
             if (idResgatado) {
                 console.log("✅ ID RESGATADO COM SUCESSO:", idResgatado);
                 return idResgatado;
             } else {
-                console.log("❌ Falha crítica: Esperei, busquei, mas retornou null.");
+                console.log("❌ Falha crítica: Cliente existe mas a busca não retornou ID.");
+                // Se falhar, retornamos NULL para o script principal avisar
+                return null;
             }
         }
 
-        console.error("❌ ERRO TINY (Final):", mensagemErro);
+        // Se for outro erro (ex: CPF inválido), mostra no log
+        console.error("❌ ERRO TINY (Não foi duplicidade):", mensagemErro);
         throw error; 
     }
 }

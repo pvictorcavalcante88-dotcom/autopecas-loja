@@ -2137,57 +2137,54 @@ function checarSeAchou(response) {
     return false;
 }
 
-async function resolverClienteParaVenda(dadosCliente, token) {
-    const cpfLimpo = (dadosCliente.documento || dadosCliente.cpf || '').replace(/\D/g, '');
+async function resolverClienteParaVenda(cliente, token) {
+    const nomeCliente = cliente.nome;
+    const cpfLimpo = (cliente.documento || cliente.cpf || '').replace(/\D/g, '');
 
-    // 1. TENTATIVA RÁPIDA DE BUSCA (Para economizar tempo)
-    let idExistente = await buscarClienteCerteiro(cpfLimpo, token);
-    if (idExistente) {
-        console.log(`✅ Cliente já identificado pelo CPF: ${idExistente}`);
-        return idExistente;
-    }
-
-    // 2. SE NÃO ACHOU, TENTA CRIAR
     try {
-        console.log("📤 Cliente novo? Tentando cadastrar...");
-        const response = await axios.post(
+        console.log(`🔎 Buscando cliente por nome: ${nomeCliente}`);
+        
+        // 1. Busca pelo NOME (igual você faz no manual)
+        const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
+            params: { pesquisa: nomeCliente },
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const lista = res.data.data || [];
+        
+        // 2. Se achou alguém com esse nome, pegamos o ID
+        if (Array.isArray(lista) && lista.length > 0) {
+            console.log(`✅ Achei o cliente pelo nome! ID: ${lista[0].id}`);
+            return lista[0].id;
+        }
+
+        // 3. Se não achou pelo nome, tentamos criar um novo
+        console.log("⚠️ Cliente não encontrado. Tentando cadastrar novo...");
+        const resCriar = await axios.post(
             `https://api.tiny.com.br/public-api/v3/contatos`,
             {
-                nome: dadosCliente.nome,
+                nome: nomeCliente,
+                cpfCnpj: cpfLimpo, // Enviamos o CPF aqui
                 tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
-                cpfCnpj: cpfLimpo,
-                endereco: {
-                    endereco: dadosCliente.endereco || "Rua nao informada",
-                    bairro: dadosCliente.bairro || "Centro",
-                    cidade: dadosCliente.cidade || "Maceio",
-                    uf: dadosCliente.uf || "AL"
-                },
                 situacao: "A"
             },
             { headers: { 'Authorization': `Bearer ${token}` } }
         );
-        return response.data.data?.id || response.data.id;
-    } catch (error) {
-        const erroMsg = JSON.stringify(error.response?.data || "");
         
-        // 3. SE DER ERRO DE "JÁ EXISTE" NO MOMENTO DA CRIAÇÃO
-        if (erroMsg.includes("existe") || erroMsg.includes("duplicado")) {
-            console.log("⚠️ Tiny confirmou que existe. Capturando ID no erro...");
-            const matchId = erroMsg.match(/(\d{9,})/);
-            if (matchId) return matchId[1];
+        return resCriar.data.data?.id || resCriar.data.id;
 
-            // Se o ID não veio no erro, esperamos 3s e tentamos a busca final por nome
-            await new Promise(r => setTimeout(r, 3000));
-            const primeiroNome = dadosCliente.nome.split(' ')[0];
-            const resNome = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${primeiroNome}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const lista = resNome.data.data || [];
-            const final = lista.find(c => (c.cpfCnpj || c.cpf_cnpj || '').replace(/\D/g, '') === cpfLimpo);
-            return final ? final.id : null;
+    } catch (error) {
+        const msgErro = JSON.stringify(error.response?.data || "");
+        
+        // 4. Se ele reclamar do CPF mesmo assim, pescamos o ID na mensagem
+        if (msgErro.includes("existe") || msgErro.includes("cadastrado")) {
+            const matchId = msgErro.match(/(\d{9,})/);
+            if (matchId) return matchId[1];
         }
+        
+        console.error("❌ Erro ao resolver cliente:", msgErro);
+        return null;
     }
-    return null;
 }
 
 // ==========================================

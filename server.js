@@ -1282,13 +1282,10 @@ app.post('/api/checkout/pix', async (req, res) => {
 
             const totalItemVenda = precoVendaUnitario * qtd;
             const totalItemCusto = custoPeca * qtd;
-            
-            // O lucro da loja é baseado no preço original de tabela (preco_novo) menos o custo.
-            const totalItemLojaBase = limparValor(prodBanco.preco_novo) * qtd; 
+            const totalItemLojaBase = precoLoja * qtd; 
 
             const faturamentoAfiliado = totalItemVenda - totalItemLojaBase; 
             const faturamentoLoja = totalItemLojaBase - totalItemCusto;
-            // ---------------------------
 
             valorTotalVenda += totalItemVenda;
             custoTotalProdutos += totalItemCusto;
@@ -1297,7 +1294,7 @@ app.post('/api/checkout/pix', async (req, res) => {
 
             itensParaBanco.push({
                 id: prodBanco.id, 
-                nome: item.nome || prodBanco.titulo, // Usa o nome que veio ou o do banco
+                nome: prodBanco.titulo, 
                 qtd: qtd,
                 unitario: precoVendaUnitario, 
                 total: totalItemVenda, 

@@ -2056,6 +2056,20 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             situacao: 0
         };
 
+                // 🚨 AQUI ESTÁ A CORREÇÃO:
+        if (idClienteFinal) {
+            // Se o cliente é novo e foi criado agora, mandamos o ID
+            payloadPedido.idContato = idClienteFinal; 
+        } else {
+            // Se já existia (Caso Rafaela), mandamos APENAS o objeto cliente
+            // SEM a chave 'idContato' para não dar erro de "deve ser maior que 0"
+            payloadPedido.cliente = {
+                nome: nomeParaExibicao, // Ex: "Rafaela souza cpf 09112143480"
+                tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
+                cpfCnpj: "" // Vazio para burlar a duplicidade
+            };
+        }
+
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/pedidos`, 
             payloadPedido,

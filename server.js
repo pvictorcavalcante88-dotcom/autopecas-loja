@@ -2134,54 +2134,75 @@ app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
 // ==========================================
 // FUNÇÃO DE BUSCA "RAIO-X" (Busca até Inativos)
 // ==========================================
+// ==========================================
+// FUNÇÃO DE BUSCA: AGORA MOSTRA O JSON COMPLETO NO LOG
+// ==========================================
 async function buscarClientePorCPF(cpf, token) {
     const cpfLimpo = cpf.replace(/\D/g, '');
     const formatarCPF = (v) => v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
     const cpfComMascara = formatarCPF(cpfLimpo);
-    const achou = (res) => (res.data && res.data.data && res.data.data.length > 0);
+    
+    // Função para verificar se achou e LOGAR O QUE ACHOU
+    const verificarRetorno = (res, tentativa) => {
+        if (res.data && res.data.data && res.data.data.length > 0) {
+            const clienteEncontrado = res.data.data[0];
+            
+            // 🚨 AQUI VAMOS DESCOBRIR O NOME REAL DO CAMPO 🚨
+            console.log(`\n📦 [${tentativa}] TINY RETORNOU ISTO AQUI:`);
+            console.log(JSON.stringify(clienteEncontrado, null, 2)); 
+            console.log("---------------------------------------------------");
+
+            // Tenta pegar o ID de todas as formas possíveis conhecidas
+            const idReal = clienteEncontrado.id || 
+                           clienteEncontrado.idContato || 
+                           clienteEncontrado.id_contato || 
+                           clienteEncontrado.idclientesEForncedores; // <--- ADICIONEI SUA SUSPEITA
+
+            if (idReal) {
+                console.log(`✅ ID IDENTIFICADO: ${idReal}`);
+                return idReal;
+            } else {
+                console.log("❌ O campo 'id' veio vazio ou com nome desconhecido.");
+            }
+        }
+        return null;
+    };
 
     try {
-        // --- TENTATIVA 1: CPF FORMATADO + SITUAÇÃO GERAL ---
-        console.log(`🔎 TENTATIVA 1: CPF Formatado (${cpfComMascara}) em TODOS os status...`);
+        // --- TENTATIVA 1: CPF FORMATADO ---
+        console.log(`🔎 TENTATIVA 1: CPF Formatado (${cpfComMascara})...`);
         try {
-            // ADICIONEI &situacao=T PARA PEGAR CLIENTES INATIVOS/ARQUIVADOS
             let res = await axios.get(
                 `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfComMascara}&situacao=T`,
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
-            if (achou(res)) {
-                console.log(`✅ ACHEI (Status T)! ID: ${res.data.data[0].id}`);
-                return res.data.data[0].id;
-            }
+            const id = verificarRetorno(res, "FORMATADO");
+            if (id) return id;
         } catch (e) { console.log("⚠️ Falha tentativa 1"); }
 
-        // --- PAUSA ---
-        await new Promise(r => setTimeout(r, 1500)); 
+        // --- PAUSA RÁPIDA ---
+        await new Promise(r => setTimeout(r, 1000)); 
 
-        // --- TENTATIVA 2: CPF LIMPO + SITUAÇÃO GERAL ---
-        console.log(`🔎 TENTATIVA 2: CPF Limpo (${cpfLimpo}) em TODOS os status...`);
+        // --- TENTATIVA 2: CPF LIMPO ---
+        console.log(`🔎 TENTATIVA 2: CPF Limpo (${cpfLimpo})...`);
         try {
             let res = await axios.get(
                 `https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfLimpo}&situacao=T`,
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
-            if (achou(res)) {
-                console.log(`✅ ACHEI (Status T)! ID: ${res.data.data[0].id}`);
-                return res.data.data[0].id;
-            }
+            const id = verificarRetorno(res, "LIMPO");
+            if (id) return id;
         } catch (e) { console.log("⚠️ Falha tentativa 2"); }
 
-        // --- TENTATIVA 3: PESQUISA GERAL (Último Recurso) ---
+        // --- TENTATIVA 3: PESQUISA GERAL (NOME/CPF MISTURADO) ---
         console.log(`🔎 TENTATIVA 3: Pesquisa Geral...`);
         try {
             let res = await axios.get(
                 `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${cpfLimpo}&situacao=T`,
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
-            if (achou(res)) {
-                console.log(`✅ ACHEI NA PESQUISA! ID: ${res.data.data[0].id}`);
-                return res.data.data[0].id;
-            }
+            const id = verificarRetorno(res, "PESQUISA");
+            if (id) return id;
         } catch (e) { console.log("⚠️ Falha tentativa 3"); }
 
         return null;
@@ -2213,6 +2234,7 @@ function checarSeAchou(response) {
 // ==========================================
 async function criarClienteNoTiny(dadosCliente, token) {
     const cpfLimpo = (dadosCliente.documento || dadosCliente.cpf || '').replace(/\D/g, '');
+    const emailCliente = dadosCliente.email || ""; // Pega o email
     
     // Tratamento de Cidade/UF
     let cidadeLimpa = dadosCliente.cidade;
@@ -2233,6 +2255,7 @@ async function criarClienteNoTiny(dadosCliente, token) {
             "uf": ufLimpa,
             "pais": "Brasil"
         },
+        "email": emailCliente, // Garante que o email vá na tentativa de criação
         "situacao": "A"
     };
 
@@ -2246,59 +2269,78 @@ async function criarClienteNoTiny(dadosCliente, token) {
         return response.data.data?.id || response.data.id;
 
     } catch (error) {
-        // Pega o erro cru para análise
-        const erroDados = error.response?.data || {};
-        const erroString = JSON.stringify(erroDados);
-        const erroLower = erroString.toLowerCase();
+        const erroCompleto = JSON.stringify(error.response?.data || "");
+        const mensagemErro = erroCompleto.toLowerCase();
+        
+        // 🚨 CENÁRIO: JÁ EXISTE
+        if (mensagemErro.includes("existe") || mensagemErro.includes("duplicado") || mensagemErro.includes("cnpj") || mensagemErro.includes("validacao")) {
+            console.log("⚠️ TINY AVISOU: Cliente já existe! Iniciando resgate...");
 
-        // LOG PARA DEBUG (Mande isso aqui se falhar de novo)
-        console.log("🔥 ERRO CRU DO TINY:", erroString);
-
-        if (erroLower.includes("existe") || erroLower.includes("duplicado") || erroLower.includes("cnpj")) {
-            console.log("⚠️ CLIENTE DUPLICADO. Tentando estratégias de resgate...");
-
-            // 1. TENTA PESCAR O ID NO MEIO DO TEXTO DO ERRO
-            // Procura padrões como "id: 123", "id": 123, "id 123"
-            const matchId = erroString.match(/(?:id|código)[:"\s]+(\d{9,})/i); 
+            // 1. TENTA LER ID NO ERRO (Regex para pegar números soltos na mensagem)
+            const matchId = erroCompleto.match(/(\d{9,})/); 
             if (matchId && matchId[1]) {
                 console.log(`✅ ID PESCADO NO ERRO: ${matchId[1]}`);
                 return matchId[1];
             }
 
-            // 2. BUSCA POR NOME EXATO (API V3 - Pesquisa Geral)
-            // Se a busca nuclear falhou antes, vamos simplificar
-            console.log(`🔎 Buscando contato com nome: "${dadosCliente.nome}"`);
+            console.log("⏳ Esperando 2s...");
+            await new Promise(r => setTimeout(r, 2000)); 
+
+            // 2. NOVA ESTRATÉGIA: BUSCA POR EMAIL (INFALÍVEL)
+            if (emailCliente && emailCliente.length > 5) {
+                console.log(`📧 TENTATIVA EMAIL: Buscando por "${emailCliente}"...`);
+                try {
+                    const resEmail = await axios.get(
+                        `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(emailCliente)}&situacao=T`,
+                        { headers: { 'Authorization': `Bearer ${token}` } }
+                    );
+
+                    if (resEmail.data && resEmail.data.data) {
+                        // Pega o primeiro que encontrar (Email é único)
+                        const achouEmail = resEmail.data.data[0];
+                        if (achouEmail) {
+                            console.log(`✅ ACHEI PELO EMAIL! ID: ${achouEmail.id} (${achouEmail.nome})`);
+                            return achouEmail.id;
+                        }
+                    }
+                } catch (eEmail) { 
+                    console.log("❌ Falha na busca por email:", eEmail.message); 
+                }
+            }
+
+            // 3. RETRY: BUSCA PELO CPF (Limpo)
+            console.log("🔄 Tentando busca direta pelo CPF...");
+            let idResgatado = await buscarClientePorCPF(cpfLimpo, token);
+            if (idResgatado) return idResgatado;
+
+            // 4. ESTRATÉGIA: BUSCA POR NOME CURTO
+            const partesNome = dadosCliente.nome.trim().split(' ');
+            let nomeBusca = partesNome[0];
+            if (partesNome.length > 1) nomeBusca += " " + partesNome[1];
+
+            console.log(`☢️ TENTATIVA NOME: Buscando por "${nomeBusca}"`);
+            
             try {
-                // Pesquisa genérica costuma achar melhor que pesquisa por campo
-                const resBusca = await axios.get(
-                    `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(dadosCliente.nome)}`,
+                const resNome = await axios.get(
+                    `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(nomeBusca)}&situacao=T`,
                     { headers: { 'Authorization': `Bearer ${token}` } }
                 );
 
-                if (resBusca.data && resBusca.data.data) {
-                    // Procura alguém com o mesmo CPF na lista
-                    const achou = resBusca.data.data.find(c => {
-                        const cCpf = (c.cpf_cnpj || '').replace(/\D/g, '');
-                        return cCpf === cpfLimpo;
+                if (resNome.data && resNome.data.data) {
+                    const clienteCerto = resNome.data.data.find(c => {
+                        const cpfTiny = (c.cpf_cnpj || '').replace(/\D/g, '');
+                        return cpfTiny === cpfLimpo;
                     });
-
-                    if (achou) {
-                        console.log(`✅ ACHEI NA BUSCA POR NOME: ${achou.id}`);
-                        return achou.id;
+                    if (clienteCerto) {
+                        console.log(`✅ ACHEI PELO NOME! ID: ${clienteCerto.id}`);
+                        return clienteCerto.id;
                     }
                 }
-            } catch (e) { console.log("❌ Falha busca nome."); }
-
-            // 3. ÚLTIMO RECURSO: Retorna o ID que você pegou manualmente
-            // Se for EXATAMENTE a Rafaela, forçamos o ID dela para não travar seu teste
-            if (cpfLimpo === "09112143480") {
-                console.log("🚑 CÓDIGO DE EMERGÊNCIA: Usando ID conhecido da Rafaela.");
-                return "890236518"; 
-            }
+            } catch (eNome) { console.log("❌ Falha na busca por nome."); }
         }
-        
-        console.error("❌ FALHA TOTAL AO CRIAR/RECUPERAR CLIENTE.");
-        return null;
+
+        console.error("❌ ERRO TINY FINAL (LOG COMPLETO):", erroCompleto);
+        return null; 
     }
 }
 

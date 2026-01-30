@@ -2126,70 +2126,71 @@ app.get('/admin/tiny/ver-pedido/:id', async (req, res) => {
     }
 });
 
-// ==========================================
-// FUNÇÕES AUXILIARES CORRIGIDAS (V3)
-// ==========================================
-
 
 // ==========================================
-// FUNÇÃO DE BUSCA "RAIO-X" (Busca até Inativos)
-// ==========================================
-// ==========================================
-// FUNÇÃO DE BUSCA: MODO "IMITAR HUMANO" (PESQUISA GERAL)
+// FUNÇÃO DE BUSCA: FOCO TOTAL NO CPF
 // ==========================================
 async function buscarClientePorCPF(cpf, token) {
     const cpfLimpo = cpf.replace(/\D/g, '');
+    const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
     
-    // Função para verificar se achou
-    const verificarRetorno = (res, tipoBusca) => {
+    // Função auxiliar para validar retorno
+    const validarRetorno = (res, logPrefix) => {
         if (res.data && res.data.data && res.data.data.length > 0) {
-            // O Tiny pode retornar uma lista. Vamos ver se algum bate o CPF.
-            const clienteCerto = res.data.data.find(c => {
+            // O Tiny V3 as vezes retorna array, as vezes objeto direto dependendo do endpoint
+            const lista = Array.isArray(res.data.data) ? res.data.data : [res.data.data];
+            
+            // Filtra para garantir que não pegou "João da Silva" numa busca parcial
+            const achou = lista.find(c => {
                 const cCpf = (c.cpf_cnpj || '').replace(/\D/g, '');
-                // Se o CPF bater OU se não tiver CPF na busca (ex: busca por nome único), aceitamos
-                return cCpf === cpfLimpo || (!cpfLimpo && c.id); 
+                return cCpf === cpfLimpo;
             });
 
-            if (clienteCerto) {
-                console.log(`✅ ACHEI NA BUSCA (${tipoBusca}): ${clienteCerto.nome} (ID: ${clienteCerto.id})`);
-                return clienteCerto.id;
+            if (achou) {
+                console.log(`✅ ${logPrefix}: Encontrado ID ${achou.id} (${achou.nome})`);
+                return achou.id;
             }
         }
         return null;
     };
 
     try {
-        // --- TENTATIVA 1: JOGAR O CPF PURO NA PESQUISA GERAL ---
-        // (Igual digitar o CPF na barra de busca do Tiny)
-        console.log(`🔎 TENTATIVA 1: Pesquisando CPF Limpo (${cpfLimpo})...`);
+        // TENTATIVA 1: CPF FORMATADO (000.000.000-00)
+        // O Tiny prefere formatado na maioria das vezes
+        console.log(`🔎 Buscando CPF Formatado: ${cpfFormatado}`);
         try {
-            // Removi 'situacao=T' e 'cpf_cnpj='. Usamos apenas 'pesquisa'.
-            let res = await axios.get(
-                `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${cpfLimpo}`,
-                { headers: { 'Authorization': `Bearer ${token}` } }
-            );
-            const id = verificarRetorno(res, "GERAL_CPF");
+            const res = await axios.get(
+                `https://api.tiny.com.br/public-api/v3/contatos`, {
+                params: {
+                    cpf_cnpj: cpfFormatado, // Parâmetro Específico
+                    situacao: 'T'           // T = Todos (Ativos, Inativos, Excluídos)
+                },
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const id = validarRetorno(res, "FORMATADO");
             if (id) return id;
-        } catch (e) { console.log("⚠️ Falha tentativa 1"); }
+        } catch (e) {}
 
-        // --- PAUSA RÁPIDA ---
-        await new Promise(r => setTimeout(r, 1000)); 
-
-        // --- TENTATIVA 2: JOGAR CPF COM PONTO E TRAÇO ---
-        const cpfFormatado = cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
-        console.log(`🔎 TENTATIVA 2: Pesquisando CPF Formatado (${cpfFormatado})...`);
+        // TENTATIVA 2: CPF LIMPO (00000000000)
+        // Caso o cadastro tenha sido feito via API antiga ou importação
+        console.log(`🔎 Buscando CPF Limpo: ${cpfLimpo}`);
         try {
-            let res = await axios.get(
-                `https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(cpfFormatado)}`,
-                { headers: { 'Authorization': `Bearer ${token}` } }
-            );
-            const id = verificarRetorno(res, "GERAL_FORMATADO");
+            const res = await axios.get(
+                `https://api.tiny.com.br/public-api/v3/contatos`, {
+                params: {
+                    cpf_cnpj: cpfLimpo,
+                    situacao: 'T'
+                },
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const id = validarRetorno(res, "LIMPO");
             if (id) return id;
-        } catch (e) { console.log("⚠️ Falha tentativa 2"); }
+        } catch (e) {}
 
         return null;
+
     } catch (e) {
-        console.error("❌ Erro técnico busca:", e.message);
+        console.error("❌ Erro técnico busca CPF:", e.message);
         return null;
     }
 }
@@ -2321,18 +2322,19 @@ async function criarClienteNoTiny(dadosCliente, token) {
     }
 }
 
-// ROTA DE DIAGNÓSTICO: VAMOS VER COMO O TINY ESTÁ GUARDANDO ESSE CLIENTE
-app.get('/admin/diagnostico-cliente/:id', authenticateToken, async (req, res) => {
-    // Só admin pode usar
-    if (req.user.role !== 'admin') return res.sendStatus(403);
-
+// ==========================================
+// ROTA DE DIAGNÓSTICO PÚBLICA (SEM SENHA)
+// ==========================================
+app.get('/teste-diagnostico/:id', async (req, res) => {
     const idTiny = req.params.id;
-    const token = await getValidToken();
-
+    
     try {
-        console.log(`🕵️ DIAGNÓSTICO: Buscando cliente ID ${idTiny} direto pelo ID...`);
+        console.log(`🕵️ DIAGNÓSTICO: Buscando cliente ID ${idTiny}...`);
         
-        // Busca direta pelo ID (Isso nunca falha se o ID existir)
+        // Pega o token do Tiny internamente
+        const token = await getValidToken();
+
+        // Busca direta pelo ID
         const response = await axios.get(
             `https://api.tiny.com.br/public-api/v3/contatos/${idTiny}`,
             { headers: { 'Authorization': `Bearer ${token}` } }
@@ -2340,25 +2342,22 @@ app.get('/admin/diagnostico-cliente/:id', authenticateToken, async (req, res) =>
 
         const cliente = response.data.data || response.data;
 
-        // VAMOS IMPRIMIR TUDO NO CONSOLE PARA VOCÊ VER
-        console.log("\n========================================");
-        console.log("📄 FICHA TÉCNICA DO CLIENTE NO TINY");
-        console.log("========================================");
-        console.log(`🆔 ID: ${cliente.id}`);
-        console.log(`👤 Nome: '${cliente.nome}'`); // Aspas para ver se tem espaço
-        console.log(`🔢 CPF/CNPJ (Como está gravado): '${cliente.cpf_cnpj}'`);
-        console.log(`📧 Email: '${cliente.email}'`);
-        console.log(`🚦 Situação: '${cliente.situacao}'`); // A = Ativo, I = Inativo, E = Excluído
-        console.log("========================================\n");
+        // MOSTRA NO NAVEGADOR E NO CONSOLE
+        console.log("\n>>> DADOS REAIS DO TINY <<<");
+        console.log("CPF Gravado:", cliente.cpf_cnpj);
+        console.log("Situação:", cliente.situacao);
+        console.log("ID:", cliente.id);
+        console.log("Email:", cliente.email);
+        console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
 
-        res.json({ 
-            mensagem: "Olhe o terminal do seu servidor (VS Code) para ver o resultado!",
-            dados_tiny: cliente 
+        res.json({
+            atencao: "Veja o console do servidor para mais detalhes",
+            dados_cliente: cliente
         });
 
     } catch (error) {
-        console.error("❌ Erro no diagnóstico:", error.response?.data || error.message);
-        res.status(500).json(error.response?.data);
+        console.error("❌ Erro:", error.message);
+        res.status(500).json({ erro: error.message, detalhe: error.response?.data });
     }
 });
 

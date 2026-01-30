@@ -2232,31 +2232,21 @@ async function resolverClienteParaVenda(dadosCliente, token) {
 async function criarClienteNoTiny(dadosCliente, token) {
     const cpfLimpo = (dadosCliente.documento || dadosCliente.cpf || '').replace(/\D/g, '');
     
-    // Tratamento de Cidade/UF
-    let cidadeLimpa = dadosCliente.cidade;
-    let ufLimpa = dadosCliente.uf;
-    if (!cidadeLimpa || cidadeLimpa.trim().toLowerCase() === "cidade") cidadeLimpa = "Maceio";
-    if (!ufLimpa || ufLimpa.trim().toLowerCase() === "uf") ufLimpa = "AL";
-
     const payloadCliente = {
         "nome": dadosCliente.nome,
         "tipoPessoa": cpfLimpo.length > 11 ? 'J' : 'F',
         "cpfCnpj": cpfLimpo,
         "endereco": {
             "endereco": dadosCliente.endereco || "Rua nao informada",
-            "numero": dadosCliente.numero || "0",
             "bairro": dadosCliente.bairro || "Centro",
-            "cep": (dadosCliente.cep || "00000000").replace(/\D/g, ''),
-            "cidade": cidadeLimpa,
-            "uf": ufLimpa,
-            "pais": "Brasil"
+            "cidade": dadosCliente.cidade || "Maceio",
+            "uf": dadosCliente.uf || "AL"
         },
-        "email": dadosCliente.email || "", 
         "situacao": "A"
     };
 
     try {
-        console.log("📤 TENTATIVA DE CRIAÇÃO...");
+        console.log("📤 Tentando criar cliente...");
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/contatos`,
             payloadCliente,
@@ -2265,31 +2255,31 @@ async function criarClienteNoTiny(dadosCliente, token) {
         return response.data.data?.id || response.data.id;
 
     } catch (error) {
-        const erroCompleto = JSON.stringify(error.response?.data || "");
-        const erroLower = erroCompleto.toLowerCase();
-        
-        if (erroLower.includes("existe") || erroLower.includes("duplicado") || erroLower.includes("cnpj") || erroLower.includes("validacao")) {
-            console.log("⚠️ TINY AVISOU: Cliente já existe! Iniciando resgate...");
+        const dadosErro = error.response?.data;
+        const msgErro = JSON.stringify(dadosErro);
+        console.log("⚠️ Resposta do Tiny no erro:", msgErro);
 
-            // 1. TENTA LER ID NO ERRO
-            const matchId = erroCompleto.match(/(\d{9,})/); 
-            if (matchId && matchId[1]) {
-                console.log(`✅ ID PESCADO NO ERRO: ${matchId[1]}`);
-                return matchId[1];
-            }
-
-            // 🛑 AQUI ESTÁ A CORREÇÃO DO ERRO 429
-            // Aumentamos para 5 segundos para o Tiny "esfriar a cabeça"
-            console.log("⏳ Esperando 5s para evitar bloqueio 429...");
-            await new Promise(r => setTimeout(r, 5000)); 
-
-            // 2. BUSCA AVANÇADA (Agora com delay seguro)
-            console.log("🔄 Tentando busca de resgate...");
-            const idCpf = await buscarClientePorCPF(cpfLimpo, token, dadosCliente.nome);
-            if (idCpf) return idCpf;
+        // 🔎 ESTRATÉGIA 1: PESCAR O ID NO TEXTO DO ERRO
+        // O Tiny costuma mandar algo como: "O contato 890236518 já existe"
+        const matchId = msgErro.match(/(\d{9,})/); 
+        if (matchId && matchId[1]) {
+            console.log(`✅ ID PESCADO COM SUCESSO: ${matchId[1]}`);
+            return matchId[1];
         }
-        
-        console.error("❌ ERRO TINY FINAL:", erroCompleto);
+
+        // 🔎 ESTRATÉGIA 2: SE NÃO PESCOU, BUSCA POR NOME COMPLETO
+        // Vamos tentar o nome EXATO que está no seu banco (Rafaela souza)
+        console.log("🕵️ ID não encontrado no erro. Tentando busca por nome exato...");
+        try {
+            const resNome = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
+                params: { pesquisa: "Rafaela souza" }, // Use o nome que vimos no diagnóstico
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const lista = resNome.data.data || [];
+            const achou = lista.find(c => c.nome.toLowerCase().includes("rafaela"));
+            if (achou) return achou.id;
+        } catch (e) { console.log("Falha no resgate por nome"); }
+
         return null; 
     }
 }

@@ -2000,88 +2000,69 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
         const tokenFinal = await getValidToken();
         const { itensCarrinho, cliente, valorFrete } = req.body;
 
-        const cpfLimpo = (cliente.documento || cliente.cpf || '').replace(/\D/g, '');
+        console.log("🚀 INICIANDO PEDIDO PADRÃO PARA:", cliente.nome);
+
+        // --- 1. RESOLVER CLIENTE (BUSCA OU CRIAÇÃO) ---
         let idClienteFinal = null;
-        let nomeParaExibicao = cliente.nome;
+        const cpfLimpo = (cliente.documento || cliente.cpf || '').replace(/\D/g, '');
 
-        console.log("🚀 PROCESSANDO PEDIDO:", cliente.nome);
-
-        // --- 1. TENTATIVA DE CRIAÇÃO/IDENTIFICAÇÃO ---
+        // Tenta buscar primeiro
         try {
-            // Tenta criar o cliente de forma limpa
-            const resCriar = await axios.post(
-                `https://api.tiny.com.br/public-api/v3/contatos`,
-                {
-                    nome: cliente.nome,
-                    cpfCnpj: cpfLimpo,
-                    tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
-                    situacao: "A"
-                },
-                { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
-            );
+            const resBusca = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
+                params: { pesquisa: cpfLimpo },
+                headers: { 'Authorization': `Bearer ${tokenFinal}` }
+            });
+            if (resBusca.data.data && resBusca.data.data.length > 0) {
+                idClienteFinal = resBusca.data.data[0].id;
+                console.log("✅ Cliente encontrado ID:", idClienteFinal);
+            }
+        } catch (e) { console.log("⚠️ Busca falhou, tentando criar..."); }
+
+        // Se não achou na busca, cria o contato
+        if (!idClienteFinal) {
+            const resCriar = await axios.post(`https://api.tiny.com.br/public-api/v3/contatos`, {
+                nome: cliente.nome,
+                cpfCnpj: cpfLimpo,
+                tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
+                situacao: "A"
+            }, { headers: { 'Authorization': `Bearer ${tokenFinal}` } });
+            
             idClienteFinal = resCriar.data.data?.id || resCriar.data.id;
             console.log("✅ Novo cliente criado ID:", idClienteFinal);
-        } catch (error) {
-            const msgErro = JSON.stringify(error.response?.data || "");
-            
-            // SE JÁ EXISTIR (O caso da Rafaela)
-            if (msgErro.includes("existe") || msgErro.includes("cadastrado") || error.response?.status === 400) {
-                console.log("⚠️ Cliente já existe no Tiny. Aplicando Estratégia do Nome + CPF.");
-                // Mudamos o nome para você identificar no manual depois
-                nomeParaExibicao = `${cliente.nome} cpf ${cpfLimpo}`;
-                idClienteFinal = null; // Deixamos null para enviar como contato rápido
-            } else {
-                console.error("❌ Erro desconhecido na criação:", msgErro);
-            }
         }
 
-        // --- 2. FORMATAÇÃO DOS ITENS ---
+        // --- 2. FORMATAR ITENS ---
         const itensFormatados = itensCarrinho.map(prod => ({
             produto: { id: prod.id_tiny || prod.tinyId || prod.id },
             quantidade: prod.quantidade,
             valorUnitario: parseFloat(prod.preco || 0)
         }));
 
-        // --- 3. ENVIO DO PEDIDO ---
+        // --- 3. MONTAR PAYLOAD DO PEDIDO (PADRÃO API V3.1) ---
+        // Seguindo a exigência de idContato maior que 0
         const payloadPedido = {
             data: new Date().toISOString().split('T')[0],
-            cliente: idClienteFinal ? { id: idClienteFinal } : {
-                nome: nomeParaExibicao,
-                tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
-                cpfCnpj: "" // Vazio para não dar erro de duplicidade no pedido
-            },
+            idContato: idClienteFinal, 
             itens: itensFormatados,
-            naturezaOperacao: { id: 335900648 },
+            naturezaOperacao: { id: 335900648 }, // Verifique se este ID está correto no seu Tiny
             valorFrete: parseFloat(valorFrete || 0),
             situacao: 0
         };
 
-                // 🚨 AQUI ESTÁ A CORREÇÃO:
-        if (idClienteFinal) {
-            // Se o cliente é novo e foi criado agora, mandamos o ID
-            payloadPedido.idContato = idClienteFinal; 
-        } else {
-            // Se já existia (Caso Rafaela), mandamos APENAS o objeto cliente
-            // SEM a chave 'idContato' para não dar erro de "deve ser maior que 0"
-            payloadPedido.cliente = {
-                nome: nomeParaExibicao, // Ex: "Rafaela souza cpf 09112143480"
-                tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
-                cpfCnpj: "" // Vazio para burlar a duplicidade
-            };
-        }
-
+        console.log("📤 ENVIANDO PEDIDO AO TINY...");
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/pedidos`, 
             payloadPedido,
             { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
         );
 
-        console.log("🎉 Pedido Criado:", response.data.data?.numero);
+        console.log("🎉 SUCESSO! Pedido número: " + response.data.data?.numero);
         res.json({ sucesso: true, numero: response.data.data?.numero });
 
     } catch (error) {
-        console.error("❌ FALHA NO PEDIDO:", error.response?.data || error.message);
-        res.status(500).json({ erro: "Erro ao processar", detalhes: error.response?.data });
+        const erroDetalhado = error.response?.data || error.message;
+        console.error("❌ ERRO NO PEDIDO:", JSON.stringify(erroDetalhado));
+        res.status(500).json({ erro: "Falha na criação do pedido", detalhes: erroDetalhado });
     }
 });
 // ROTA: RAIO-X COMPLETO (SEM FILTROS)

@@ -1996,61 +1996,50 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 });
 
 app.post('/admin/tiny/criar-pedido', async (req, res) => {
-    // Função auxiliar local caso não tenha definido no topo do arquivo
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
     try {
         const tokenFinal = await getValidToken();
         const { itensCarrinho, cliente, valorFrete } = req.body;
 
-        console.log("🚀 INICIANDO PEDIDO PADRÃO PARA:", cliente.nome);
+        console.log("🚀 INICIANDO PROCESSO PARA:", cliente.nome);
 
-        // --- 1. RESOLVER CLIENTE (BUSCA OU CRIAÇÃO) ---
-        let idClienteFinal = null;
-        const cpfLimpo = (cliente.documento || cliente.cpf || '').replace(/\D/g, '');
+        // --- 1. RESOLVER CLIENTE (UNIFICADO) ---
+        // Aqui usamos a função inteligente que você já definiu no final do arquivo.
+        // Ela busca por nome, se não achar tenta criar, e se der erro de CPF duplicado, "pesca" o ID.
+        const idClienteFinal = await resolverClienteParaVenda(cliente, tokenFinal);
 
-        // 🛑 ADICIONE AQUI: Pequena pausa antes de começar para evitar o 429 imediato
-        await sleep(2000); 
-
-        // Tenta buscar primeiro
-        try {
-            const resBusca = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
-                params: { pesquisa: cpfLimpo },
-                headers: { 'Authorization': `Bearer ${tokenFinal}` }
-            });
-            if (resBusca.data.data && resBusca.data.data.length > 0) {
-                idClienteFinal = resBusca.data.data[0].id;
-                console.log("✅ Cliente encontrado ID:", idClienteFinal);
-            }
-        } catch (e) { 
-            console.log("⚠️ Busca falhou ou retornou 429, tentando criar..."); 
-            await sleep(2000); // Pausa caso a busca tenha dado erro
-        }
-
-        // Se não achou na busca, cria o contato
         if (!idClienteFinal) {
-            const resCriar = await axios.post(`https://api.tiny.com.br/public-api/v3/contatos`, {
-                nome: cliente.nome,
-                cpfCnpj: cpfLimpo,
-                tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
-                situacao: "A"
-            }, { headers: { 'Authorization': `Bearer ${tokenFinal}` } });
-            
-            idClienteFinal = resCriar.data.data?.id || resCriar.data.id;
-            console.log("✅ Novo cliente criado ID:", idClienteFinal);
-            
-            // 🛑 ADICIONE AQUI: Pausa após criar contato
-            await sleep(3000); 
+            console.error("❌ FALHA CRÍTICA: Não foi possível obter o ID do cliente.");
+            return res.status(400).json({ erro: "Não foi possível identificar ou criar o cliente no Tiny." });
         }
+        
+        console.log("✅ Cliente resolvido ID:", idClienteFinal);
 
         // --- 2. FORMATAR ITENS ---
-        const itensFormatados = itensCarrinho.map(prod => ({
-            produto: { id: prod.id_tiny || prod.tinyId || prod.id },
-            quantidade: prod.quantidade,
-            valorUnitario: parseFloat(prod.preco || 0)
+        // Pequena pausa para evitar o erro 429 entre a criação do cliente e o pedido
+        await sleep(2000); 
+
+        const itensFormatados = await Promise.all(itensCarrinho.map(async (prod) => {
+            let idFinal = prod.id_tiny || prod.tinyId || prod.id;
+
+            // Se o ID for curto (do site), tenta buscar no banco pelo Prisma
+            if (idFinal && String(idFinal).length < 6) {
+                try {
+                    const tabela = prisma.produto || prisma.product;
+                    const produtoBanco = await tabela.findUnique({ where: { id: parseInt(idFinal) } });
+                    if (produtoBanco && produtoBanco.tinyId) idFinal = produtoBanco.tinyId;
+                } catch (e) { console.error("Erro Prisma Item:", e.message); }
+            }
+
+            return {
+                produto: { id: idFinal },
+                quantidade: prod.quantidade,
+                valorUnitario: parseFloat(prod.preco || 0.01)
+            };
         }));
 
-        // --- 3. MONTAR PAYLOAD DO PEDIDO ---
+        // --- 3. MONTAR E ENVIAR O PEDIDO ---
         const payloadPedido = {
             data: new Date().toISOString().split('T')[0],
             idContato: idClienteFinal, 
@@ -2059,9 +2048,6 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             valorFrete: parseFloat(valorFrete || 0),
             situacao: 0
         };
-
-        // 🛑 ADICIONE AQUI: Pausa final de segurança antes do POST do pedido
-        if (idClienteFinal) await sleep(2000);
 
         console.log("📤 ENVIANDO PEDIDO AO TINY...");
         const response = await axios.post(
@@ -2075,8 +2061,8 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
 
     } catch (error) {
         const erroDetalhado = error.response?.data || error.message;
-        console.error("❌ ERRO NO PEDIDO:", JSON.stringify(erroDetalhado));
-        res.status(500).json({ erro: "Falha na criação do pedido", detalhes: erroDetalhado });
+        console.error("❌ ERRO NO SERVER:", JSON.stringify(erroDetalhado));
+        res.status(500).json({ erro: "Erro ao processar pedido", detalhes: erroDetalhado });
     }
 });
 // ROTA: RAIO-X COMPLETO (SEM FILTROS)

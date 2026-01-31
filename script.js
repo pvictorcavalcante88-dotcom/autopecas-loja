@@ -53,28 +53,25 @@ function adicionarAoCarrinho(id, qtd) {
     let item = c.find(p => p.id == id);
     const margemInicial = parseFloat(localStorage.getItem('minhaMargem') || 0);
 
-    // 1. CAPTURA O TÍTULO (Para não ficar "Sem Nome")
-    const elementoTitulo = document.getElementById('prod-title');
-    const nomeProduto = elementoTitulo ? elementoTitulo.innerText.trim() : "Produto sem nome";
-
-    // 2. CAPTURA O PREÇO (Para não ficar R$ 0.00)
-    const elementoPreco = document.getElementById('prod-price');
-    const precoTexto = elementoPreco ? elementoPreco.innerText : "0";
-    
-    // 3. LIMPA E CONVERTE
+    // CAPTURA O TÍTULO E PREÇO
+    const nomeProduto = document.getElementById('prod-title')?.innerText.trim() || "Produto sem nome";
+    const precoTexto = document.getElementById('prod-price')?.innerText || "0";
     const precoLimpo = limparPrecoBR(precoTexto);
 
-    console.log("🔍 DIAGNÓSTICO DE ADIÇÃO:");
-    console.log("   - Nome capturado:", nomeProduto);
-    console.log("   - Preço capturado:", precoTexto, " -> Limpo:", precoLimpo);
+    // 🟢 NOVA CAPTURA: Captura o ID do Tiny (deve estar em um campo oculto ou global)
+    // Se você salvou o produto na página como um objeto global, use ele:
+    const tinyIdCapturado = window.currentProductTinyId || null; 
 
     if (item) {
         item.quantidade = (item.quantidade || 1) + qtd;
         item.preco = precoLimpo; 
         item.nome = nomeProduto;
+        // Atualiza o tinyId caso não tenha
+        if (!item.tinyId) item.tinyId = tinyIdCapturado;
     } else {
         c.push({ 
             id: parseInt(id), 
+            tinyId: tinyIdCapturado, // ✅ AGORA SALVAMOS O ID DO TINY NO CARRINHO
             quantidade: qtd, 
             preco: precoLimpo, 
             nome: nomeProduto,
@@ -1005,7 +1002,19 @@ function montarNomeCompleto(itemDoLocalStorage, produtoDaApi) {
 }
 
 function setupProductPage() { const pId = new URLSearchParams(window.location.search).get('id'); if(pId) { buscarProdutoPorId(pId); const btn = document.querySelector('.btn-add-cart'); const qtd = document.getElementById('quantity-input'); if(btn) { const n = btn.cloneNode(true); btn.parentNode.replaceChild(n, btn); n.addEventListener('click', () => { adicionarAoCarrinho(pId, qtd ? parseInt(qtd.value) : 1); }); } } }
-async function buscarProdutoPorId(id) { try { const res = await fetch(`${API_URL}/products/${id}`); const p = await res.json(); document.getElementById('product-title').textContent = p.name || p.titulo; document.getElementById('main-product-image').src = p.image || p.imagem; document.getElementById('product-price-new').textContent = formatarMoeda(parseFloat(p.price || p.preco_novo)); } catch(e) {} }
+async function buscarProdutoPorId(id) { 
+    try { 
+        const res = await fetch(`${API_URL}/products/${id}`); 
+        const p = await res.json(); 
+        
+        // 🟢 INJETA O TINY ID NA MEMÓRIA GLOBAL DA PÁGINA
+        window.currentProductTinyId = p.tinyId; 
+
+        document.getElementById('product-title').textContent = p.name || p.titulo; 
+        document.getElementById('main-product-image').src = p.image || p.imagem; 
+        document.getElementById('product-price-new').textContent = formatarMoeda(parseFloat(p.price || p.preco_novo)); 
+    } catch(e) { console.error("Erro ao carregar produto:", e); } 
+}
 async function buscarProdutosPromocao() {
     try {
         const res = await fetch(`${API_URL}/search?q=`);
@@ -1130,7 +1139,7 @@ async function finalizarCompraAsaas() {
             
             return { 
                 id: i.id, 
-                id_tiny: i.id_tiny || i.id_tiny, // Garante ID do Tiny
+                tinyId: i.tinyId || null, // ✅ AGORA PASSA O ID REAL DO TINY
                 quantidade: i.quantidade,
                 preco: precoComMargem.toFixed(2),
                 customMargin: parseFloat(margemFinal)
@@ -1388,7 +1397,7 @@ async function criarPedidoNoTiny(dadosCliente, carrinho) {
             if (precoVendaFinal <= 0) precoVendaFinal = 0.01;
 
             return {
-                id_tiny: item.id,
+                id_tiny: item.tinyId || item.id,
                 quantidade: item.quantidade,
                 // ✅ Envia o preço já com o lucro do afiliado embutido
                 preco: precoVendaFinal.toFixed(2) 

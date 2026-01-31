@@ -2131,47 +2131,67 @@ async function resolverClienteParaVenda(cliente, token) {
     const cpfLimpo = (cliente.documento || cliente.cpf || '').replace(/\D/g, '');
 
     try {
-        console.log(`🔎 Buscando cliente por nome: ${nomeCliente}`);
-        
-        // 1. Busca pelo NOME (igual você faz no manual)
+        console.log(`🔎 1. Buscando por nome: ${nomeCliente}`);
         const res = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos`, {
             params: { pesquisa: nomeCliente },
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
         const lista = res.data.data || [];
-        
-        // 2. Se achou alguém com esse nome, pegamos o ID
         if (Array.isArray(lista) && lista.length > 0) {
-            console.log(`✅ Achei o cliente pelo nome! ID: ${lista[0].id}`);
+            console.log(`✅ Achei pelo nome! ID: ${lista[0].id}`);
             return lista[0].id;
         }
 
-        // 3. Se não achou pelo nome, tentamos criar um novo
-        console.log("⚠️ Cliente não encontrado. Tentando cadastrar novo...");
+        // Se não achou, tenta criar com o PAYLOAD COMPLETO (exigência 3.1)
+        console.log("⚠️ 2. Não achou. Tentando cadastrar novo...");
+        const payload = {
+            nome: nomeCliente,
+            cpfCnpj: cpfLimpo,
+            tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
+            situacao: "A",
+            // Adicionando dados mínimos para evitar rejeição da API
+            endereco: {
+                endereco: cliente.endereco || "Nao informado",
+                bairro: cliente.bairro || "Centro",
+                cidade: cliente.cidade || "Maceio",
+                uf: cliente.uf || "AL"
+            }
+        };
+
         const resCriar = await axios.post(
             `https://api.tiny.com.br/public-api/v3/contatos`,
-            {
-                nome: nomeCliente,
-                cpfCnpj: cpfLimpo, // Enviamos o CPF aqui
-                tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
-                situacao: "A"
-            },
+            payload,
             { headers: { 'Authorization': `Bearer ${token}` } }
         );
         
         return resCriar.data.data?.id || resCriar.data.id;
 
     } catch (error) {
-        const msgErro = JSON.stringify(error.response?.data || "");
+        // TRATAMENTO DE ERRO MELHORADO
+        const status = error.response?.status;
+        const dadosErro = error.response?.data;
+        const msgErro = JSON.stringify(dadosErro || error.message);
         
-        // 4. Se ele reclamar do CPF mesmo assim, pescamos o ID na mensagem
-        if (msgErro.includes("existe") || msgErro.includes("cadastrado")) {
+        console.error(`❌ Erro técnico (Status ${status}):`, msgErro);
+
+        // Se for erro de duplicidade (400 ou mensagem "existe")
+        if (msgErro.includes("existe") || msgErro.includes("cadastrado") || status === 400) {
+            console.log("🕵️ Pescando ID no erro de duplicidade...");
             const matchId = msgErro.match(/(\d{9,})/);
-            if (matchId) return matchId[1];
+            if (matchId) {
+                console.log(`✅ ID PESCADO: ${matchId[1]}`);
+                return matchId[1];
+            }
+            
+            // Última tentativa: Busca pelo CPF puro no campo de pesquisa
+            console.log("🕵️ Tentando busca final pelo CPF puro...");
+            const resFinal = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${cpfLimpo}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            return resFinal.data.data?.[0]?.id || null;
         }
         
-        console.error("❌ Erro ao resolver cliente:", msgErro);
         return null;
     }
 }

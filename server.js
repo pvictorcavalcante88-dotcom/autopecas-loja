@@ -2002,62 +2002,42 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
         const tokenFinal = await getValidToken();
         const { itensCarrinho, cliente, valorFrete } = req.body;
 
-        console.log("🚀 TENTATIVA DIRETA PARA:", cliente.nome);
+        console.log("🚀 INICIANDO PEDIDO COM IDs SINCRONIZADOS:", cliente.nome);
 
-        let idClienteFinal = null;
-        const cpfLimpo = (cliente.documento || cliente.cpf || '').replace(/\D/g, '');
+        // --- 1. RESOLVER CLIENTE ---
+        const idClienteFinal = await resolverClienteParaVenda(cliente, tokenFinal);
+        if (!idClienteFinal) return res.status(400).json({ erro: "ID do cliente não obtido." });
 
-        // --- 1. TENTATIVA DE CRIAÇÃO DIRETA ---
-        try {
-            console.log("📤 Enviando comando de criação ao Tiny...");
-            const resCriar = await axios.post(`https://api.tiny.com.br/public-api/v3/contatos`, {
-                nome: cliente.nome,
-                cpfCnpj: cpfLimpo,
-                tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
-                situacao: "A",
-                endereco: { cidade: "Maceio", uf: "AL" }
-            }, { headers: { 'Authorization': `Bearer ${tokenFinal}` } });
+        // --- 2. RESOLVER ITENS (A MÁGICA AQUI) ---
+        const itensFormatados = await Promise.all(itensCarrinho.map(async (item) => {
+            // Prioridade 1: tinyId enviado pelo site
+            // Prioridade 2: Buscar no banco pelo ID do site
+            let idTinyFinal = item.id_tiny || item.tinyId;
 
-            idClienteFinal = resCriar.data.data?.id || resCriar.data.id;
-        } catch (error) {
-            const status = error.response?.status;
-            const msgErro = JSON.stringify(error.response?.data || "");
-
-            if (status === 429) {
-                console.log("🛑 O Tiny barrou (429). Você precisa MESMO esperar uns minutos sem clicar em nada.");
-                return res.status(429).json({ erro: "O Tiny ainda está te bloqueando. Espere 5 minutos e tente UM ÚNICO teste." });
+            if (!idTinyFinal || String(idTinyFinal).length < 6) {
+                console.log(`🕵️ Buscando ID Tiny no banco para o produto ${item.id}...`);
+                const prodBanco = await prisma.produto.findUnique({ where: { id: parseInt(item.id) } });
+                idTinyFinal = prodBanco?.tinyId || item.id;
             }
 
-            // Se o erro for porque você já criou em um teste anterior (Duplicado)
-            if (msgErro.includes("existe") || msgErro.includes("cadastrado")) {
-                const matchId = msgErro.match(/(\d{9,})/);
-                if (matchId) idClienteFinal = matchId[1];
-            }
-        }
-
-        if (!idClienteFinal) {
-            throw new Error("Não foi possível criar o cliente (API Bloqueada ou Erro de Dados)");
-        }
-
-        console.log("✅ Cliente OK, preparando itens...");
-        await sleep(3000); // Pausa de segurança
-
-        // --- 2. FORMATAR ITENS ---
-        const itensFormatados = itensCarrinho.map(prod => ({
-            produto: { id: prod.id_tiny || prod.tinyId || prod.id },
-            quantidade: prod.quantidade,
-            valorUnitario: parseFloat(prod.preco || 0)
+            return {
+                produto: { id: String(idTinyFinal) },
+                quantidade: parseInt(item.quantidade),
+                valorUnitario: parseFloat(item.preco || 0)
+            };
         }));
 
         // --- 3. ENVIO DO PEDIDO ---
         const payloadPedido = {
             data: new Date().toISOString().split('T')[0],
-            idContato: idClienteFinal, 
+            idContato: idClienteFinal,
             itens: itensFormatados,
             naturezaOperacao: { id: 335900648 },
             valorFrete: parseFloat(valorFrete || 0),
             situacao: 0
         };
+
+        await sleep(2000); // Respiro para evitar 429
 
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/pedidos`, 
@@ -2065,11 +2045,12 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
         );
 
+        console.log("🎉 SUCESSO! Pedido no Tiny:", response.data.data?.numero);
         res.json({ sucesso: true, numero: response.data.data?.numero });
 
     } catch (error) {
-        console.error("❌ ERRO:", error.response?.data || error.message);
-        res.status(500).json({ erro: error.message });
+        console.error("❌ ERRO NO PEDIDO:", JSON.stringify(error.response?.data || error.message));
+        res.status(500).json({ erro: "Erro ao processar", detalhes: error.response?.data });
     }
 });
 // ROTA: RAIO-X COMPLETO (SEM FILTROS)

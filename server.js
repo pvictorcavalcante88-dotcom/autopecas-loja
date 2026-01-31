@@ -1999,8 +1999,10 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
     try {
+        await sleep(5000);
         const tokenFinal = await getValidToken();
         const { itensCarrinho, cliente, valorFrete } = req.body;
+    
 
         console.log("🚀 INICIANDO PROCESSO PARA:", cliente.nome);
 

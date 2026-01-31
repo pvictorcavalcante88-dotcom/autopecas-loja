@@ -132,6 +132,7 @@ document.addEventListener("DOMContentLoaded", async function() {
             if (Array.isArray(itensResgatados)) {
                 const carrinhoParaSalvar = itensResgatados.map(item => ({
                     id: item.id,
+                    tinyId: item.ti || item.tinyId, // ✅ Recupera o Tiny ID do link
                     quantidade: item.q || item.quantidade,
                     nome: item.n || item.nome,
                     // ✅ Voltamos para o preço de Custo (150.00)
@@ -831,6 +832,7 @@ function gerarPayloadUrl() {
     
     const payload = itens.map(i => ({ 
         id: i.id, 
+        ti: i.id_tiny || i.tinyId, // ✅ Adicionamos o Tiny ID (ti) aqui
         q: i.qtd,
         n: i.nome,
         m: i.customMargin,     // ✅ Enviamos a MARGEM real (ex: 25)

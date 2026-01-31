@@ -1996,6 +1996,9 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 });
 
 app.post('/admin/tiny/criar-pedido', async (req, res) => {
+    // Função auxiliar local caso não tenha definido no topo do arquivo
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
     try {
         const tokenFinal = await getValidToken();
         const { itensCarrinho, cliente, valorFrete } = req.body;
@@ -2005,6 +2008,9 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
         // --- 1. RESOLVER CLIENTE (BUSCA OU CRIAÇÃO) ---
         let idClienteFinal = null;
         const cpfLimpo = (cliente.documento || cliente.cpf || '').replace(/\D/g, '');
+
+        // 🛑 ADICIONE AQUI: Pequena pausa antes de começar para evitar o 429 imediato
+        await sleep(2000); 
 
         // Tenta buscar primeiro
         try {
@@ -2016,7 +2022,10 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
                 idClienteFinal = resBusca.data.data[0].id;
                 console.log("✅ Cliente encontrado ID:", idClienteFinal);
             }
-        } catch (e) { console.log("⚠️ Busca falhou, tentando criar..."); }
+        } catch (e) { 
+            console.log("⚠️ Busca falhou ou retornou 429, tentando criar..."); 
+            await sleep(2000); // Pausa caso a busca tenha dado erro
+        }
 
         // Se não achou na busca, cria o contato
         if (!idClienteFinal) {
@@ -2029,6 +2038,9 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             
             idClienteFinal = resCriar.data.data?.id || resCriar.data.id;
             console.log("✅ Novo cliente criado ID:", idClienteFinal);
+            
+            // 🛑 ADICIONE AQUI: Pausa após criar contato
+            await sleep(3000); 
         }
 
         // --- 2. FORMATAR ITENS ---
@@ -2038,16 +2050,18 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             valorUnitario: parseFloat(prod.preco || 0)
         }));
 
-        // --- 3. MONTAR PAYLOAD DO PEDIDO (PADRÃO API V3.1) ---
-        // Seguindo a exigência de idContato maior que 0
+        // --- 3. MONTAR PAYLOAD DO PEDIDO ---
         const payloadPedido = {
             data: new Date().toISOString().split('T')[0],
             idContato: idClienteFinal, 
             itens: itensFormatados,
-            naturezaOperacao: { id: 335900648 }, // Verifique se este ID está correto no seu Tiny
+            naturezaOperacao: { id: 335900648 },
             valorFrete: parseFloat(valorFrete || 0),
             situacao: 0
         };
+
+        // 🛑 ADICIONE AQUI: Pausa final de segurança antes do POST do pedido
+        if (idClienteFinal) await sleep(2000);
 
         console.log("📤 ENVIANDO PEDIDO AO TINY...");
         const response = await axios.post(

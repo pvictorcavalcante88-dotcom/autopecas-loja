@@ -1450,64 +1450,87 @@ async function criarPedidoNoTiny(dadosCliente, carrinho) {
 }
 
 // ==========================================
-// 🟢 LÓGICA DE PARCELAMENTO NO CHECKOUT
+// 🟢 LÓGICA DE ATUALIZAÇÃO DE PREÇO E PARCELAS
 // ==========================================
 
-// 1. Mostra ou Esconde o Seletor
-function toggleParcelas() {
-    const radioCartao = document.getElementById('pagamento-cartao');
-    const container = document.getElementById('container-parcelas');
-    
-    if (radioCartao && radioCartao.checked) {
-        container.style.display = 'block';
-        atualizarSimulacaoParcelas(); // Já calcula assim que abre
-    } else {
-        container.style.display = 'none';
-        // Reseta para 1x se mudar para Pix, para não bugar a lógica
-        document.getElementById('parcelas-select').value = "1";
-    }
-}
-
-// 2. Faz a Conta (2x Sem Juros / 3x+ Com Juros)
-function atualizarSimulacaoParcelas() {
-    // Busca o total do carrinho salvo
+// Função auxiliar para calcular o Total Base (Sem Juros)
+function calcularTotalBase() {
     const carrinho = JSON.parse(localStorage.getItem('nossoCarrinho') || '[]');
     const margemGlobal = parseFloat(localStorage.getItem('minhaMargem') || 0);
     
-    // Calcula o Total Real (igual ao backend faz)
-    let totalVenda = carrinho.reduce((acc, item) => {
+    return carrinho.reduce((acc, item) => {
         let margem = (item.customMargin !== undefined) ? item.customMargin : margemGlobal;
         let precoBase = parseFloat(item.preco || item.preco_novo || 0);
         let precoFinal = precoBase * (1 + (margem / 100));
         return acc + (precoFinal * item.quantidade);
     }, 0);
+}
 
-    const numParcelas = parseInt(document.getElementById('parcelas-select').value);
-    const infoDiv = document.getElementById('info-parcela');
+// 1. Mostra/Esconde e Reseta valores
+function toggleParcelas() {
+    const radioCartao = document.getElementById('pagamento-cartao');
+    const container = document.getElementById('container-parcelas');
+    const displayTotal = document.getElementById('cart-total');
     
-    if (!infoDiv) return;
-
-    let valorParcela = 0;
-    let totalComJuros = totalVenda;
-
-    // --- A REGRA DE OURO ---
-    if (numParcelas <= 2) {
-        // 1x ou 2x: SEM JUROS (Preço normal)
-        valorParcela = totalVenda / numParcelas;
-        infoDiv.innerHTML = `<span style="color:#27ae60">${numParcelas}x de ${formatarMoeda(valorParcela)}</span> (Sem Juros)`;
+    if (radioCartao && radioCartao.checked) {
+        // Se escolheu Cartão, mostra o simulador
+        container.style.display = 'block';
+        atualizarSimulacaoParcelas(); // Força recálculo
     } else {
-        // 3x a 12x: COM JUROS (Simulação Asaas ~2.99% a.m aproximado)
-        // Fórmula simples para simular o acréscimo: Total * (1 + (Taxa * Meses))
-        // Ajuste esse 0.0299 conforme a taxa real que você paga no Asaas para ficar preciso
-        const taxaJurosMensal = 0.035; // 3.5% ao mês (estimativa Asaas Link Parcelado)
+        // Se escolheu PIX:
+        container.style.display = 'none';
         
-        // Juros Simples para Simulação Rápida (ou use Tabela Price se preferir)
-        totalComJuros = totalVenda * (1 + (taxaJurosMensal * numParcelas));
+        // 🟢 RESETA O PREÇO PARA O VALOR ORIGINAL (SEM JUROS)
+        const totalBase = calcularTotalBase();
+        if(displayTotal) displayTotal.innerText = formatarMoeda(totalBase);
+        
+        // Reseta o select para 1x
+        document.getElementById('parcelas-select').value = "1";
+    }
+}
+
+// 2. Faz a Conta e ATUALIZA O TOTAL DA TELA
+function atualizarSimulacaoParcelas() {
+    const totalBase = calcularTotalBase();
+    const numParcelas = parseInt(document.getElementById('parcelas-select').value);
+    
+    const displayTotal = document.getElementById('cart-total'); // Onde mostra o preço grande
+    const infoDiv = document.getElementById('info-parcela');    // Onde mostra o detalhe pequeno
+    
+    let totalComJuros = totalBase;
+    let valorParcela = 0;
+
+    // --- A REGRA DE JUROS ---
+    if (numParcelas <= 2) {
+        // 1x ou 2x: SEM JUROS
+        totalComJuros = totalBase;
+        valorParcela = totalBase / numParcelas;
+        
+        if(infoDiv) {
+            infoDiv.innerHTML = `<span style="color:#27ae60">${numParcelas}x de ${formatarMoeda(valorParcela)}</span> (Sem Juros)`;
+        }
+    } else {
+        // 3x a 12x: COM JUROS (3.5% a.m aproximado)
+        const taxaJurosMensal = 0.035; 
+        totalComJuros = totalBase * (1 + (taxaJurosMensal * numParcelas));
         valorParcela = totalComJuros / numParcelas;
 
-        infoDiv.innerHTML = `
-            <span style="color:#e67e22">${numParcelas}x de ${formatarMoeda(valorParcela)}</span>
-            <br><span style="font-size:0.8em; color:#7f8c8d">Total estim.: ${formatarMoeda(totalComJuros)}</span>
-        `;
+        if(infoDiv) {
+            infoDiv.innerHTML = `
+                <span style="color:#e67e22">${numParcelas}x de ${formatarMoeda(valorParcela)}</span>
+            `;
+        }
+    }
+
+    // 🟢 AQUI ESTÁ O PEDIDO: Atualiza o "Total a Pagar" lá em cima
+    if(displayTotal) {
+        displayTotal.innerText = formatarMoeda(totalComJuros);
+        
+        // Efeito visual (fica laranja se tiver juros, verde se não)
+        if (numParcelas > 2) {
+            displayTotal.style.color = '#e67e22'; // Laranja (Aviso de Juros)
+        } else {
+            displayTotal.style.color = '#27ae60'; // Verde (Normal)
+        }
     }
 }

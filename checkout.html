@@ -174,28 +174,6 @@
                 <span style="font-weight: bold;">Cartão de Crédito</span>
             </label>
 
-            <div id="container-parcelas" style="display:none; margin-left: 28px; margin-top: 10px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
-                <label style="font-size: 0.9rem; color: #666; display:block; margin-bottom:5px;">Em quantas vezes?</label>
-                
-                <select id="parcelas-select" onchange="atualizarSimulacaoParcelas()" style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 1rem; background: #fff;">
-                    <option value="1">1x À Vista (Sem Juros)</option>
-                    <option value="2">2x Sem Juros</option>
-                    <option value="3">3x (c/ Juros)</option>
-                    <option value="4">4x (c/ Juros)</option>
-                    <option value="5">5x (c/ Juros)</option>
-                    <option value="6">6x (c/ Juros)</option>
-                    <option value="7">7x (c/ Juros)</option>
-                    <option value="8">8x (c/ Juros)</option>
-                    <option value="9">9x (c/ Juros)</option>
-                    <option value="10">10x (c/ Juros)</option>
-                    <option value="11">11x (c/ Juros)</option>
-                    <option value="12">12x (c/ Juros)</option>
-                </select>
-
-                <div id="info-parcela" style="margin-top: 10px; font-weight: bold; color: #2c3e50; font-size: 0.95rem;"></div>
-                
-                <p style="font-size: 0.75rem; color: #999; margin-top: 5px;">*Simulação aproximada com taxas de antecipação.</p>
-            </div>
         </div>
 
         <p style="font-size:0.8rem; color:#888; margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
@@ -217,6 +195,29 @@
             </div>
 
             <div id="container-botoes-dinamicos" style="margin-top: 25px;"></div>
+
+            <div id="container-parcelas" style="display:none; margin-top: 20px; padding: 15px; background: #fff8e1; border: 1px dashed #f1c40f; border-radius: 8px;">
+            <label style="font-size: 0.9rem; color: #d35400; display:block; margin-bottom:5px; font-weight:bold;">
+                <i class="ph ph-credit-card"></i> Opções de Parcelamento:
+            </label>
+            
+            <select id="parcelas-select" onchange="atualizarSimulacaoParcelas()" style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #f39c12; font-size: 1rem; background: #fff;">
+                <option value="1">1x À Vista (Sem Juros)</option>
+                <option value="2">2x Sem Juros</option>
+                <option value="3">3x (c/ Juros)</option>
+                <option value="4">4x (c/ Juros)</option>
+                <option value="5">5x (c/ Juros)</option>
+                <option value="6">6x (c/ Juros)</option>
+                <option value="7">7x (c/ Juros)</option>
+                <option value="8">8x (c/ Juros)</option>
+                <option value="9">9x (c/ Juros)</option>
+                <option value="10">10x (c/ Juros)</option>
+                <option value="11">11x (c/ Juros)</option>
+                <option value="12">12x (c/ Juros)</option>
+            </select>
+
+            <div id="info-parcela" style="margin-top: 10px; font-weight: bold; color: #2c3e50; font-size: 0.95rem; text-align:center;"></div>
+        </div>
 
             <a href="cart.html" class="back-link">Voltar ao Carrinho</a>
         </div>

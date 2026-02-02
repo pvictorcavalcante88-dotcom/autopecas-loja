@@ -71,31 +71,38 @@ async function criarCobrancaPixDireto(cliente, valorTotal, descricao, walletIdAf
 // Função de LINK (usada para Cartão/Parcelamento)
 // services/asaasService.js
 
-async function criarLinkPagamento(cliente, valorTotal, descricao, walletIdAfiliado, comissaoAfiliado) {
+// services/asaasService.js
+
+async function criarLinkPagamento(cliente, valorTotal, descricao, walletIdAfiliado, comissaoAfiliado, qtdeParcelas = 1) {
     try {
-        const isParcelado = qtdeParcelas > 1;
+        // 1. LÓGICA DE SEGURANÇA:
+        // Se a variável chegou undefined ou null, assume 1
+        const parcelas = parseInt(qtdeParcelas) || 1;
+        const isParcelado = parcelas > 1;
+
+        console.log(`⚙️ Processando Link Asaas: ${parcelas}x (Parcelado? ${isParcelado})`);
+
         const payload = {
-            
-            billingType: 'CREDIT_CARD',
-            chargeType: isParcelado ? 'INSTALLMENT' : 'DETACHED',
             name: descricao.substring(0, 255),
+            description: descricao.substring(0, 255),
             value: Number(valorTotal.toFixed(2)),
-            // 🔴 CORREÇÃO DO ERRO AQUI:
-            dueDateLimitDays: 3, // O link ficará ativo por 3 dias
-            maxInstallmentCount: 10,
-            notificationDisabled: false
+            dueDateLimitDays: 3,
+            notificationDisabled: false,
+
+            // Lógica Híbrida:
+            billingType:'CREDIT_CARD',
+            chargeType: isParcelado ? 'INSTALLMENT' : 'DETACHED'
         };
 
         if (isParcelado) {
-            // TRAVA NO NÚMERO QUE O CLIENTE ESCOLHEU
-            payload.installmentCount = qtdeParcelas; 
-            // Opcional: Se quiser mostrar o valor da parcela na descrição
-            // payload.installmentValue = valorTotal / qtdeParcelas; 
+            // Se for parcelado, trava no número escolhido
+            payload.installmentCount = parcelas; 
         } else {
-            // SE FOR À VISTA, TRAVA EM 1X
+            // Se for à vista, trava em 1x
             payload.maxInstallmentCount = 1; 
         }
 
+        // Split de pagamento (Comissão)
         if (walletIdAfiliado && comissaoAfiliado > 0) {
             payload.split = [{ 
                 walletId: walletIdAfiliado, 
@@ -103,8 +110,7 @@ async function criarLinkPagamento(cliente, valorTotal, descricao, walletIdAfilia
             }];
         }
 
-        console.log(`🚀 Asaas Link (${isParcelado ? qtdeParcelas + 'x' : 'À Vista/Detached'}):`, JSON.stringify(payload));
-        console.log("🚀 Enviando payload para Asaas Link:", JSON.stringify(payload));
+        console.log("🚀 Payload Enviado ao Asaas:", JSON.stringify(payload));
 
         const response = await api.post('/paymentLinks', payload);
         
@@ -115,12 +121,13 @@ async function criarLinkPagamento(cliente, valorTotal, descricao, walletIdAfilia
             invoiceUrl: response.data.url
         };
     } catch (e) { 
-        // Log detalhado para capturar erros do Asaas
         const msg = e.response?.data?.errors ? JSON.stringify(e.response.data.errors) : e.message;
-        console.error("❌ Erro detalhado no Asaas Link:", msg);
+        console.error("❌ Erro Asaas Link:", msg);
         throw new Error("Erro Asaas Link: " + msg);
     }
 }
+
+module.exports = { criarCobrancaPixDireto, criarLinkPagamento }; // Exportar as duas
 
 
 module.exports = { criarCobrancaPixDireto, criarLinkPagamento };

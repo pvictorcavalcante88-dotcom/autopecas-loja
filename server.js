@@ -20,10 +20,11 @@ const app = express();
 const allowedOrigins = [
     'https://vunn.com.br',
     'https://www.vunn.com.br',
-    'https://autopecas-loja.onrender.com',        // Seu Backend
-    'https://nimble-bublanina-1395f3.netlify.app', // 🟢 SEU ADMIN (NETLIFY)
-    'http://127.0.0.1:5500',                      // Teste Local (VS Code)
-    'http://localhost:3000'                       // Teste Local (React/Node)
+    'http://vunn.com.br',      // Backup sem SSL
+    'http://www.vunn.com.br',   // Backup sem SSL
+    'https://autopecas-loja.onrender.com',
+    'https://nimble-bublanina-1395f3.netlify.app',
+    'http://127.0.0.1:5500'                   // Teste Local (React/Node)
 ];
 
 app.use(cors({

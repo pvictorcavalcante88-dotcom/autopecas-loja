@@ -74,7 +74,7 @@ async function criarCobrancaPixDireto(cliente, valorTotal, descricao, walletIdAf
 async function criarLinkPagamento(cliente, valorTotal, descricao, walletIdAfiliado, comissaoAfiliado) {
     try {
         const payload = {
-            billingType: 'UNDEFINED',
+            billingType: 'CREDIT_CARD',
             chargeType: 'DETACHED',
             name: descricao.substring(0, 255),
             value: Number(valorTotal.toFixed(2)),

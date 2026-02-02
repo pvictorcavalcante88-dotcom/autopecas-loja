@@ -2,7 +2,7 @@
    🚀 SCRIPT GERAL (SALVAMENTO AUTOMÁTICO NO CHECKOUT)
    ============================================================== */
 
-const API_URL = ''; 
+const API_URL = 'https://www.vunn.com.br'; 
 let FATOR_GLOBAL = 1.0; 
 
 // LISTA DE CARROS ACEITOS (WHITELIST)

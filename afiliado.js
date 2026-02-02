@@ -1,4 +1,4 @@
-const API_URL = ''; // Deixe vazio se estiver no mesmo domínio
+const API_URL = 'https://www.vunn.com.br'; // Deixe vazio se estiver no mesmo domínio
 
 // ============================================================
 // INICIALIZAÇÃO E DATAS

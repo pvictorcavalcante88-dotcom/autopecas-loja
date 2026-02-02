@@ -97,6 +97,7 @@ async function criarLinkPagamento(cliente, valorTotal, descricao, walletIdAfilia
         if (isParcelado) {
             // Se for parcelado, trava no número escolhido
             payload.installmentCount = parcelas; 
+            payload.maxInstallmentCount = parcelas; 
         } else {
             // Se for à vista, trava em 1x
             payload.maxInstallmentCount = 1; 

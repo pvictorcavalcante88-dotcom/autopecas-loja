@@ -1448,3 +1448,66 @@ async function criarPedidoNoTiny(dadosCliente, carrinho) {
         return null;
     }
 }
+
+// ==========================================
+// 🟢 LÓGICA DE PARCELAMENTO NO CHECKOUT
+// ==========================================
+
+// 1. Mostra ou Esconde o Seletor
+function toggleParcelas() {
+    const radioCartao = document.getElementById('pagamento-cartao');
+    const container = document.getElementById('container-parcelas');
+    
+    if (radioCartao && radioCartao.checked) {
+        container.style.display = 'block';
+        atualizarSimulacaoParcelas(); // Já calcula assim que abre
+    } else {
+        container.style.display = 'none';
+        // Reseta para 1x se mudar para Pix, para não bugar a lógica
+        document.getElementById('parcelas-select').value = "1";
+    }
+}
+
+// 2. Faz a Conta (2x Sem Juros / 3x+ Com Juros)
+function atualizarSimulacaoParcelas() {
+    // Busca o total do carrinho salvo
+    const carrinho = JSON.parse(localStorage.getItem('nossoCarrinho') || '[]');
+    const margemGlobal = parseFloat(localStorage.getItem('minhaMargem') || 0);
+    
+    // Calcula o Total Real (igual ao backend faz)
+    let totalVenda = carrinho.reduce((acc, item) => {
+        let margem = (item.customMargin !== undefined) ? item.customMargin : margemGlobal;
+        let precoBase = parseFloat(item.preco || item.preco_novo || 0);
+        let precoFinal = precoBase * (1 + (margem / 100));
+        return acc + (precoFinal * item.quantidade);
+    }, 0);
+
+    const numParcelas = parseInt(document.getElementById('parcelas-select').value);
+    const infoDiv = document.getElementById('info-parcela');
+    
+    if (!infoDiv) return;
+
+    let valorParcela = 0;
+    let totalComJuros = totalVenda;
+
+    // --- A REGRA DE OURO ---
+    if (numParcelas <= 2) {
+        // 1x ou 2x: SEM JUROS (Preço normal)
+        valorParcela = totalVenda / numParcelas;
+        infoDiv.innerHTML = `<span style="color:#27ae60">${numParcelas}x de ${formatarMoeda(valorParcela)}</span> (Sem Juros)`;
+    } else {
+        // 3x a 12x: COM JUROS (Simulação Asaas ~2.99% a.m aproximado)
+        // Fórmula simples para simular o acréscimo: Total * (1 + (Taxa * Meses))
+        // Ajuste esse 0.0299 conforme a taxa real que você paga no Asaas para ficar preciso
+        const taxaJurosMensal = 0.035; // 3.5% ao mês (estimativa Asaas Link Parcelado)
+        
+        // Juros Simples para Simulação Rápida (ou use Tabela Price se preferir)
+        totalComJuros = totalVenda * (1 + (taxaJurosMensal * numParcelas));
+        valorParcela = totalComJuros / numParcelas;
+
+        infoDiv.innerHTML = `
+            <span style="color:#e67e22">${numParcelas}x de ${formatarMoeda(valorParcela)}</span>
+            <br><span style="font-size:0.8em; color:#7f8c8d">Total estim.: ${formatarMoeda(totalComJuros)}</span>
+        `;
+    }
+}

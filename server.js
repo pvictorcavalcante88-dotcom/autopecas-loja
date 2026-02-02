@@ -18,6 +18,8 @@ const app = express();
 // 1. CONFIGURAÇÃO DOS ENDEREÇOS PERMITIDOS (CORS)
 // ==============================================================
 const allowedOrigins = [
+    'https://vunn.com.br',
+    'https://www.vunn.com.br',
     'https://autopecas-loja.onrender.com',        // Seu Backend
     'https://nimble-bublanina-1395f3.netlify.app', // 🟢 SEU ADMIN (NETLIFY)
     'http://127.0.0.1:5500',                      // Teste Local (VS Code)
@@ -25,19 +27,19 @@ const allowedOrigins = [
 ];
 
 app.use(cors({
-    origin: function (origin, callback) {
-        // PERMITE SE:
-        // 1. Não tiver origem (acesso direto via Postman ou servidor-servidor)
-        // 2. A origem for "null" (alguns navegadores fazem isso em redirecionamentos)
-        // 3. A origem estiver na lista allowedOrigins
-        if (!origin || origin === 'null' || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            console.log("🚫 CORS Bloqueou a origem:", origin); // Log para você ver quem foi barrado
-            callback(new Error('Bloqueado pelo CORS: Origem não permitida.'));
-        }
-    },
-    credentials: true // Importante para cookies/login funcionarem
+  origin: function (origin, callback) {
+    // permite solicitações sem origem (como aplicativos móveis ou solicitações curl)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'A política CORS para este site não permite acesso da origem informada.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
 
 // ... resto do código (rotas, app.listen, etc) ...

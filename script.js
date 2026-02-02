@@ -1151,12 +1151,17 @@ async function finalizarCompraAsaas() {
         // Verifica se o cliente marcou a bolinha (radio button) do Cartão no HTML
         let metodoEscolhido = 'PIX'; 
         const radioCartao = document.getElementById('pagamento-cartao'); 
+        let qtdeParcelas = 1;
+        const selectParcelas = document.getElementById('parcelas-select'); // Verifique se o ID no HTML é esse mesmo
         
         if (radioCartao && radioCartao.checked) {
             metodoEscolhido = 'CARTAO';
+            if (selectParcelas) {
+                qtdeParcelas = parseInt(selectParcelas.value);
+            }
         }
 
-        console.log(`Enviando método de pagamento: ${metodoEscolhido}`);
+        console.log(`Enviando método: ${metodoEscolhido} | Parcelas: ${qtdeParcelas}x`);
 
         const payload = {
             cliente: { 
@@ -1169,7 +1174,8 @@ async function finalizarCompraAsaas() {
             itens: itensParaEnviar,
             afiliadoId: null,
             afiliadoCodigo: null,
-            metodoPagamento: metodoEscolhido
+            metodoPagamento: metodoEscolhido,
+            parcelasSelecionadas: qtdeParcelas
         };
 
         // Verifica se tem afiliado logado ou código de referência

@@ -1241,7 +1241,7 @@ app.get('/admin/saques-pendentes', authenticateToken, async (req, res) => {
 // ============================================================
 app.post('/api/checkout/pix', async (req, res) => {
     try {
-        const { itens, cliente, afiliadoId, afiliadoCodigo, metodoPagamento } = req.body;
+        const { itens, cliente, afiliadoId, afiliadoCodigo, metodoPagamento, parcelasSelecionadas } = req.body;
 
         // 1. Identificar Afiliado
         let idFinalAfiliado = null;
@@ -1337,14 +1337,16 @@ app.post('/api/checkout/pix', async (req, res) => {
 
         // 5. GERAÇÃO DA COBRANÇA
         let dadosAsaas;
+        const numParcelas = parseInt(parcelasSelecionadas) || 1;
         
         if (metodoPuro === 'CARTAO') {
             dadosAsaas = await criarLinkPagamento(
                 cliente, 
                 valorTotalVenda, 
-                `Pedido Cartão - AutoPeças`,
+                `Pedido Cartão (${numParcelas}x) - Vunn`,
                 walletIdAfiliado,
-                comissaoLiquidaAfiliado
+                comissaoLiquidaAfiliado,
+                numParcelas
             );
         } else {
             dadosAsaas = await criarCobrancaPixDireto( 

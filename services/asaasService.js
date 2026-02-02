@@ -73,9 +73,11 @@ async function criarCobrancaPixDireto(cliente, valorTotal, descricao, walletIdAf
 
 async function criarLinkPagamento(cliente, valorTotal, descricao, walletIdAfiliado, comissaoAfiliado) {
     try {
+        const isParcelado = qtdeParcelas > 1;
         const payload = {
+            
             billingType: 'CREDIT_CARD',
-            chargeType: ["DETACHED", "INSTALLMENT"],
+            chargeType: isParcelado ? 'INSTALLMENT' : 'DETACHED',
             name: descricao.substring(0, 255),
             value: Number(valorTotal.toFixed(2)),
             // 🔴 CORREÇÃO DO ERRO AQUI:
@@ -84,6 +86,16 @@ async function criarLinkPagamento(cliente, valorTotal, descricao, walletIdAfilia
             notificationDisabled: false
         };
 
+        if (isParcelado) {
+            // TRAVA NO NÚMERO QUE O CLIENTE ESCOLHEU
+            payload.installmentCount = qtdeParcelas; 
+            // Opcional: Se quiser mostrar o valor da parcela na descrição
+            // payload.installmentValue = valorTotal / qtdeParcelas; 
+        } else {
+            // SE FOR À VISTA, TRAVA EM 1X
+            payload.maxInstallmentCount = 1; 
+        }
+
         if (walletIdAfiliado && comissaoAfiliado > 0) {
             payload.split = [{ 
                 walletId: walletIdAfiliado, 
@@ -91,6 +103,7 @@ async function criarLinkPagamento(cliente, valorTotal, descricao, walletIdAfilia
             }];
         }
 
+        console.log(`🚀 Asaas Link (${isParcelado ? qtdeParcelas + 'x' : 'À Vista/Detached'}):`, JSON.stringify(payload));
         console.log("🚀 Enviando payload para Asaas Link:", JSON.stringify(payload));
 
         const response = await api.post('/paymentLinks', payload);

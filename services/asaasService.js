@@ -75,12 +75,12 @@ async function criarLinkPagamento(cliente, valorTotal, descricao, walletIdAfilia
     try {
         const payload = {
             billingType: 'CREDIT_CARD',
-            chargeType: 'DETACHED',
+            chargeType: ["DETACHED", "INSTALLMENT"],
             name: descricao.substring(0, 255),
             value: Number(valorTotal.toFixed(2)),
             // 🔴 CORREÇÃO DO ERRO AQUI:
             dueDateLimitDays: 3, // O link ficará ativo por 3 dias
-            maxInstallmentCount: 12,
+            maxInstallmentCount: 10,
             notificationDisabled: false
         };
 

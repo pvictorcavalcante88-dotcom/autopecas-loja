@@ -75,7 +75,7 @@ async function criarLinkPagamento(cliente, valorTotal, descricao, walletIdAfilia
     try {
         const payload = {
             billingType: 'UNDEFINED',
-            //chargeType: 'DETACHED',
+            chargeType: 'DETACHED',
             name: descricao.substring(0, 255),
             value: Number(valorTotal.toFixed(2)),
             // 🔴 CORREÇÃO DO ERRO AQUI:

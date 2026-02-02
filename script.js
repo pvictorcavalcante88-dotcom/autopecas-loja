@@ -192,7 +192,7 @@ document.addEventListener("DOMContentLoaded", async function() {
 async function carregarPaginaCarrinho() {
     if (!localStorage.getItem('afiliadoLogado')) {
         alert("Você precisa fazer login para acessar o carrinho.");
-        window.location.href = "login.html";
+        window.location.href = "afiliado_login.html";
         return;
     }
 
@@ -462,7 +462,7 @@ async function carregarPaginaCheckout() {
 
     // --- BLOQUEIO DE SEGURANÇA INTELIGENTE ---
     if (!afiliadoLogado && carrinho.length === 0) {
-        window.location.href = "login.html"; // Ou index.html
+        window.location.href = "afiliado_login.html"; // Ou index.html
         return;
     }
     // ------------------------------------------

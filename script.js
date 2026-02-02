@@ -652,7 +652,7 @@ async function gerarLinkZap(codigo, total) {
     const baseUrl = window.location.origin + window.location.pathname.replace('checkout.html', '') + 'checkout.html';
     const link = `${baseUrl}?restore=${payload}&ref=${codigo}`;
     
-    let msg = `*Orçamento AutoPeças Veloz*\n`; 
+    let msg = `*Orçamento Vunn*\n`; 
     window.ITENS_CHECKOUT.forEach(i => { msg += `${i.qtd}x ${i.nome} - ${formatarMoeda(i.total)}\n`; });
     msg += `*Total: ${formatarMoeda(total)}*\n\n`;
     msg += `Pague aqui: ${link}`;
@@ -697,7 +697,7 @@ async function gerarPDFCustom() {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
-    doc.text("AutoPeças Veloz", marginX, 20);
+    doc.text("Vunn", marginX, 20);
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");

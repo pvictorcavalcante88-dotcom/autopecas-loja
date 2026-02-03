@@ -2366,6 +2366,29 @@ app.get('/teste-parametro/:cpf', async (req, res) => {
     }
 });
 
+// Rota para gerar lista de compras (Produtos com estoque baixo ou geral)
+app.get('/api/admin/lista-compras', async (req, res) => {
+    try {
+        // Busca todos os produtos ordenados pelo nome
+        // DICA: Se quiser só os com estoque baixo, adicione: where: { estoque: { lte: 5 } }
+        const produtos = await prisma.produto.findMany({
+            orderBy: { titulo: 'asc' },
+            select: {
+                id: true,
+                titulo: true,
+                referencia: true,
+                fabricante: true,
+                estoque: true
+            }
+        });
+
+        res.json(produtos);
+    } catch (error) {
+        console.error("Erro ao buscar lista:", error);
+        res.status(500).json({ error: "Erro ao buscar produtos" });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);

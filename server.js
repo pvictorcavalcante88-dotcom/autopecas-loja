@@ -1256,22 +1256,20 @@ app.post('/api/checkout/pix', async (req, res) => {
             }
         }
 
-        let valorTotalVenda = 0;      
+        // ==========================================
+        // PASSO A: SOMA DOS PRODUTOS (BASE)
+        // ==========================================
+        let valorTotalProdutos = 0;      
         let custoTotalProdutos = 0;   
         let lucroBrutoLoja = 0;       
         let lucroBrutoAfiliado = 0;   
         let itensParaBanco = [];
 
-        // 2. Loop dos Produtos (Cálculo de Lucros e Custos)
         for (const item of itens) {
             const prodBanco = await prisma.produto.findUnique({ where: { id: item.id } });
             if (!prodBanco) continue;
 
-            const limparValor = (val) => {
-                if (!val) return 0;
-                return parseFloat(String(val).replace(',', '.'));
-            };
-
+            const limparValor = (val) => val ? parseFloat(String(val).replace(',', '.')) : 0;
             const precoLoja = limparValor(prodBanco.preco_novo); 
             const custoPeca = limparValor(prodBanco.preco_custo) || (precoLoja * 0.8); 
             
@@ -1287,10 +1285,11 @@ app.post('/api/checkout/pix', async (req, res) => {
             const totalItemCusto = custoPeca * qtd;
             const totalItemLojaBase = precoLoja * qtd; 
 
+            // Lucro Bruto (Baseado no preço do produto, sem juros)
             const faturamentoAfiliado = totalItemVenda - totalItemLojaBase; 
             const faturamentoLoja = totalItemLojaBase - totalItemCusto;
 
-            valorTotalVenda += totalItemVenda;
+            valorTotalProdutos += totalItemVenda;
             custoTotalProdutos += totalItemCusto;
             lucroBrutoAfiliado += faturamentoAfiliado;
             lucroBrutoLoja += faturamentoLoja;
@@ -1305,22 +1304,41 @@ app.post('/api/checkout/pix', async (req, res) => {
             });
         }
 
-        // 3. CÁLCULO DAS TAXAS TOTAIS
+        // ==========================================
+        // PASSO B: CÁLCULO DOS JUROS (ANTES DAS TAXAS) 🔄
+        // ==========================================
+        const metodoPuro = metodoPagamento ? metodoPagamento.toUpperCase().trim() : 'PIX';
+        const numParcelas = parseInt(parcelasSelecionadas) || 1;
+        
+        // O valor base da cobrança é o total dos produtos
+        let valorFinalCobranca = valorTotalProdutos; 
+
+        // Se for parcelado > 2x, aplica juros no Valor Final
+        if (numParcelas > 2) {
+            const taxaJurosMensal = 0.035; // 3.5% a.m
+            valorFinalCobranca = valorTotalProdutos * (1 + (taxaJurosMensal * numParcelas));
+            console.log(`📈 Juros Aplicados (${numParcelas}x): R$ ${valorTotalProdutos.toFixed(2)} -> R$ ${valorFinalCobranca.toFixed(2)}`);
+        }
+
+        // ==========================================
+        // PASSO C: CÁLCULO DAS TAXAS (SOBRE O TOTAL REAL) 💸
+        // ==========================================
         let custoTaxasTotal = 0;
-        const valorImposto = valorTotalVenda * CONFIG_FINANCEIRA.impostoGoverno;
+        
+        // Imposto governo sobre o total transacionado (Nota Fiscal sai cheia)
+        const valorImposto = valorFinalCobranca * CONFIG_FINANCEIRA.impostoGoverno;
         custoTaxasTotal += valorImposto;
         
-
-        // Define o método limpo (PIX ou CARTAO)
-        const metodoPuro = metodoPagamento ? metodoPagamento.toUpperCase().trim() : 'PIX';
-
         if (metodoPuro === 'CARTAO') {
-            custoTaxasTotal += (valorTotalVenda * CONFIG_FINANCEIRA.taxaAsaasCartaoPct) + CONFIG_FINANCEIRA.taxaAsaasCartaoFixo;
+            // Asaas cobra % sobre o valor CHEIO (com juros)
+            custoTaxasTotal += (valorFinalCobranca * CONFIG_FINANCEIRA.taxaAsaasCartaoPct) + CONFIG_FINANCEIRA.taxaAsaasCartaoFixo;
         } else {
             custoTaxasTotal += CONFIG_FINANCEIRA.taxaAsaasPix;
         }
 
-        // 4. RATEIO PROPORCIONAL
+        // ==========================================
+        // PASSO D: RATEIO (PROTEGENDO O LUCRO DO AFILIADO) 🛡️
+        // ==========================================
         const lucroOperacionalTotal = lucroBrutoLoja + lucroBrutoAfiliado;
         let comissaoLiquidaAfiliado = 0;
         let parteTaxaAfiliado = 0;
@@ -1328,34 +1346,30 @@ app.post('/api/checkout/pix', async (req, res) => {
         let lucroLiquidoLoja = lucroBrutoLoja - custoTaxasTotal;
 
         if (lucroOperacionalTotal > 0 && lucroBrutoAfiliado > 0) {
+            // O peso é calculado sobre o lucro bruto DOS PRODUTOS
             const pesoAfiliado = lucroBrutoAfiliado / lucroOperacionalTotal;
+            
+            // Mas a taxa a ser paga agora é maior (pois inclui a taxa sobre os juros)
             parteTaxaAfiliado = custoTaxasTotal * pesoAfiliado;
+            
+            // Isso vai reduzir a comissão líquida, corrigindo o valor
             comissaoLiquidaAfiliado = lucroBrutoAfiliado - parteTaxaAfiliado;
+            
             parteTaxaLoja = custoTaxasTotal - parteTaxaAfiliado;
             lucroLiquidoLoja = lucroBrutoLoja - parteTaxaLoja;
         }
         if (comissaoLiquidaAfiliado < 0) comissaoLiquidaAfiliado = 0;
 
-        // 5. GERAÇÃO DA COBRANÇA
+        // ==========================================
+        // PASSO E: GERAÇÃO DO LINK ASAAS
+        // ==========================================
         let dadosAsaas;
-        const numParcelas = parseInt(parcelasSelecionadas) || 1;
-        let valorFinalCobranca = valorTotalVenda; // Começa com o valor base
-        if (numParcelas > 2) {
-            // A mesma taxa usada no script.js (3.5% a.m)
-            const taxaJurosMensal = 0.035; 
-            
-            // Fórmula: ValorBase * (1 + (Taxa * Parcelas))
-            valorFinalCobranca = valorTotalVenda * (1 + (taxaJurosMensal * numParcelas));
-            
-            console.log(`📈 Aplicando Juros de Parcelamento (${numParcelas}x): Base R$ ${valorTotalVenda.toFixed(2)} -> Final R$ ${valorFinalCobranca.toFixed(2)}`);
-        }
         
         if (metodoPuro === 'CARTAO') {
             dadosAsaas = await criarLinkPagamento(
                 cliente, 
-                //valorTotalVenda, 
-                valorFinalCobranca,
-                `Pedido Cartão (${numParcelas}x) - Vunn`,
+                valorFinalCobranca, // Valor COM juros
+                `Pedido Cartão (${numParcelas}x) - AutoPeças`,
                 walletIdAfiliado,
                 comissaoLiquidaAfiliado,
                 numParcelas
@@ -1363,7 +1377,7 @@ app.post('/api/checkout/pix', async (req, res) => {
         } else {
             dadosAsaas = await criarCobrancaPixDireto( 
                 cliente, 
-                valorTotalVenda, 
+                valorTotalProdutos, // Pix é valor base
                 `Pedido PIX - AutoPeças`,
                 walletIdAfiliado,
                 comissaoLiquidaAfiliado
@@ -1371,33 +1385,23 @@ app.post('/api/checkout/pix', async (req, res) => {
         }
 
         // --- LOG DE AUDITORIA ---
-        const pctTaxaSobreLoja = lucroBrutoLoja > 0 ? (parteTaxaLoja / lucroBrutoLoja) * 100 : 0;
-        const pctTaxaSobreAfiliado = lucroBrutoAfiliado > 0 ? (parteTaxaAfiliado / lucroBrutoAfiliado) * 100 : 0;
-        const margemLiquidaLoja = valorTotalVenda > 0 ? (lucroLiquidoLoja / valorTotalVenda) * 100 : 0;
-
         console.log(`
         ============================================================
-        📊 AUDITORIA DE TAXAS - MÉTODO: ${metodoPuro}
+        📊 AUDITORIA CORRIGIDA - MÉTODO: ${metodoPuro} (${numParcelas}x)
         ============================================================
-        💰 VENDA TOTAL:          R$ ${valorTotalVenda.toFixed(2)}
-        📦 CUSTO PRODUTOS:       R$ ${custoTotalProdutos.toFixed(2)}
-        ------------------------------------------------------------
-        🧾 TAXAS TOTAIS (CONTA): R$ ${custoTaxasTotal.toFixed(2)}
+        💰 PRODUTOS (BASE):      R$ ${valorTotalProdutos.toFixed(2)}
+        📈 VALOR COM JUROS:      R$ ${valorFinalCobranca.toFixed(2)}
+        🧾 TAXAS TOTAIS (REAL):  R$ ${custoTaxasTotal.toFixed(2)} (Base calc: R$ ${valorFinalCobranca.toFixed(2)})
         
-        ⚖️ QUEM PAGOU A CONTA (RATEIO):
-        🏢 LOJA:
-           - Lucro Bruto:        R$ ${lucroBrutoLoja.toFixed(2)}
-           - Taxa Paga:         -R$ ${parteTaxaLoja.toFixed(2)} (${pctTaxaSobreLoja.toFixed(1)}% do lucro)
-           - LUCRO LÍQUIDO:      R$ ${lucroLiquidoLoja.toFixed(2)} (Margem Final: ${margemLiquidaLoja.toFixed(1)}%)
-
+        ⚖️ RATEIO FINAL:
         🤝 AFILIADO:
-           - Lucro Bruto:        R$ ${lucroBrutoAfiliado.toFixed(2)}
-           - Taxa Paga:         -R$ ${parteTaxaAfiliado.toFixed(2)} (${pctTaxaSobreAfiliado.toFixed(1)}% do lucro)
-           - COMISSÃO LÍQUIDA:   R$ ${comissaoLiquidaAfiliado.toFixed(2)}
+           - Lucro Bruto (Prod): R$ ${lucroBrutoAfiliado.toFixed(2)}
+           - Taxa Proporcional: -R$ ${parteTaxaAfiliado.toFixed(2)}
+           - COMISSÃO FINAL:     R$ ${comissaoLiquidaAfiliado.toFixed(2)}
         ============================================================
         `);
 
-        // 🟢 SALVA O PEDIDO COM O MÉTODO DE PAGAMENTO CORRETO
+        // 🟢 SALVA O PEDIDO
         const novoPedido = await prisma.pedido.create({
             data: {
                 clienteNome: cliente.nome,
@@ -1405,19 +1409,16 @@ app.post('/api/checkout/pix', async (req, res) => {
                 clienteEmail: cliente.email,
                 clienteTelefone: cliente.telefone,
                 clienteEndereco: cliente.endereco,
-                valorTotal: (metodoPuro === 'CARTAO') ? valorFinalCobranca : valorTotalVenda,
+                valorTotal: (metodoPuro === 'CARTAO') ? valorFinalCobranca : valorTotalProdutos,
                 itens: JSON.stringify(itensParaBanco),
                 status: 'AGUARDANDO_PAGAMENTO',
                 asaasId: dadosAsaas.id, 
                 afiliadoId: idFinalAfiliado, 
                 comissaoGerada: comissaoLiquidaAfiliado,
-                
-                // AQUI ESTÁ A CORREÇÃO:
-                metodoPagamento: metodoPuro // Salva "PIX" ou "CARTAO"
+                metodoPagamento: metodoPuro 
             }
         });
 
-        // Resposta para o Modal
         res.json({
             sucesso: true,
             pedidoId: novoPedido.id,

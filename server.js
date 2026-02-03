@@ -1353,7 +1353,7 @@ app.post('/api/checkout/pix', async (req, res) => {
         if (metodoPuro === 'CARTAO') {
             dadosAsaas = await criarLinkPagamento(
                 cliente, 
-                valorTotalVenda, 
+                //valorTotalVenda, 
                 valorFinalCobranca,
                 `Pedido Cartão (${numParcelas}x) - Vunn`,
                 walletIdAfiliado,

@@ -1309,6 +1309,7 @@ app.post('/api/checkout/pix', async (req, res) => {
         let custoTaxasTotal = 0;
         const valorImposto = valorTotalVenda * CONFIG_FINANCEIRA.impostoGoverno;
         custoTaxasTotal += valorImposto;
+        
 
         // Define o método limpo (PIX ou CARTAO)
         const metodoPuro = metodoPagamento ? metodoPagamento.toUpperCase().trim() : 'PIX';
@@ -1338,11 +1339,22 @@ app.post('/api/checkout/pix', async (req, res) => {
         // 5. GERAÇÃO DA COBRANÇA
         let dadosAsaas;
         const numParcelas = parseInt(parcelasSelecionadas) || 1;
+        let valorFinalCobranca = valorTotalVenda; // Começa com o valor base
+        if (numParcelas > 2) {
+            // A mesma taxa usada no script.js (3.5% a.m)
+            const taxaJurosMensal = 0.035; 
+            
+            // Fórmula: ValorBase * (1 + (Taxa * Parcelas))
+            valorFinalCobranca = valorTotalVenda * (1 + (taxaJurosMensal * numParcelas));
+            
+            console.log(`📈 Aplicando Juros de Parcelamento (${numParcelas}x): Base R$ ${valorTotalVenda.toFixed(2)} -> Final R$ ${valorFinalCobranca.toFixed(2)}`);
+        }
         
         if (metodoPuro === 'CARTAO') {
             dadosAsaas = await criarLinkPagamento(
                 cliente, 
                 valorTotalVenda, 
+                valorFinalCobranca,
                 `Pedido Cartão (${numParcelas}x) - Vunn`,
                 walletIdAfiliado,
                 comissaoLiquidaAfiliado,
@@ -1393,7 +1405,7 @@ app.post('/api/checkout/pix', async (req, res) => {
                 clienteEmail: cliente.email,
                 clienteTelefone: cliente.telefone,
                 clienteEndereco: cliente.endereco,
-                valorTotal: valorTotalVenda,
+                valorTotal: (metodoPuro === 'CARTAO') ? valorFinalCobranca : valorTotalVenda,
                 itens: JSON.stringify(itensParaBanco),
                 status: 'AGUARDANDO_PAGAMENTO',
                 asaasId: dadosAsaas.id, 

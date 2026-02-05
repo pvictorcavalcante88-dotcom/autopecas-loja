@@ -561,6 +561,45 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         transform: scale(0.98);
     }
 
+    /* 1. Ajuste da Barra Escura Geral */
+    .top-bar-container { /* Ou a classe que você usa na div preta do topo */
+        padding: 8px 15px !important; /* Reduz o espaçamento vertical */
+        height: auto !important;
+        min-height: 50px; /* Garante que fique fininha */
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    /* 2. Transformar "PARCEIRO ATIVO" em Bolinha Verde */
+    .badge-ativo, .badge { /* Use a classe que está no span verde */
+        font-size: 0 !important; /* Esconde o texto */
+        padding: 0 !important;   /* Tira o espaço interno */
+        width: 12px !important;  /* Largura fixa da bolinha */
+        height: 12px !important; /* Altura fixa da bolinha */
+        border-radius: 50% !important; /* Deixa redonda */
+        background-color: #27ae60 !important; /* Mantém a cor verde */
+        display: inline-block;
+        margin-left: 5px; /* Afasta um pouco do nome */
+        border: 2px solid rgba(255,255,255,0.2); /* Borda sutil para destaque */
+    }
+
+    /* 3. Reduzir o Botão "Meu Painel" */
+    .btn-painel { /* Use a classe ou ID do botão cinza */
+        padding: 6px 12px !important; /* Menos gordo */
+        font-size: 0.75rem !important; /* Letra menor */
+        height: auto !important;
+        line-height: 1;
+    }
+
+    /* 4. Ajuste do Nome do Usuário (Opcional) */
+    .user-greeting { 
+        font-size: 0.85rem !important;
+        max-width: 150px; /* Limita largura */
+        white-space: nowrap; /* Não quebra linha */
+        overflow: hidden; /* Corta se for muito longo */
+        text-overflow: ellipsis; /* Adiciona "..." */
+    }
     
 
 }

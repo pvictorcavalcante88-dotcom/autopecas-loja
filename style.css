@@ -612,105 +612,83 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
 }
 
 /* ========================================================================
-   MOBILE OTIMIZADO (HEADER COMPACTO + BARRA PARCEIRO LINHA ÚNICA)
+   MOBILE OTIMIZADO (BARRA FINA + CABEÇALHO LIMPO)
    ======================================================================== */
 
 @media (max-width: 768px) {
 
-    /* 1. AJUSTE DO CORPO (Recalculado para barra fina) */
+    /* 1. AJUSTE DO CORPO */
     /* Barra (40px) + Header (110px) = ~150px de topo */
     body {
         padding-top: 155px !important; 
         padding-bottom: 60px !important;
     }
 
-    /* 2. BARRA DO PARCEIRO (O Ajuste que você pediu) */
+    /* 2. BARRA DO PARCEIRO (Forçar tamanho pequeno) */
     #barra-parceiro {
-        height: 40px !important; /* Altura fixa bem fina */
-        padding: 0 10px !important; /* Pouco espaçamento lateral */
-        justify-content: space-between !important; /* Nome na Esq, Botão na Dir */
-        gap: 0 !important;
-        font-size: 0.8rem !important; /* Fonte menor */
+        height: 40px !important; /* Altura fixa fina */
+        padding: 0 10px !important;
+        font-size: 0.8rem !important; /* Letra menor */
+        justify-content: center !important; /* Centralizado */
     }
 
-    /* Nome do Afiliado */
-    #barra-parceiro .parceiro-info {
-        gap: 5px !important;
-    }
-    
-    /* Esconde o ícone de aperto de mão no celular pra ganhar espaço */
-    #barra-parceiro .parceiro-info i.ph-handshake {
-        display: none !important;
-    }
-
-    /* TRANSFORMA TEXTO "PARCEIRO ATIVO" EM BOLINHA VERDE */
-    .badge-ativo {
-        font-size: 0 !important; /* Some o texto */
-        width: 8px !important;   /* Largura da bolinha */
-        height: 8px !important;  /* Altura da bolinha */
-        background-color: #27ae60 !important; /* Verde */
-        border-radius: 50% !important;
-        display: inline-block !important;
-        box-shadow: 0 0 5px #27ae60; /* Efeito de brilho */
-        margin-left: 2px;
-    }
-
-    /* Botão "Painel" Pequeno */
-    .btn-painel-topo {
-        padding: 4px 10px !important; /* Mais fino */
-        font-size: 0.75rem !important; /* Letra pequena */
-        background: rgba(255,255,255,0.2) !important;
-        border: 1px solid rgba(255,255,255,0.3);
-    }
-    
-    /* Esconde o ícone do botão painel no celular, deixa só o texto "Painel" */
-    .btn-painel-topo i {
-        display: none !important;
-    }
-
-    /* 3. CABEÇALHO BRANCO (Fica colado na barra fina) */
+    /* 3. CABEÇALHO BRANCO */
     .main-header {
-        top: 40px !important; /* Cola logo abaixo da barra de 40px */
+        top: 40px !important; /* Cola logo abaixo da barra preta */
         padding: 10px 15px;
     }
 
-    /* 4. RESTANTE DO LAYOUT (Logo, Ícones, Busca) */
+    /* 4. LAYOUT DO HEADER (Logo + Icones + Busca embaixo) */
     .header-container {
         display: flex;
-        flex-wrap: wrap;
-        flex-direction: row !important;
+        flex-direction: row !important; /* Linha horizontal */
+        flex-wrap: wrap; 
         align-items: center;
         justify-content: space-between;
         padding: 0;
+        gap: 10px;
     }
 
+    /* Logo na Esquerda */
     .logo {
-        order: 1; flex: 1; margin: 0; font-size: 1.3rem; justify-content: flex-start;
+        order: 1; 
+        flex: 1; 
+        justify-content: flex-start; 
+        margin: 0; 
+        font-size: 1.3rem;
     }
 
+    /* Ícones na Direita */
     .header-actions {
-        order: 2; width: auto !important; margin: 0 !important; gap: 15px !important;
+        order: 2; 
+        width: auto !important; 
+        margin: 0 !important; 
+        gap: 15px !important;
     }
     
-    /* Aumenta ícones de ação */
     .header-actions i { font-size: 1.4rem; }
-    /* Esconde textos dos botões de ação */
+    /* Esconde texto dos botões */
     .header-actions span:not(.badge) { display: none; }
 
-    /* Busca na linha de baixo */
+    /* Busca Embaixo */
     .search-container {
-        order: 3; width: 100% !important; margin-top: 5px; height: 40px;
+        order: 3; 
+        width: 100% !important; 
+        margin-top: 5px; 
+        height: 40px;
     }
-    
-    /* 5. CARDS DE PRODUTO (Estilo Lista Horizontal) */
+
+    /* 5. CARDS EM LISTA (Bônus visual) */
     .product-card {
-        flex-direction: row; padding: 10px; align-items: center;
+        flex-direction: row; 
+        align-items: center; 
+        padding: 10px;
     }
     .product-card .product-image {
         width: 90px; height: 90px; margin: 0 15px 0 0;
     }
     .product-card h3 {
-        font-size: 0.9rem; -webkit-line-clamp: 2; height: auto; margin-bottom: 5px;
+        font-size: 0.9rem; -webkit-line-clamp: 2; height: auto;
     }
 }
 

@@ -121,56 +121,56 @@
             verificarAfiliadoLogado();
         });
 
-function verificarAfiliadoLogado() {
-    const afData = localStorage.getItem('afiliadoLogado');
-    
-    if (afData) {
-        const afiliado = JSON.parse(afData);
+    function verificarAfiliadoLogado() {
+        const afData = localStorage.getItem('afiliadoLogado');
         
-        // 1. Mostra o sino e ajusta login (igual antes)
-        document.getElementById('box-sino').style.display = 'flex';
-        const linkLogin = document.getElementById('btn-login-header'); // Ajustei o ID conforme seu HTML anterior
-        if(linkLogin) {
-            linkLogin.innerHTML = `<i class="ph ph-user-circle"></i>`; // Só ícone no mobile fica melhor
-            linkLogin.href = "afiliado_dashboard.html";
-        }
-
-        // 2. CRIA A BARRA DE PARCEIRO (ESTRUTURA OTIMIZADA)
-        const barra = document.createElement('div');
-        barra.id = 'barra-parceiro';
-        barra.style.background = '#2c3e50';
-        barra.style.color = 'white';
-        // O estilo base já garante flexbox
-        barra.style.display = 'flex'; 
-        barra.style.alignItems = 'center';
-        barra.style.justifyContent = 'center'; // Centralizado no PC
-        barra.style.gap = '15px';
-        barra.style.padding = '10px';
-        barra.style.fontSize = '0.9rem';
-        barra.style.position = 'fixed'; // Fixo no topo
-        barra.style.top = '0';
-        barra.style.width = '100%';
-        barra.style.zIndex = '2000';
-
-        // HTML INTERNO
-        barra.innerHTML = `
-            <div class="parceiro-info" style="display:flex; align-items:center; gap:5px;">
-                <i class="ph ph-handshake" style="color:#f1c40f;"></i>
-                <span>Olá, <strong>${afiliado.nome.split(' ')[0]}</strong></span>
-                <span class="badge-ativo">PARCEIRO ATIVO</span>
-            </div>
+        if (afData) {
+            const afiliado = JSON.parse(afData);
             
-            <a href="afiliado_dashboard.html" class="btn-painel-topo" style="background:rgba(255,255,255,0.15); color:white; padding:5px 15px; border-radius:20px; text-decoration:none; font-size:0.85rem; display:flex; align-items:center; gap:5px; transition:0.3s;">
-                <i class="ph ph-squares-four"></i> Painel
-            </a>
-        `;
+            // 1. Mostra o sino e ajusta login
+            document.getElementById('box-sino').style.display = 'flex';
+            const linkLogin = document.getElementById('btn-login-header'); 
+            if(linkLogin) {
+                linkLogin.innerHTML = `<i class="ph ph-user-circle"></i>`; 
+                linkLogin.href = "afiliado_dashboard.html";
+            }
 
-        document.body.prepend(barra);
+            // 2. CRIA A BARRA DE PARCEIRO (LINHA ÚNICA)
+            const barra = document.createElement('div');
+            barra.id = 'barra-parceiro';
+            
+            // Estilo Base (Funciona PC e Mobile)
+            barra.style.background = '#2c3e50';
+            barra.style.color = 'white';
+            barra.style.display = 'flex'; 
+            barra.style.alignItems = 'center';
+            barra.style.justifyContent = 'center'; // Tudo no centro
+            barra.style.gap = '10px'; // Espaço entre nome e botão
+            barra.style.padding = '8px';
+            barra.style.fontSize = '0.9rem';
+            barra.style.position = 'fixed'; 
+            barra.style.top = '0';
+            barra.style.width = '100%';
+            barra.style.zIndex = '2000';
 
-        // 3. Inicia busca de notificações
-        buscarNotificacoes(afData);
+            // HTML SIMPLIFICADO: Nome + Icone + Botão (Tudo junto)
+            barra.innerHTML = `
+                <div style="display:flex; align-items:center; gap:5px;">
+                    <span>Olá, <strong>${afiliado.nome.split(' ')[0]}</strong></span>
+                    <i class="ph-fill ph-check-circle" style="color:#2ecc71; font-size:1.1rem;" title="Parceiro Ativo"></i>
+                </div>
+                
+                <a href="afiliado_dashboard.html" style="background:rgba(255,255,255,0.2); color:white; padding:4px 12px; border-radius:20px; text-decoration:none; font-size:0.8rem; display:flex; align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.2);">
+                    <i class="ph ph-squares-four"></i> Painel
+                </a>
+            `;
+
+            document.body.prepend(barra);
+
+            // 3. Inicia busca de notificações
+            buscarNotificacoes(afData);
+        }
     }
-}
 
         async function buscarNotificacoes(jsonString) {
             try {

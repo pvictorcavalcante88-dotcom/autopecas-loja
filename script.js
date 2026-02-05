@@ -1075,6 +1075,11 @@ function calcularTotalVisual(carrinho) {
 // 🟢 FUNÇÃO DE FINALIZAR COM ASAAS (ATUALIZADA COM SELEÇÃO DE PAGAMENTO)
 // 🟢 FUNÇÃO DE FINALIZAR COM ASAAS E TINY (ATUALIZADA)
 async function finalizarCompraAsaas() {
+
+    const checkEstoque = await verificarEstoqueAntesDePagar();
+    if (!checkEstoque.aprovado) {
+        return; // Para tudo se o estoque falhou. O Modal já abriu.
+    }
     // 1. PEGAR DADOS DO FORMULÁRIO
 // 1. CAPTURA DOS INPUTS (Usando IDs que conferimos antes)
     const nome = document.getElementById('nome_cliente').value.trim(); 
@@ -1532,5 +1537,138 @@ function atualizarSimulacaoParcelas() {
         } else {
             displayTotal.style.color = '#27ae60'; // Verde (Normal)
         }
+    }
+}
+
+// ============================================================
+// 🛡️ GUARDIÃO DE ESTOQUE (Validação em Tempo Real)
+// ============================================================
+async function verificarEstoqueAntesDePagar() {
+    const carrinho = getCarrinho();
+    if (carrinho.length === 0) return { aprovado: false };
+
+    let itensEsgotados = [];
+    let itensComEstoque = [];
+    let novoTotalBase = 0;
+
+    // Mostra feedback no botão
+    const btn = document.getElementById('btn-finalizar-pix');
+    const textoOriginal = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Conferindo estoque...';
+        btn.disabled = true;
+    }
+
+    try {
+        // Varre todos os itens do carrinho checando a API
+        for (const item of carrinho) {
+            const res = await fetch(`${API_URL}/products/${item.id}`);
+            const produtoAtual = await res.json();
+            
+            // Verifica se o estoque atual (no banco) atende a quantidade do pedido
+            // Se estoque for <= 0 ou menor que o pedido
+            if (produtoAtual.estoque < item.quantidade) {
+                itensEsgotados.push({
+                    id: item.id,
+                    nome: produtoAtual.name || produtoAtual.titulo,
+                    qtdPedida: item.quantidade,
+                    estoqueReal: produtoAtual.estoque
+                });
+            } else {
+                itensComEstoque.push(item);
+                // Recalcula quanto ficaria o total SEM os itens ruins
+                // Precisamos calcular com a margem para mostrar o valor real ao cliente
+                let margem = (item.customMargin !== undefined) ? item.customMargin : ((FATOR_GLOBAL - 1) * 100);
+                let precoBase = parseFloat(item.preco || item.preco_novo);
+                let precoFinal = precoBase * (1 + (margem / 100));
+                novoTotalBase += (precoFinal * item.quantidade);
+            }
+        }
+    } catch (e) {
+        console.error("Erro ao validar estoque", e);
+        // Em caso de erro de rede, deixamos passar ou bloqueamos? 
+        // Por segurança, melhor alertar.
+        alert("Erro de conexão ao validar estoque. Tente novamente.");
+        if (btn) { btn.innerHTML = textoOriginal; btn.disabled = false; }
+        return { aprovado: false };
+    }
+
+    // Restaura botão
+    if (btn) { btn.innerHTML = textoOriginal; btn.disabled = false; }
+
+    // RESULTADO DA ANÁLISE
+    if (itensEsgotados.length > 0) {
+        abrirModalResolucaoEstoque(itensEsgotados, itensComEstoque, novoTotalBase);
+        return { aprovado: false };
+    }
+
+    return { aprovado: true };
+}
+
+function abrirModalResolucaoEstoque(ruins, bons, novoTotal) {
+    const modal = document.getElementById('modal-estoque-erro');
+    const msg = document.getElementById('msg-estoque-detalhe');
+    const boxBtn = document.getElementById('box-acao-estoque');
+    
+    // Lista os nomes dos itens sem estoque
+    const nomes = ruins.map(i => `<li>${i.nome}</li>`).join('');
+    
+    if (bons.length > 0) {
+        // CENÁRIO 1: TEM ITENS RESTANTES (Cliente pode continuar comprando o resto)
+        msg.innerHTML = `
+            Detectamos que os seguintes itens acabaram de esgotar no nosso estoque:
+            <ul style="text-align:left; background:#fff5f5; padding:10px 20px; border-radius:5px; margin:10px 0;">${nomes}</ul>
+            <br>
+            <strong>Deseja remover estes itens e continuar a compra com os produtos restantes?</strong>
+            <br><br>
+            Novo Total Estimado: <strong style="color:#27ae60; font-size:1.2rem;">${novoTotal.toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}</strong>
+        `;
+
+        boxBtn.innerHTML = `
+            <button onclick="resolverEstoque(true)" style="background:#27ae60; color:white; border:none; padding:12px 20px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:1rem; width:100%; margin-bottom:10px;">
+                <i class="ph ph-check"></i> Sim, comprar o restante
+            </button>
+            <button onclick="resolverEstoque(false)" style="background:#fff; color:#7f8c8d; border:1px solid #ccc; padding:10px 20px; border-radius:6px; cursor:pointer; width:100%;">
+                Cancelar pedido
+            </button>
+        `;
+        
+        // Salvamos os itens bons temporariamente na janela para usar no onclick
+        window.TEMP_ITENS_BONS = bons;
+
+    } else {
+        // CENÁRIO 2: TUDO ACABOU (Não sobra nada no carrinho)
+        msg.innerHTML = `
+            Infelizmente o(s) item(ns) abaixo esgotaram agora mesmo:<br>
+            <ul style="text-align:left; background:#fff5f5; padding:10px 20px; border-radius:5px; margin:10px 0;">${nomes}</ul>
+            Não é possível prosseguir com este pedido no momento.
+        `;
+        boxBtn.innerHTML = `
+            <button onclick="resolverEstoque(false)" style="background:#c0392b; color:white; border:none; padding:12px 20px; border-radius:6px; cursor:pointer; font-weight:bold; width:100%;">
+                Entendi, voltar
+            </button>
+        `;
+    }
+
+    modal.style.display = 'flex';
+}
+
+function resolverEstoque(aceitarNovoCarrinho) {
+    const modal = document.getElementById('modal-estoque-erro');
+    modal.style.display = 'none';
+
+    if (aceitarNovoCarrinho && window.TEMP_ITENS_BONS) {
+        // 1. ATUALIZA O CARRINHO (Remove os itens ruins da memória)
+        // Isso garante que a comissão do afiliado seja recalculada apenas sobre o que sobrou!
+        localStorage.setItem('nossoCarrinho', JSON.stringify(window.TEMP_ITENS_BONS));
+        
+        // 2. RECARREGA A TELA (Atualiza valores visuais e prepara para nova tentativa)
+        alert("✅ Itens indisponíveis removidos. O valor foi atualizado.");
+        carregarPaginaCarrinho(); // Recarrega a lista visual
+        carregarPaginaCheckout(); // Recarrega o resumo lateral
+        
+    } else {
+        // Apenas fecha ou recarrega para limpar
+        window.location.reload();
     }
 }

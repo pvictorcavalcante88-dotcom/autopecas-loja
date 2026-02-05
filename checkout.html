@@ -329,5 +329,20 @@ document.addEventListener('change', (e) => {
     </div>
 </div>
 
+<div id="modal-estoque-erro" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:none; justify-content:center; align-items:center; z-index:10000;">
+    <div style="background:white; padding:30px; border-radius:12px; max-width:450px; width:90%; text-align:center; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+        <div style="font-size:3rem; color:#e74c3c; margin-bottom:10px;"><i class="ph ph-warning-octagon"></i></div>
+        
+        <h3 style="color:#c0392b; margin-top:0;">Ops! Estoque Insuficiente</h3>
+        
+        <p id="msg-estoque-detalhe" style="color:#555; line-height:1.5; font-size:1rem;">
+            Verificamos o estoque agora e infelizmente o item <strong>X</strong> acabou de esgotar.
+        </p>
+
+        <div id="box-acao-estoque" style="margin-top:25px; padding-top:20px; border-top:1px solid #eee;">
+            </div>
+    </div>
+</div>
+
 </body>
 </html>

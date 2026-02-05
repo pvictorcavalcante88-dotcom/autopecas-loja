@@ -408,31 +408,34 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
 .btn-banner:hover { transform: scale(1.05); }
 
 /* ========================================================================
-   MOBILE OTIMIZADO (CORREÇÃO FINAL)
+   MOBILE FINAL - (HEADER COMPACTO + CARRINHO + CHECKOUT)
    ======================================================================== */
 
 @media (max-width: 768px) {
 
-    /* 1. AJUSTE DO CORPO (Recalculado para barra fina 40px + Header 110px) */
+    /* --- 1. ESTRUTURA GERAL E TOPO --- */
+    
+    /* Ajuste do corpo para compensar o topo fixo */
     body {
         padding-top: 155px !important; 
         padding-bottom: 60px !important;
     }
 
-    /* 2. BARRA DO PARCEIRO */
+    /* Barra do Parceiro (Fina e em uma linha) */
     #barra-parceiro {
         height: 40px !important;
         padding: 0 10px !important;
-        /* O resto já foi definido no JS inline, aqui é só garantia */
+        font-size: 0.8rem !important;
+        justify-content: center !important;
     }
 
-    /* 3. CABEÇALHO BRANCO */
+    /* Cabeçalho Branco (Cola na barra preta) */
     .main-header {
-        top: 40px !important; /* Cola logo abaixo da barra preta */
+        top: 40px !important; 
         padding: 10px 15px;
     }
 
-    /* 4. LAYOUT DO HEADER (Logo + Icones na mesma linha, Busca embaixo) */
+    /* Layout do Header: Linha única para Logo e Ícones */
     .header-container {
         display: flex;
         flex-direction: row !important;
@@ -443,38 +446,84 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         gap: 10px;
     }
 
-    /* Logo na Esquerda */
     .logo {
-        order: 1; 
-        flex: 1; 
-        justify-content: flex-start; 
-        margin: 0; 
-        font-size: 1.3rem;
+        order: 1; flex: 1; justify-content: flex-start; margin: 0; font-size: 1.3rem;
     }
 
-    /* Ícones na Direita (Sino, Login, Carrinho) */
     .header-actions {
-        order: 2; 
-        width: auto !important; 
-        margin: 0 !important; 
-        gap: 15px !important;
-        display: flex !important;
-        align-items: center;
+        order: 2; width: auto !important; margin: 0 !important; gap: 15px !important;
+        display: flex !important; align-items: center;
     }
     
     .header-actions i { font-size: 1.4rem; }
-    /* Esconde texto dos botões no mobile para não quebrar */
-    .header-actions span:not(.badge) { display: none; }
+    .header-actions span:not(.badge) { display: none; } /* Esconde texto, mantém ícone */
 
-    /* Busca na linha de baixo (Ocupa tudo) */
+    /* Busca na linha de baixo */
     .search-container {
-        order: 3; 
-        width: 100% !important; 
-        margin-top: 5px; 
-        height: 40px;
+        order: 3; width: 100% !important; margin-top: 5px; height: 40px;
     }
 
-    /* 5. CARDS DE PRODUTO (Estilo Lista Horizontal) */
+    /* --- 2. RESTAURAÇÃO DO CARRINHO (CART.HTML) --- */
+    
+    /* Transforma a página do carrinho em coluna */
+    .cart-page-container {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        padding: 10px !important;
+        gap: 20px;
+    }
+
+    /* Esconde a tabela de desktop */
+    .desktop-only { display: none !important; }
+    
+    /* Mostra os cards mobile (se você tiver essa classe no HTML do carrinho) */
+    .mobile-only { display: block !important; width: 100% !important; }
+
+    /* Estilo do Card de Produto no Carrinho (Mobile) */
+    .mobile-cart-card {
+        background: white;
+        border: 1px solid #eee;
+        border-radius: 12px;
+        padding: 15px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .mobile-cart-img {
+        width: 80px; height: 80px; object-fit: contain; margin-bottom: 10px;
+    }
+
+    .mobile-qty-box {
+        background: #f5f5f5; padding: 5px 15px; border-radius: 20px; margin: 10px 0;
+        display: flex; gap: 15px; align-items: center; font-weight: bold;
+    }
+
+    /* Botão de Remover (Lixeira) */
+    .mobile-remove-btn {
+        background: #ffebee; color: #c0392b; width: 100%; border: none; 
+        padding: 10px; border-radius: 6px; margin-top: 10px; font-weight: bold;
+    }
+
+    /* --- 3. BOTÃO DE FINALIZAR COMPRA (FIXO OU VISÍVEL) --- */
+    .cart-total-box {
+        width: 100% !important;
+        margin-top: 0;
+    }
+
+    .btn-place-order {
+        width: 100% !important;
+        padding: 15px !important;
+        font-size: 1.1rem !important;
+        background: #27ae60 !important; /* Verde destaque */
+    }
+
+    /* --- 4. CARDS DE PRODUTOS (HOME/BUSCA) --- */
+    /* Estilo "Lista" (Foto na esquerda, texto na direita) */
     .product-card {
         flex-direction: row; 
         align-items: center; 
@@ -482,17 +531,15 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         min-height: 120px;
     }
     .product-card .product-image {
-        width: 90px; height: 90px; margin: 0 15px 0 0;
-        background: transparent;
+        width: 100px; height: 100px; margin: 0 15px 0 0; background: transparent;
     }
     .product-card h3 {
-        font-size: 0.9rem; 
-        -webkit-line-clamp: 2; 
-        height: auto;
-        margin-bottom: 5px;
+        font-size: 0.95rem; -webkit-line-clamp: 2; height: auto; margin-bottom: 5px; text-align: left;
+    }
+    .product-card .price-new {
+        font-size: 1.2rem; margin-bottom: 5px; text-align: left;
     }
     .btn-card-action {
-        padding: 5px;
-        font-size: 0.8rem;
+        padding: 8px; font-size: 0.85rem;
     }
 }

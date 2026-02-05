@@ -612,66 +612,105 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
 }
 
 /* ========================================================================
-   CORREÇÃO CIRÚRGICA DO MOBILE (Mantendo seu Design)
+   MOBILE OTIMIZADO (HEADER COMPACTO + BARRA PARCEIRO LINHA ÚNICA)
    ======================================================================== */
 
 @media (max-width: 768px) {
 
-    /* 1. Ajusta o corpo para o cabeçalho não cobrir o conteúdo */
+    /* 1. AJUSTE DO CORPO (Recalculado para barra fina) */
+    /* Barra (40px) + Header (110px) = ~150px de topo */
     body {
-        padding-top: 180px !important; /* Espaço para as 3 linhas do cabeçalho */
+        padding-top: 155px !important; 
+        padding-bottom: 60px !important;
     }
 
-    /* 2. Solta o Header para ele crescer conforme necessário */
-    .main-header {
-        height: auto !important;
-        padding-bottom: 10px;
+    /* 2. BARRA DO PARCEIRO (O Ajuste que você pediu) */
+    #barra-parceiro {
+        height: 40px !important; /* Altura fixa bem fina */
+        padding: 0 10px !important; /* Pouco espaçamento lateral */
+        justify-content: space-between !important; /* Nome na Esq, Botão na Dir */
+        gap: 0 !important;
+        font-size: 0.8rem !important; /* Fonte menor */
     }
 
-    /* 3. Organiza os itens em COLUNA (Um embaixo do outro) */
-    .header-container {
-        display: flex;
-        flex-direction: column; /* O SEGREDO: Coluna vertical */
-        align-items: center;
-        gap: 15px; /* Espaço entre Logo, Busca e Botões */
-    }
-
-    /* 4. Centraliza a Logo */
-    .logo {
-        width: 100%;
-        justify-content: center;
-        margin: 0;
-    }
-
-    /* 5. A Busca ocupa a largura toda */
-    .search-container {
-        width: 100%;
-        max-width: 100%;
-        margin: 0;
-        order: 2; /* Garante que fique no meio */
-    }
-
-    /* 6. Arruma os botões (Sino, Entrar, Carrinho) */
-    .header-actions {
-        width: 100%;
-        display: flex;
-        justify-content: center; /* Centraliza na tela */
-        gap: 25px; /* Afasta um ícone do outro */
-        margin: 0 !important; /* Remove margens negativas antigas */
-        padding: 0;
-        order: 3; /* Garante que fique por último */
-        position: static; /* Remove posições absolutas que causam sobreposição */
-    }
-
-    /* 7. Limpeza visual: Esconde o texto "Carrinho/Entrar" no mobile, mantém só ícone */
-    /* Se você quiser que o texto apareça, apague as 3 linhas abaixo */
-    .header-actions .action-button span:not(.badge) {
-        display: none;
+    /* Nome do Afiliado */
+    #barra-parceiro .parceiro-info {
+        gap: 5px !important;
     }
     
-    /* Aumenta um pouco os ícones para facilitar o toque */
-    .header-actions i {
-        font-size: 1.5rem;
+    /* Esconde o ícone de aperto de mão no celular pra ganhar espaço */
+    #barra-parceiro .parceiro-info i.ph-handshake {
+        display: none !important;
+    }
+
+    /* TRANSFORMA TEXTO "PARCEIRO ATIVO" EM BOLINHA VERDE */
+    .badge-ativo {
+        font-size: 0 !important; /* Some o texto */
+        width: 8px !important;   /* Largura da bolinha */
+        height: 8px !important;  /* Altura da bolinha */
+        background-color: #27ae60 !important; /* Verde */
+        border-radius: 50% !important;
+        display: inline-block !important;
+        box-shadow: 0 0 5px #27ae60; /* Efeito de brilho */
+        margin-left: 2px;
+    }
+
+    /* Botão "Painel" Pequeno */
+    .btn-painel-topo {
+        padding: 4px 10px !important; /* Mais fino */
+        font-size: 0.75rem !important; /* Letra pequena */
+        background: rgba(255,255,255,0.2) !important;
+        border: 1px solid rgba(255,255,255,0.3);
+    }
+    
+    /* Esconde o ícone do botão painel no celular, deixa só o texto "Painel" */
+    .btn-painel-topo i {
+        display: none !important;
+    }
+
+    /* 3. CABEÇALHO BRANCO (Fica colado na barra fina) */
+    .main-header {
+        top: 40px !important; /* Cola logo abaixo da barra de 40px */
+        padding: 10px 15px;
+    }
+
+    /* 4. RESTANTE DO LAYOUT (Logo, Ícones, Busca) */
+    .header-container {
+        display: flex;
+        flex-wrap: wrap;
+        flex-direction: row !important;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0;
+    }
+
+    .logo {
+        order: 1; flex: 1; margin: 0; font-size: 1.3rem; justify-content: flex-start;
+    }
+
+    .header-actions {
+        order: 2; width: auto !important; margin: 0 !important; gap: 15px !important;
+    }
+    
+    /* Aumenta ícones de ação */
+    .header-actions i { font-size: 1.4rem; }
+    /* Esconde textos dos botões de ação */
+    .header-actions span:not(.badge) { display: none; }
+
+    /* Busca na linha de baixo */
+    .search-container {
+        order: 3; width: 100% !important; margin-top: 5px; height: 40px;
+    }
+    
+    /* 5. CARDS DE PRODUTO (Estilo Lista Horizontal) */
+    .product-card {
+        flex-direction: row; padding: 10px; align-items: center;
+    }
+    .product-card .product-image {
+        width: 90px; height: 90px; margin: 0 15px 0 0;
+    }
+    .product-card h3 {
+        font-size: 0.9rem; -webkit-line-clamp: 2; height: auto; margin-bottom: 5px;
     }
 }
 

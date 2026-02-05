@@ -127,47 +127,53 @@
         if (afData) {
             const afiliado = JSON.parse(afData);
             
-            // 1. Mostra o sino e ajusta login
+            // 1. Ajustes do Header (Sino e Login)
             document.getElementById('box-sino').style.display = 'flex';
             const linkLogin = document.getElementById('btn-login-header'); 
             if(linkLogin) {
+                // No mobile, deixa só o ícone para economizar espaço
                 linkLogin.innerHTML = `<i class="ph ph-user-circle"></i>`; 
                 linkLogin.href = "afiliado_dashboard.html";
             }
 
-            // 2. CRIA A BARRA DE PARCEIRO (LINHA ÚNICA)
+            // 2. CRIA A BARRA DE PARCEIRO (COMPACTA)
             const barra = document.createElement('div');
             barra.id = 'barra-parceiro';
             
-            // Estilo Base (Funciona PC e Mobile)
-            barra.style.background = '#2c3e50';
-            barra.style.color = 'white';
-            barra.style.display = 'flex'; 
-            barra.style.alignItems = 'center';
-            barra.style.justifyContent = 'center'; // Tudo no centro
-            barra.style.gap = '10px'; // Espaço entre nome e botão
-            barra.style.padding = '8px';
-            barra.style.fontSize = '0.9rem';
-            barra.style.position = 'fixed'; 
+            // Estilos essenciais via JS para garantir funcionamento imediato
+            barra.style.position = 'fixed';
             barra.style.top = '0';
+            barra.style.left = '0';
             barra.style.width = '100%';
             barra.style.zIndex = '2000';
+            barra.style.background = '#2c3e50';
+            barra.style.color = 'white';
+            barra.style.display = 'flex';
+            barra.style.alignItems = 'center';
+            barra.style.justifyContent = 'center'; // Centraliza tudo
+            barra.style.height = '40px'; // Altura fixa fina
+            barra.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
 
-            // HTML SIMPLIFICADO: Nome + Icone + Botão (Tudo junto)
+            // CONTEÚDO EM UMA LINHA SÓ: Nome + Check + Botão
             barra.innerHTML = `
-                <div style="display:flex; align-items:center; gap:5px;">
+                <div style="display:flex; align-items:center; gap:8px; font-size: 0.85rem;">
+                    
                     <span>Olá, <strong>${afiliado.nome.split(' ')[0]}</strong></span>
+                    
                     <i class="ph-fill ph-check-circle" style="color:#2ecc71; font-size:1.1rem;" title="Parceiro Ativo"></i>
+                    
+                    <span style="opacity:0.3;">|</span>
+
+                    <a href="afiliado_dashboard.html" style="background:rgba(255,255,255,0.15); color:white; padding:3px 10px; border-radius:15px; text-decoration:none; font-size:0.75rem; display:flex; align-items:center; gap:4px; border:1px solid rgba(255,255,255,0.2);">
+                        Painel <i class="ph-bold ph-arrow-right" style="font-size:0.8rem;"></i>
+                    </a>
+
                 </div>
-                
-                <a href="afiliado_dashboard.html" style="background:rgba(255,255,255,0.2); color:white; padding:4px 12px; border-radius:20px; text-decoration:none; font-size:0.8rem; display:flex; align-items:center; gap:5px; border:1px solid rgba(255,255,255,0.2);">
-                    <i class="ph ph-squares-four"></i> Painel
-                </a>
             `;
 
             document.body.prepend(barra);
 
-            // 3. Inicia busca de notificações
+            // 3. Busca notificações
             buscarNotificacoes(afData);
         }
     }

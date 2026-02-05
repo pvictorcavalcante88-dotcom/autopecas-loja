@@ -70,3 +70,43 @@
     display: flex; align-items: center; gap: 5px; transition: 0.3s;
 }
 .btn-help-header:hover { background: rgba(255,255,255,0.4); }
+/* =========================================
+   CORREÇÃO DO BOTÃO DE AJUDA (PAINEL)
+   ========================================= */
+
+.btn-help-header {
+    background-color: #3498db !important; /* Azul amigável */
+    color: white !important;              /* Ícone branco */
+    width: 38px !important;               /* Largura fixa */
+    height: 38px !important;              /* Altura fixa */
+    border-radius: 50% !important;        /* Redondo */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-decoration: none !important;
+    border: none !important;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.15) !important; /* Sombra para destacar */
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+/* Efeito ao passar o mouse */
+.btn-help-header:hover {
+    background-color: #2980b9 !important; /* Azul mais escuro */
+    transform: translateY(-2px);          /* Sobe um pouquinho */
+}
+
+/* Ajuste do tamanho do ícone dentro do botão */
+.btn-help-header i {
+    font-size: 1.3rem !important;
+}
+
+/* --- (OPCIONAL) SE QUISER LARANJA, USE ESTE ABAIXO --- */
+/*
+.btn-help-header {
+    background-color: #e67e22 !important; 
+}
+.btn-help-header:hover {
+    background-color: #d35400 !important; 
+}
+*/

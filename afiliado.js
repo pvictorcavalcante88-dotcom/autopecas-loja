@@ -681,3 +681,71 @@ function previewImagem(event) {
         // Por enquanto, isso é apenas visual no navegador.
     }
 }
+
+// =========================================
+// LÓGICA DO TOUR / ONBOARDING
+// =========================================
+
+let tourStepAtual = 0;
+const totalSteps = 5;
+
+document.addEventListener("DOMContentLoaded", () => {
+    // Verifica se é a primeira vez do usuário
+    const jaViuTour = localStorage.getItem('vunn_tour_visto');
+    
+    if (!jaViuTour) {
+        // Se não viu, abre o tour (pequeno delay pra carregar a tela antes)
+        setTimeout(() => {
+            document.getElementById('tour-overlay').style.display = 'flex';
+        }, 1000);
+    }
+});
+
+function proximoPasso() {
+    // Esconde o atual
+    document.querySelector(`.tour-step[data-index="${tourStepAtual}"]`).classList.remove('active');
+    document.querySelectorAll('.dot')[tourStepAtual].classList.remove('active');
+
+    // Avança
+    tourStepAtual++;
+
+    // Se chegou no fim da navegação (Passo 5 é o último, index 4)
+    if (tourStepAtual >= totalSteps) {
+        fecharTour();
+        return;
+    }
+
+    // Mostra o próximo
+    document.querySelector(`.tour-step[data-index="${tourStepAtual}"]`).classList.add('active');
+    document.querySelectorAll('.dot')[tourStepAtual].classList.add('active');
+
+    // Se for o último passo, esconde a navegação padrão (botões) pq o botão verde assume
+    if (tourStepAtual === 4) {
+        document.getElementById('tour-nav').style.display = 'none';
+    }
+}
+
+function fecharTour() {
+    document.getElementById('tour-overlay').style.display = 'none';
+    // Marca que já viu para não abrir sozinho de novo
+    localStorage.setItem('vunn_tour_visto', 'true');
+}
+
+// Função para o botão do Header (Reabrir)
+function abrirTourManual() {
+    tourStepAtual = 0;
+    
+    // Reseta visualização
+    document.querySelectorAll('.tour-step').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.dot').forEach(el => el.classList.remove('active'));
+    
+    // Ativa o primeiro
+    document.querySelector(`.tour-step[data-index="0"]`).classList.add('active');
+    document.querySelectorAll('.dot')[0].classList.add('active');
+    
+    // Mostra controles
+    document.getElementById('tour-nav').style.display = 'flex';
+    
+    // Abre modal
+    document.getElementById('tour-overlay').style.display = 'flex';
+}

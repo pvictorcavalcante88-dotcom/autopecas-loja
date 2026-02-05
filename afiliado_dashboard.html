@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel do Parceiro | vunn</title>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="afiliado.css">
     <style>
     /* =========================================
        RESET OBRIGATÓRIO
@@ -75,6 +76,8 @@
         .btn-loja { flex: 1; text-align: center; font-size: 0.85rem; padding: 10px; }
     }
 </style>
+
+
 </head>
 <body>
 
@@ -93,6 +96,9 @@
         <header>
             <div class="welcome">
                 <h1 id="nome-afiliado">Olá, Parceiro!</h1>
+                <button onclick="abrirTourManual()" class="btn-help-header" title="Como funciona?">
+                    <i class="ph ph-question"></i> <span class="desktop-only">Ajuda</span>
+                </button>
                 <small>Gerencie seus ganhos e orçamentos.</small>
             </div>
             <div class="header-actions">
@@ -409,6 +415,73 @@
             </div>
         </div>
     </div>
+
+    <div id="tour-overlay" class="tour-overlay">
+    <div class="tour-card">
+        
+        <div class="tour-step step-1 active" data-index="0">
+            <div class="tour-icon-box"><i class="ph ph-magnifying-glass"></i></div>
+            <h3 class="tour-title">Encontre tudo Rápido</h3>
+            <p class="tour-desc">
+                Use a barra superior para pesquisar peças pelo <strong>Nome</strong>, <strong>Código</strong> ou navegue pelas <strong>Categorias</strong> (Motor, Freio, etc). O sistema é inteligente!
+            </p>
+        </div>
+
+        <div class="tour-step step-2" data-index="1">
+            <div class="tour-icon-box"><i class="ph ph-currency-dollar"></i></div>
+            <h3 class="tour-title">Seu Lucro, Suas Regras</h3>
+            <p class="tour-desc">
+                No produto, defina sua <strong>Margem (%)</strong> e veja na hora quanto vai ganhar. <br><br>
+                <small style="background:#fff3cd; padding:5px; border-radius:4px; display:block;">
+                💡 Dica: Não achou a peça? Use o botão <strong>"Adicionar Conhecimento"</strong> para ensinar o sistema e facilitar a próxima busca!</small>
+            </p>
+        </div>
+
+        <div class="tour-step step-3" data-index="2">
+            <div class="tour-icon-box"><i class="ph ph-shopping-cart"></i></div>
+            <h3 class="tour-title">Carrinho Inteligente</h3>
+            <p class="tour-desc">
+                Confira os itens selecionados no ícone do carrinho. Lá você pode <strong>reajustar sua margem</strong> antes de fechar o pedido e garantir a melhor negociação.
+            </p>
+        </div>
+
+        <div class="tour-step step-4" data-index="3">
+            <div class="tour-icon-box"><i class="ph ph-file-pdf"></i></div>
+            <h3 class="tour-title">Orçamento Profissional</h3>
+            <p class="tour-desc">
+                Gere um <strong>PDF personalizado</strong> para enviar ao seu cliente. No próprio PDF existe um botão onde o cliente clica e paga (Pix ou Cartão). Simples assim!
+            </p>
+        </div>
+
+        <div class="tour-step step-5" data-index="4">
+            <div class="tour-icon-box"><i class="ph ph-chart-line-up"></i></div>
+            <h3 class="tour-title">Dinheiro no Bolso</h3>
+            <p class="tour-desc">
+                Acompanhe suas vendas e comissões no painel. Solicite o saque do seu saldo e receba em até <strong>3 dias úteis</strong>.
+            </p>
+            <button class="tour-btn" onclick="fecharTour()" style="background:#27ae60; color:white; width:100%; margin-top:10px; font-size:1.1rem;">
+                🚀 Começar a Vender!
+            </button>
+        </div>
+
+        <div class="tour-footer" id="tour-nav">
+            <button class="tour-btn btn-skip" onclick="fecharTour()">Pular</button>
+            
+            <div class="tour-dots">
+                <div class="dot active"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+
+            <button class="tour-btn btn-next" onclick="proximoPasso()">
+                Próximo <i class="ph ph-arrow-right"></i>
+            </button>
+        </div>
+
+    </div>
+</div>
 
     <script src="afiliado.js"></script>
 

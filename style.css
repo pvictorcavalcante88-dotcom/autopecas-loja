@@ -408,37 +408,240 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
 .btn-banner:hover { transform: scale(1.05); }
 
 /* ========================================================================
-   MOBILE FINAL - (HEADER COMPACTO + CARRINHO + CHECKOUT)
+   📱 MOBILE FINAL (CARDS + HEADER + BOTÃO FIXED)
+   ======================================================================== */
+
+.mobile-only { display: none !important; } /* Esconde mobile no PC */
+
+@media (max-width: 768px) {
+
+    /* --- 1. CONSERTO DO CABEÇALHO (FIXO E ORGANIZADO) --- */
+    
+    /* Espaço para o cabeçalho duplo não cobrir o conteúdo */
+    body {
+        padding-top: 170px !important; 
+        padding-bottom: 50px !important;
+    }
+
+    /* Barra Verde/Escura do Parceiro (Fica no topo absoluto) */
+    #barra-parceiro {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: auto;
+        min-height: 40px;
+        z-index: 2000; /* Fica acima de tudo */
+        padding: 5px 10px !important;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    /* Cabeçalho Branco (Logo e Busca) - Fica logo abaixo da barra parceiro */
+    .main-header {
+        position: fixed;
+        top: 50px; /* Altura estimada da barra do parceiro */
+        left: 0;
+        width: 100%;
+        z-index: 1900;
+        background: white;
+        padding: 10px 15px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    /* Organiza os itens do cabeçalho */
+    .header-container { flex-direction: column; gap: 5px; width: 100%; padding: 0; }
+    .logo { justify-content: center; margin-bottom: 5px; }
+    .search-container { width: 100%; max-width: 100%; order: 3; }
+    
+
+
+    /* --- 2. LAYOUT DA PÁGINA --- */
+    .cart-page-container {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        padding: 10px !important;
+        gap: 20px !important;
+    }
+
+    /* Esconde tabela PC / Mostra Cards Mobile */
+    .desktop-only { display: none !important; }
+    .mobile-only { display: block !important; width: 100% !important; }
+
+
+    /* --- 3. ESTILO DOS CARDS (JÁ ESTAVA BOM, MANTIVE) --- */
+    .mobile-cart-card {
+        background: white;
+        border: 1px solid #eee;
+        border-radius: 12px;
+        padding: 15px;
+        margin-bottom: 15px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .mobile-cart-img { width: 120px; height: 120px; object-fit: contain; margin-bottom: 10px; }
+    
+    .mobile-cart-title { 
+        font-size: 1rem; font-weight: bold; color: #005fb9; margin-bottom: 8px; line-height: 1.4;
+    }
+
+    .mobile-lucro-box {
+        background: #fff8e1; border: 1px dashed #e67e22; padding: 5px 15px;
+        border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px;
+    }
+    .mobile-lucro-box input {
+        width: 50px; padding: 5px; text-align: center; border: 1px solid #ccc; border-radius: 4px;
+    }
+
+    .mobile-cart-details {
+        width: 100%; display: flex; justify-content: space-between; align-items: center;
+        border-top: 1px solid #f0f0f0; padding-top: 10px; margin-top: 5px;
+    }
+    
+    .mobile-qty-box {
+        display: flex; align-items: center; gap: 10px; background: #f5f5f5;
+        padding: 5px 10px; border-radius: 6px;
+    }
+
+    .mobile-remove-btn {
+        width: 100%; margin-top: 15px; background: #ffebee; color: #c0392b;
+        border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer;
+    }
+
+
+    /* --- 4. CONSERTO DO BOTÃO FINALIZAR (O Resgate!) --- */
+    
+    .cart-total-box {
+        width: 100% !important;
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+        margin-top: 10px;
+    }
+
+    /* Container onde o JS coloca o botão */
+    #afiliado-cart-actions {
+        display: block !important;
+        width: 100% !important;
+        margin-top: 20px;
+    }
+
+    /* Estilo forçado para o botão (caso esteja invisível) */
+    #afiliado-cart-actions button, .btn-place-order {
+        display: block !important;
+        width: 100% !important;
+        background-color: #2c3e50 !important; /* Azul Escuro */
+        color: white !important;
+        padding: 15px !important;
+        font-size: 1.1rem !important;
+        font-weight: bold !important;
+        border: none !important;
+        border-radius: 8px !important;
+        cursor: pointer !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        text-align: center;
+    }
+    
+    /* Hover do botão */
+    #afiliado-cart-actions button:active {
+        background-color: #1a252f !important;
+        transform: scale(0.98);
+    }
+
+    /* 1. Ajuste da Barra Escura Geral */
+    .top-bar-container { /* Ou a classe que você usa na div preta do topo */
+        padding: 8px 15px !important; /* Reduz o espaçamento vertical */
+        height: auto !important;
+        min-height: 50px; /* Garante que fique fininha */
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    /* 2. Transformar "PARCEIRO ATIVO" em Bolinha Verde */
+    .badge-ativo, .badge { /* Use a classe que está no span verde */
+        font-size: 0 !important; /* Esconde o texto */
+        padding: 0 !important;   /* Tira o espaço interno */
+        width: 12px !important;  /* Largura fixa da bolinha */
+        height: 12px !important; /* Altura fixa da bolinha */
+        border-radius: 50% !important; /* Deixa redonda */
+        background-color: #27ae60 !important; /* Mantém a cor verde */
+        display: inline-block;
+        margin-left: 5px; /* Afasta um pouco do nome */
+        border: 2px solid rgba(255,255,255,0.2); /* Borda sutil para destaque */
+    }
+
+    /* 3. Reduzir o Botão "Meu Painel" */
+    .btn-painel { /* Use a classe ou ID do botão cinza */
+        padding: 6px 12px !important; /* Menos gordo */
+        font-size: 0.75rem !important; /* Letra menor */
+        height: auto !important;
+        line-height: 1;
+    }
+
+    /* 4. Ajuste do Nome do Usuário (Opcional) */
+    .user-greeting { 
+        font-size: 0.85rem !important;
+        max-width: 150px; /* Limita largura */
+        white-space: nowrap; /* Não quebra linha */
+        overflow: hidden; /* Corta se for muito longo */
+        text-overflow: ellipsis; /* Adiciona "..." */
+    }
+    
+
+}
+
+/* FORÇA O BOTÃO DO CARRINHO A APARECER SEMPRE */
+.header-actions {
+    display: flex !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* ========================================================================
+   MOBILE OTIMIZADO (BARRA FINA + CABEÇALHO LIMPO)
    ======================================================================== */
 
 @media (max-width: 768px) {
 
-    /* --- 1. ESTRUTURA GERAL E TOPO --- */
-    
-    /* Ajuste do corpo para compensar o topo fixo */
+    /* 1. AJUSTE DO CORPO */
+    /* Barra (40px) + Header (110px) = ~150px de topo */
     body {
         padding-top: 155px !important; 
         padding-bottom: 60px !important;
     }
 
-    /* Barra do Parceiro (Fina e em uma linha) */
+    /* 2. BARRA DO PARCEIRO (Forçar tamanho pequeno) */
     #barra-parceiro {
-        height: 40px !important;
+        height: 40px !important; /* Altura fixa fina */
         padding: 0 10px !important;
-        font-size: 0.8rem !important;
-        justify-content: center !important;
+        font-size: 0.8rem !important; /* Letra menor */
+        justify-content: center !important; /* Centralizado */
     }
 
-    /* Cabeçalho Branco (Cola na barra preta) */
+    /* 3. CABEÇALHO BRANCO */
     .main-header {
-        top: 40px !important; 
+        top: 40px !important; /* Cola logo abaixo da barra preta */
         padding: 10px 15px;
     }
 
-    /* Layout do Header: Linha única para Logo e Ícones */
+    /* 4. LAYOUT DO HEADER (Logo + Icones + Busca embaixo) */
     .header-container {
         display: flex;
-        flex-direction: row !important;
+        flex-direction: row !important; /* Linha horizontal */
         flex-wrap: wrap; 
         align-items: center;
         justify-content: space-between;
@@ -446,100 +649,162 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         gap: 10px;
     }
 
+    /* Logo na Esquerda */
     .logo {
-        order: 1; flex: 1; justify-content: flex-start; margin: 0; font-size: 1.3rem;
+        order: 1; 
+        flex: 1; 
+        justify-content: flex-start; 
+        margin: 0; 
+        font-size: 1.3rem;
     }
 
+    /* Ícones na Direita */
     .header-actions {
-        order: 2; width: auto !important; margin: 0 !important; gap: 15px !important;
-        display: flex !important; align-items: center;
+        order: 2; 
+        width: auto !important; 
+        margin: 0 !important; 
+        gap: 15px !important;
     }
     
     .header-actions i { font-size: 1.4rem; }
-    .header-actions span:not(.badge) { display: none; } /* Esconde texto, mantém ícone */
+    /* Esconde texto dos botões */
+    .header-actions span:not(.badge) { display: none; }
 
-    /* Busca na linha de baixo */
+    /* Busca Embaixo */
     .search-container {
-        order: 3; width: 100% !important; margin-top: 5px; height: 40px;
+        order: 3; 
+        width: 100% !important; 
+        margin-top: 5px; 
+        height: 40px;
     }
 
-    /* --- 2. RESTAURAÇÃO DO CARRINHO (CART.HTML) --- */
-    
-    /* Transforma a página do carrinho em coluna */
-    .cart-page-container {
-        display: flex !important;
-        flex-direction: column !important;
-        width: 100% !important;
-        padding: 10px !important;
-        gap: 20px;
-    }
-
-    /* Esconde a tabela de desktop */
-    .desktop-only { display: none !important; }
-    
-    /* Mostra os cards mobile (se você tiver essa classe no HTML do carrinho) */
-    .mobile-only { display: block !important; width: 100% !important; }
-
-    /* Estilo do Card de Produto no Carrinho (Mobile) */
-    .mobile-cart-card {
-        background: white;
-        border: 1px solid #eee;
-        border-radius: 12px;
-        padding: 15px;
-        margin-bottom: 15px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-    }
-
-    .mobile-cart-img {
-        width: 80px; height: 80px; object-fit: contain; margin-bottom: 10px;
-    }
-
-    .mobile-qty-box {
-        background: #f5f5f5; padding: 5px 15px; border-radius: 20px; margin: 10px 0;
-        display: flex; gap: 15px; align-items: center; font-weight: bold;
-    }
-
-    /* Botão de Remover (Lixeira) */
-    .mobile-remove-btn {
-        background: #ffebee; color: #c0392b; width: 100%; border: none; 
-        padding: 10px; border-radius: 6px; margin-top: 10px; font-weight: bold;
-    }
-
-    /* --- 3. BOTÃO DE FINALIZAR COMPRA (FIXO OU VISÍVEL) --- */
-    .cart-total-box {
-        width: 100% !important;
-        margin-top: 0;
-    }
-
-    .btn-place-order {
-        width: 100% !important;
-        padding: 15px !important;
-        font-size: 1.1rem !important;
-        background: #27ae60 !important; /* Verde destaque */
-    }
-
-    /* --- 4. CARDS DE PRODUTOS (HOME/BUSCA) --- */
-    /* Estilo "Lista" (Foto na esquerda, texto na direita) */
+    /* 5. CARDS EM LISTA (Bônus visual) */
     .product-card {
         flex-direction: row; 
         align-items: center; 
         padding: 10px;
-        min-height: 120px;
     }
     .product-card .product-image {
-        width: 100px; height: 100px; margin: 0 15px 0 0; background: transparent;
+        width: 90px; height: 90px; margin: 0 15px 0 0;
     }
     .product-card h3 {
-        font-size: 0.95rem; -webkit-line-clamp: 2; height: auto; margin-bottom: 5px; text-align: left;
+        font-size: 0.9rem; -webkit-line-clamp: 2; height: auto;
     }
-    .product-card .price-new {
-        font-size: 1.2rem; margin-bottom: 5px; text-align: left;
+}
+
+/* } <--- ESSA CHAVE É UMA SEGURANÇA CASO TENHA FICADO ALGUMA ABERTA ANTES */
+
+/* ========================================================================
+   CORREÇÃO DE EMERGÊNCIA (FORCE MOBILE)
+   ======================================================================== */
+
+/* 1. Esconde o menu de notificações que está vazando na tela */
+.notif-dropdown {
+    display: none !important; /* Só deve aparecer quando clicar */
+}
+
+/* Quando clicar (via JS), ele deve flutuar e não empurrar nada */
+.notif-dropdown.show, .notif-dropdown.active {
+    display: block !important;
+    position: absolute !important;
+    top: 40px !important;
+    right: 0 !important;
+    z-index: 9999 !important;
+    background: white !important;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2) !important;
+    width: 250px !important;
+}
+
+/* 2. Força BRUTAL do layout em Coluna no Mobile */
+@media screen and (max-width: 900px) { /* Aumentei para 900px para pegar celulares grandes */
+    
+    .header-container {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        height: auto !important;
+        padding-bottom: 15px !important;
     }
-    .btn-card-action {
-        padding: 8px; font-size: 0.85rem;
+
+    /* Linha 1: Logo */
+    .logo {
+        width: 100% !important;
+        justify-content: center !important;
+        margin-bottom: 10px !important;
+        display: flex !important;
+    }
+
+    /* Linha 2: Busca */
+    .search-container {
+        width: 100% !important;
+        max-width: 95% !important; /* Um pouco menos que 100% pra não colar na borda */
+        margin: 0 auto 15px auto !important;
+        order: 2 !important;
+    }
+
+    /* Linha 3: Ícones */
+    .header-actions {
+        width: 100% !important;
+        justify-content: center !important;
+        margin: 0 !important;
+        order: 3 !important;
+        display: flex !important;
+        gap: 20px !important;
+        position: static !important; /* Remove qualquer posição fixa que esteja atrapalhando */
+    }
+
+    /* Ajuste para o botão "Acessar Meu Painel" não quebrar o topo */
+    #barra-parceiro {
+        flex-wrap: wrap !important;
+        height: auto !important;
+        padding: 5px !important;
+    }
+}
+
+/* ========================================================================
+   CORREÇÃO FINAL: BARRA DO AFILIADO + CABEÇALHO
+   ======================================================================== */
+
+@media (max-width: 768px) {
+
+    /* 1. ARRUMA A BARRA PRETA (PARCEIRO) */
+    #barra-parceiro {
+        height: auto !important;       /* Deixa a altura crescer conforme precisa */
+        min-height: 80px !important;   /* Garante tamanho para 2 linhas */
+        flex-wrap: wrap !important;    /* Permite quebrar linha */
+        justify-content: center !important;
+        padding: 10px 5px !important;
+        gap: 8px !important;
+        align-content: center !important;
+    }
+
+    /* Ajuste fino dos itens dentro da barra preta */
+    #barra-parceiro > div {
+        width: 100%;                  /* Força o Nome+Status a ocupar a linha de cima */
+        justify-content: center;      /* Centraliza */
+        margin-bottom: 5px;
+    }
+
+    #barra-parceiro > a {
+        width: 90%;                   /* Botão "Acessar Painel" quase largura total */
+        justify-content: center;      /* Centraliza texto do botão */
+    }
+
+    /* 2. EMPURRA O CABEÇALHO BRANCO PRA BAIXO */
+    /* Como a barra preta ficou maior (aprox 80px), o cabeçalho branco tem que descer */
+    .main-header {
+        top: 85px !important;         /* Desce para não ficar embaixo da barra preta */
+    }
+
+    /* 3. EMPURRA O CORPO DO SITE PRA BAIXO */
+    /* Soma: 85px (barra preta) + 140px (cabeçalho branco) = ~225px */
+    body {
+        padding-top: 230px !important; 
+    }
+
+    /* 4. AJUSTE FINO NO CARRINHO (CART) */
+    /* Dá um espaço extra no final do card para o botão não ficar colado */
+    .mobile-cart-card {
+        padding-bottom: 20px;
     }
 }

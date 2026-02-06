@@ -600,11 +600,11 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         overflow: hidden; /* Corta se for muito longo */
         text-overflow: ellipsis; /* Adiciona "..." */
     }
-
-        /* AQUI ESTÁ A MÁGICA: Força 1 coluna apenas */
-    #promocoes-track, #search-track, .category-grid {
+/* --- 2. CORREÇÃO DOS PRODUTOS (PROMOÇÕES E BUSCA) --- */
+    /* Apenas os produtos ficam em 1 coluna (Lista) */
+    #promocoes-track, #search-track {
         display: grid !important;
-        grid-template-columns: 1fr !important; /* 1 Coluna ocupando tudo */
+        grid-template-columns: 1fr !important; /* UMA COLUNA SÓ */
         gap: 15px !important;
         padding: 0 10px !important;
     }

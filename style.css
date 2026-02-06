@@ -686,18 +686,6 @@ h2::after { content: ''; display: block; width: 50%; height: 3px; background: va
         height: 40px;
     }
 
-    /* 5. CARDS EM LISTA (Bônus visual) */
-    .product-card {
-        flex-direction: row; 
-        align-items: center; 
-        padding: 10px;
-    }
-    .product-card .product-image {
-        width: 90px; height: 90px; margin: 0 15px 0 0;
-    }
-    .product-card h3 {
-        font-size: 0.9rem; -webkit-line-clamp: 2; height: auto;
-    }
 }
 
 /* } <--- ESSA CHAVE É UMA SEGURANÇA CASO TENHA FICADO ALGUMA ABERTA ANTES */

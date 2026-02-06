@@ -820,42 +820,46 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
             } catch (err) { console.error("Erro estoque:", err); }
         }
 
-        // =================================================================================
-        // 2. LIBERAR COMISSÃO E COBRAR DÍVIDA (LÓGICA CLAWBACK)
+// =================================================================================
+        // 2. LIBERAR COMISSÃO E COBRAR DÍVIDA (LÓGICA BLINDADA 🛡️)
         // =================================================================================
         if (status === 'APROVADO' && pedidoAntigo.status !== 'APROVADO') {
             if (pedidoAntigo.afiliadoId && pedidoAntigo.comissaoGerada > 0) {
                 
-                // Busca o afiliado atualizado para ver a dívida
+                // Busca o afiliado atualizado
                 const afiliado = await prisma.afiliado.findUnique({ where: { id: pedidoAntigo.afiliadoId }});
-                const dividaAtual = afiliado.saldoDevedor || 0;
-                const comissaoNova = pedidoAntigo.comissaoGerada;
+                
+                // Força conversão para garantir números (evita erro de texto)
+                const dividaAtual = parseFloat(afiliado.saldoDevedor || 0);
+                const comissaoNova = parseFloat(pedidoAntigo.comissaoGerada);
+                const saldoAtualCarteira = parseFloat(afiliado.saldo || 0);
 
                 if (dividaAtual > 0) {
-                    // 🔴 O AFILIADO TEM DÍVIDA! VAMOS ABATER.
+                    // 🔴 O AFILIADO TEM DÍVIDA!
                     if (comissaoNova >= dividaAtual) {
-                        // Cenário 1: Comissão paga a dívida toda e sobra troco
+                        // Cenário 1: Paga TUDO e sobra troco
                         const sobra = comissaoNova - dividaAtual;
+                        const novoSaldoCarteira = saldoAtualCarteira + sobra; // Calculamos aqui
                         
                         await prisma.afiliado.update({
                             where: { id: pedidoAntigo.afiliadoId },
                             data: { 
-                                saldoDevedor: 0,       // Zerou a dívida
-                                saldo: { increment: sobra } // Recebe o resto
+                                saldoDevedor: 0.0,       // ZERA A DÍVIDA NA MARRA
+                                saldo: novoSaldoCarteira // Define o valor exato (mais seguro que increment)
                             }
                         });
                     } else {
-                        // Cenário 2: Comissão não paga a dívida toda (abate parcial)
+                        // Cenário 2: Abate parcial (Comissão não paga tudo)
                         await prisma.afiliado.update({
                             where: { id: pedidoAntigo.afiliadoId },
                             data: { 
-                                saldoDevedor: { decrement: comissaoNova }, // Diminui a dívida
-                                // Saldo não muda, ele não recebe nada líquido dessa vez
+                                saldoDevedor: { decrement: comissaoNova } // Diminui a dívida
+                                // Saldo não muda
                             }
                         });
                     }
                 } else {
-                    // 🟢 SEM DÍVIDA: Vida normal, recebe tudo
+                    // 🟢 SEM DÍVIDA: Recebe tudo
                     await prisma.afiliado.update({
                         where: { id: pedidoAntigo.afiliadoId },
                         data: { saldo: { increment: comissaoNova } }

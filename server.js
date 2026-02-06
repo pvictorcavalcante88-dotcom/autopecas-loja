@@ -281,6 +281,7 @@ app.get('/afiliado/dashboard', authenticateToken, async (req, res) => {
             nome: afiliado.nome,
             codigo: afiliado.codigo, 
             saldo: afiliado.saldo,
+            saldoDevedor: afiliado.saldoDevedor || 0.0,
             
             // Dados Bancários
             chavePix: afiliado.chavePix,
@@ -783,12 +784,16 @@ app.get('/admin/pedidos', authenticateToken, async (req, res) => {
     } catch (e) { res.status(500).json({ erro: "Erro ao buscar pedidos" }); }
 });
 
-// MUDAR STATUS DO PEDIDO (Estoque e Comissão)
+
+// =================================================================
+// 🔄 ATUALIZAR STATUS DO PEDIDO (COM SISTEMA DE DÍVIDA/CLAWBACK)
+// =================================================================
 app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         const { status, itens, novoTotal } = req.body; 
 
+        // Busca pedido antigo e dados do afiliado
         const pedidoAntigo = await prisma.pedido.findUnique({ 
             where: { id: id },
             include: { afiliado: true }
@@ -797,7 +802,7 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
         if (!pedidoAntigo) return res.status(404).json({ erro: "Pedido não encontrado" });
 
         // =================================================================================
-        // 1. BAIXA DE ESTOQUE (QUANDO APROVA)
+        // 1. BAIXA DE ESTOQUE (QUANDO APROVA PELA PRIMEIRA VEZ)
         // =================================================================================
         if (status === 'APROVADO' && pedidoAntigo.status !== 'APROVADO') {
             try {
@@ -816,29 +821,55 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
         }
 
         // =================================================================================
-        // 2. LIBERAR COMISSÃO (QUANDO APROVA)
+        // 2. LIBERAR COMISSÃO E COBRAR DÍVIDA (LÓGICA CLAWBACK)
         // =================================================================================
         if (status === 'APROVADO' && pedidoAntigo.status !== 'APROVADO') {
             if (pedidoAntigo.afiliadoId && pedidoAntigo.comissaoGerada > 0) {
-                await prisma.afiliado.update({
-                    where: { id: pedidoAntigo.afiliadoId },
-                    data: { saldo: { increment: pedidoAntigo.comissaoGerada } }
-                });
+                
+                // Busca o afiliado atualizado para ver a dívida
+                const afiliado = await prisma.afiliado.findUnique({ where: { id: pedidoAntigo.afiliadoId }});
+                const dividaAtual = afiliado.saldoDevedor || 0;
+                const comissaoNova = pedidoAntigo.comissaoGerada;
+
+                if (dividaAtual > 0) {
+                    // 🔴 O AFILIADO TEM DÍVIDA! VAMOS ABATER.
+                    if (comissaoNova >= dividaAtual) {
+                        // Cenário 1: Comissão paga a dívida toda e sobra troco
+                        const sobra = comissaoNova - dividaAtual;
+                        
+                        await prisma.afiliado.update({
+                            where: { id: pedidoAntigo.afiliadoId },
+                            data: { 
+                                saldoDevedor: 0,       // Zerou a dívida
+                                saldo: { increment: sobra } // Recebe o resto
+                            }
+                        });
+                    } else {
+                        // Cenário 2: Comissão não paga a dívida toda (abate parcial)
+                        await prisma.afiliado.update({
+                            where: { id: pedidoAntigo.afiliadoId },
+                            data: { 
+                                saldoDevedor: { decrement: comissaoNova }, // Diminui a dívida
+                                // Saldo não muda, ele não recebe nada líquido dessa vez
+                            }
+                        });
+                    }
+                } else {
+                    // 🟢 SEM DÍVIDA: Vida normal, recebe tudo
+                    await prisma.afiliado.update({
+                        where: { id: pedidoAntigo.afiliadoId },
+                        data: { saldo: { increment: comissaoNova } }
+                    });
+                }
             }
         }
 
         // =================================================================================
-        // 3. ESTORNO TOTAL (QUANDO CANCELA PEDIDO JÁ APROVADO/DEVOLVIDO)
+        // 3. ESTORNO TOTAL (QUANDO CANCELA PEDIDO JÁ PAGO)
         // =================================================================================
         if (status === 'CANCELADO' && (pedidoAntigo.status === 'APROVADO' || pedidoAntigo.status === 'ENTREGUE' || pedidoAntigo.status === 'DEVOLUCAO_PARCIAL')) {
-            // Tira o dinheiro do afiliado
-            if (pedidoAntigo.afiliadoId && pedidoAntigo.comissaoGerada > 0) {
-                await prisma.afiliado.update({
-                    where: { id: pedidoAntigo.afiliadoId },
-                    data: { saldo: { decrement: pedidoAntigo.comissaoGerada } }
-                });
-            }
-            // Devolve TUDO ao estoque
+            
+            // A. Devolve TUDO ao estoque físico
             try {
                 const listaItens = typeof pedidoAntigo.itens === 'string' ? JSON.parse(pedidoAntigo.itens) : pedidoAntigo.itens;
                 if (Array.isArray(listaItens)) {
@@ -851,7 +882,33 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
                         }
                     }
                 }
-            } catch(e) {}
+            } catch(e) { console.error("Erro devolucao estoque total", e); }
+
+            // B. Estorno Financeiro (Gera Dívida se não tiver saldo)
+            if (pedidoAntigo.afiliadoId && pedidoAntigo.comissaoGerada > 0) {
+                const afiliado = await prisma.afiliado.findUnique({ where: { id: pedidoAntigo.afiliadoId }});
+                const valorEstorno = pedidoAntigo.comissaoGerada;
+
+                if (afiliado.saldo >= valorEstorno) {
+                    // Tem saldo, desconta normal
+                    await prisma.afiliado.update({
+                        where: { id: pedidoAntigo.afiliadoId },
+                        data: { saldo: { decrement: valorEstorno } }
+                    });
+                } else {
+                    // NÃO tem saldo suficiente -> Vira DÍVIDA
+                    const saldoDisponivel = afiliado.saldo > 0 ? afiliado.saldo : 0;
+                    const oQueFalta = valorEstorno - saldoDisponivel;
+
+                    await prisma.afiliado.update({
+                        where: { id: pedidoAntigo.afiliadoId },
+                        data: { 
+                            saldo: 0,
+                            saldoDevedor: { increment: oQueFalta } 
+                        }
+                    });
+                }
+            }
         }
 
         // =================================================================================
@@ -872,33 +929,49 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
                         const porcentagemDevolvida = diferencaValor / valorAntigo;
                         const valorEstorno = pedidoAntigo.comissaoGerada * porcentagemDevolvida;
 
-                        await prisma.afiliado.update({
-                            where: { id: pedidoAntigo.afiliadoId },
-                            data: { saldo: { decrement: valorEstorno } }
-                        });
+                        // LÓGICA DO SALDO DEVEDOR
+                        const afiliado = await prisma.afiliado.findUnique({ where: { id: pedidoAntigo.afiliadoId }});
 
+                        if (afiliado.saldo >= valorEstorno) {
+                            // Tem saldo, desconta normal
+                            await prisma.afiliado.update({
+                                where: { id: pedidoAntigo.afiliadoId },
+                                data: { saldo: { decrement: valorEstorno } }
+                            });
+                        } else {
+                            // Vira Dívida
+                            const saldoDisponivel = afiliado.saldo > 0 ? afiliado.saldo : 0;
+                            const oQueFalta = valorEstorno - saldoDisponivel;
+
+                            await prisma.afiliado.update({
+                                where: { id: pedidoAntigo.afiliadoId },
+                                data: { 
+                                    saldo: 0,
+                                    saldoDevedor: { increment: oQueFalta } 
+                                }
+                            });
+                        }
+
+                        // Atualiza a comissão que sobrou no pedido
                         const novaComissao = pedidoAntigo.comissaoGerada - valorEstorno;
                         dadosAtualizacao.comissaoGerada = novaComissao;
                     }
                 }
 
-                // 🟢 B. ESTORNO AUTOMÁTICO DE ESTOQUE (PRODUTOS) 🟢
+                // B. ESTORNO AUTOMÁTICO DE ESTOQUE (Mantido idêntico ao original)
                 try {
                     const listaAntiga = typeof pedidoAntigo.itens === 'string' ? JSON.parse(pedidoAntigo.itens) : pedidoAntigo.itens;
                     const listaNova = typeof itens === 'string' ? JSON.parse(itens) : itens;
 
-                    // Percorre a lista original para ver o que sumiu ou diminuiu
                     for (const itemAntigo of listaAntiga) {
-                        // Procura esse mesmo item na lista nova (pelo ID ou Nome se ID falhar)
-                        // Se o item não existir na lista nova, assumimos qtd = 0 (foi totalmente devolvido)
+                        // Tenta achar o item na lista nova
                         const itemNovo = listaNova.find(i => (i.id && i.id === itemAntigo.id) || i.nome === itemAntigo.nome) || { qtd: 0 };
                         
-                        // Calcula a diferença
                         const qtdAntiga = parseInt(itemAntigo.qtd);
                         const qtdNova = parseInt(itemNovo.qtd);
                         const qtdDevolvida = qtdAntiga - qtdNova;
 
-                        // Se devolveu algo (diferença positiva), devolve pro estoque
+                        // Se a quantidade diminuiu, devolve a diferença pro estoque
                         if (qtdDevolvida > 0 && itemAntigo.id) {
                             await prisma.produto.update({
                                 where: { id: itemAntigo.id },
@@ -906,18 +979,16 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
                             });
                         }
                     }
-                } catch (erroEstoque) {
-                    console.error("Erro ao devolver estoque parcial:", erroEstoque);
-                }
+                } catch (erroEstoque) { console.error("Erro estoque parcial:", erroEstoque); }
 
-                // C. PREPARA DADOS PARA SALVAR NO PEDIDO
+                // C. SALVA NOVO CARRINHO NO PEDIDO
                 dadosAtualizacao.itens = typeof itens === 'object' ? JSON.stringify(itens) : itens;
                 dadosAtualizacao.valorTotal = parseFloat(novoTotal);
             }
         }
 
         // =================================================================================
-        // UPDATE FINAL
+        // UPDATE FINAL NO BANCO
         // =================================================================================
         const pedidoAtualizado = await prisma.pedido.update({
             where: { id: id },
@@ -927,7 +998,7 @@ app.put('/admin/orders/:id/status', authenticateToken, async (req, res) => {
         res.json(pedidoAtualizado);
 
     } catch (e) { 
-        console.error(e);
+        console.error("Erro Status:", e);
         res.status(500).json({ erro: e.message }); 
     }
 });

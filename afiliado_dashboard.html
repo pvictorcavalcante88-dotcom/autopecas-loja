@@ -108,6 +108,28 @@
         </header>
 
         <div id="dashboard" class="tab-content active">
+
+            <div id="box-debito-alert" style="display:none; background: #fff5f5; border-left: 5px solid #c0392b; padding: 15px; margin-bottom: 25px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
+                    <div style="display:flex; gap:15px; align-items:center;">
+                        <div style="background:#c0392b; color:white; min-width:45px; height:45px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.5rem;">
+                            <i class="ph ph-warning-octagon"></i>
+                        </div>
+                        <div>
+                            <h4 style="margin:0; color:#c0392b; font-size:1rem;">Saldo Devedor (Devoluções)</h4>
+                            <p style="margin:5px 0 0 0; color:#555; font-size:0.9rem; line-height:1.4;">
+                                Houve devoluções de vendas já pagas anteriormente. <br>
+                                Este valor será descontado automaticamente das suas próximas comissões.
+                            </p>
+                        </div>
+                    </div>
+                    <div style="text-align:right; min-width: 120px;">
+                        <span style="display:block; font-size:0.8rem; color:#777; text-transform:uppercase; font-weight:bold;">Total a Compensar</span>
+                        <span id="valor-debito-display" style="font-size:1.5rem; font-weight:800; color:#c0392b;">R$ 0,00</span>
+                    </div>
+                </div>
+            </div>
+
             <div class="stats-grid">
                 <div class="card money">
                     <h3>Saldo Disponível (Líquido)</h3>

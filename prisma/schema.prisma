@@ -41,6 +41,7 @@ model Afiliado {
   sugestoes   Sugestao[]
   saques      Saque[]
   clientes    ClienteAfiliado[]
+  saldoDevedor Float @default(0.0)
 
   createdAt DateTime @default(now())
 }

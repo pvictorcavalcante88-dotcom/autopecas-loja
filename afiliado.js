@@ -61,9 +61,8 @@ function verificarLogin() {
     carregarClientesCadastrados();
 }
 
-// ============================================================
-// 1. CARREGAR DADOS DO DASHBOARD
-// ============================================================
+// No arquivo afiliado.js
+
 async function carregarDashboardCompleto() {
     try {
         const res = await fetch(`${API_URL}/afiliado/dashboard`, {
@@ -76,11 +75,9 @@ async function carregarDashboardCompleto() {
         window.DADOS_AFILIADO = dados;
         window.TODAS_VENDAS = dados.vendas || [];
         
+        // --- PREENCHIMENTO BÁSICO (IGUAL AO SEU) ---
         const elNome = document.getElementById('nome-afiliado');
         if(elNome) elNome.innerText = `Olá, ${dados.nome}!`;
-
-        const elSaldo = document.getElementById('saldo-total');
-        if(elSaldo) elSaldo.innerText = parseFloat(dados.saldo).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
 
         const elQtd = document.getElementById('qtd-vendas');
         if(elQtd && dados.vendas) {
@@ -88,15 +85,37 @@ async function carregarDashboardCompleto() {
             elQtd.innerText = aprovadas;
         }
 
-        const elLink = document.getElementById('link-afiliado');
-        if(elLink && dados.codigo) {
-            elLink.value = `${window.location.origin}/index.html?ref=${dados.codigo}`;
-        }
+        // --- 🔴 LÓGICA DO SALDO DEVEDOR (NOVO) ---
+        const boxDebito = document.getElementById('box-debito-alert');
+        const valorDebitoDisplay = document.getElementById('valor-debito-display');
+        const saldoDisplay = document.getElementById('saldo-total');
 
+        // O backend deve retornar: dados.saldo (Saldo Positivo) e dados.saldoDevedor (Dívida)
+        const saldoPositivo = parseFloat(dados.saldo || 0);
+        const saldoDevedor = parseFloat(dados.saldoDevedor || 0); // <--- CAMPO NOVO
+
+        if (saldoDevedor > 0) {
+            // Mostra o alerta vermelho
+            if(boxDebito) boxDebito.style.display = 'block';
+            if(valorDebitoDisplay) valorDebitoDisplay.innerText = `-${saldoDevedor.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}`;
+            
+            // Opcional: Se você quiser mostrar o saldo liquido real (Saldo - Dívida) no card verde
+            // Mas geralmente mostramos o saldo zerado se a dívida for maior que o saldo
+            let saldoReal = saldoPositivo - saldoDevedor;
+            if (saldoReal < 0) saldoReal = 0; 
+            
+            if(saldoDisplay) saldoDisplay.innerText = saldoReal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+            
+        } else {
+            // Esconde alerta se não dever nada
+            if(boxDebito) boxDebito.style.display = 'none';
+            if(saldoDisplay) saldoDisplay.innerText = saldoPositivo.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+        }
+        // ------------------------------------------
+
+        // Continuação do preenchimento...
         if(document.getElementById('input-pix')) document.getElementById('input-pix').value = dados.chavePix || '';
-        if(document.getElementById('input-banco')) document.getElementById('input-banco').value = dados.banco || '';
-        if(document.getElementById('input-agencia')) document.getElementById('input-agencia').value = dados.agencia || '';
-        if(document.getElementById('input-conta')) document.getElementById('input-conta').value = dados.conta || '';
+        // ... (resto dos seus inputs)
 
         calcularVendasPorPeriodo(); 
         preencherTabelaVendas('lista-ultimas-vendas', dados.vendas.slice(0, 5)); 

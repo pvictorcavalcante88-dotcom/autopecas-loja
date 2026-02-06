@@ -1130,7 +1130,7 @@ app.get('/admin/afiliados', authenticateToken, async (req, res) => {
     try {
         const afiliados = await prisma.afiliado.findMany({ include: { pedidos: true } });
         const resposta = afiliados.map(af => ({
-            id: af.id, nome: af.nome, telefone: af.telefone, codigo: af.codigo, saldo: af.saldo,
+            id: af.id, nome: af.nome, telefone: af.telefone, codigo: af.codigo, saldo: af.saldo,saldoDevedor: af.saldoDevedor || 0.0,
             aprovado: af.aprovado, chavePix: af.chavePix, banco: af.banco, agencia: af.agencia, conta: af.conta,
             vendasTotais: af.pedidos.reduce((acc, p) => acc + p.valorTotal, 0)
         }));
@@ -1147,6 +1147,30 @@ app.put('/admin/afiliados/:id/status', authenticateToken, async (req, res) => {
         });
         res.json({ success: true });
     } catch(e) { res.status(500).json({ erro: "Erro status" }); }
+});
+
+// ============================================================
+// 📉 RELATÓRIO DE DEVEDORES (RESUMO FINANCEIRO)
+// ============================================================
+app.get('/admin/devedores-resumo', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    try {
+        // Busca apenas quem deve alguma coisa (saldoDevedor > 0)
+        const devedores = await prisma.afiliado.findMany({
+            where: { saldoDevedor: { gt: 0 } },
+            select: { id: true, nome: true, saldoDevedor: true },
+            orderBy: { saldoDevedor: 'desc' }
+        });
+        
+        // Soma tudo
+        const totalRecuperar = devedores.reduce((acc, d) => acc + d.saldoDevedor, 0);
+        
+        res.json({ 
+            totalRecuperar, 
+            qtdDevedores: devedores.length,
+            lista: devedores // Manda a lista caso queira fazer um popup
+        });
+    } catch (e) { res.status(500).json({ erro: "Erro ao buscar resumo" }); }
 });
 
 // SUGESTÕES

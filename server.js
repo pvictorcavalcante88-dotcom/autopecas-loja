@@ -2523,10 +2523,10 @@ app.get('/api/admin/lista-compras', async (req, res) => {
 });
 
 // =================================================================
-// 🧹 ROTA DA VASSOURA: LIMPEZA GERAL PARA PRODUÇÃO
+// 🧹 ROTA DA VASSOURA (CORRIGIDA PARA SEU SCHEMA)
 // =================================================================
 app.delete('/admin/limpar-banco-testes', authenticateToken, async (req, res) => {
-    // 1. SEGURANÇA MÁXIMA: Só Admin pode fazer isso
+    // 1. SEGURANÇA MÁXIMA
     if (req.user.role !== 'admin') {
         return res.status(403).json({ erro: "Você não tem permissão para isso." });
     }
@@ -2534,21 +2534,20 @@ app.delete('/admin/limpar-banco-testes', authenticateToken, async (req, res) => 
     try {
         console.log("🔥 INICIANDO LIMPEZA DO BANCO DE DADOS...");
 
-        // Usamos transaction para garantir que ou apaga tudo ou não apaga nada (segurança)
+        // A ORDEM AQUI É CRUCIAL (Apaga filhos -> depois pais)
         await prisma.$transaction([
-            // 1. Apaga itens dependentes primeiro (filhos)
-            prisma.saque.deleteMany({}),      // Apaga saques
-            prisma.mensagem.deleteMany({}),   // Apaga mensagens
-            prisma.sugestao.deleteMany({}),   // Apaga sugestões
-            prisma.orcamento.deleteMany({}),  // Apaga orçamentos salvos
+            // 1. Tabelas que dependem de Afiliado ou Pedido
+            prisma.saque.deleteMany({}),           // Depende de Afiliado
+            prisma.mensagem.deleteMany({}),        // Depende de Afiliado
+            prisma.sugestao.deleteMany({}),        // Depende de Produto e Afiliado
+            prisma.orcamento.deleteMany({}),       // Depende de Afiliado
+            prisma.clienteAfiliado.deleteMany({}), // Depende de Afiliado
             
-            // 2. Apaga Pedidos (O coração das vendas)
+            // 2. Apaga Pedidos (Depende de Afiliado)
             prisma.pedido.deleteMany({}),     
 
-            // 3. Apaga Clientes de Afiliados (CRM)
-            prisma.clienteAfiliado.deleteMany({}),
-
-            // 4. Apaga Afiliados de Teste (OPCIONAL - Se quiser manter algum, comente essa linha)
+            // 3. Apaga Afiliados (Agora pode apagar, pois não tem mais filhos)
+            // Se quiser manter seus afiliados de teste, comente a linha abaixo:
             prisma.afiliado.deleteMany({}),   
         ]);
 
@@ -2556,7 +2555,7 @@ app.delete('/admin/limpar-banco-testes', authenticateToken, async (req, res) => 
 
         res.json({ 
             sucesso: true, 
-            mensagem: "Todos os dados de teste (Vendas, Saques, Afiliados, Msgs) foram apagados! Produtos e Admin foram mantidos." 
+            mensagem: "Limpeza concluída! Vendas, Saques, Msgs e Afiliados foram apagados." 
         });
 
     } catch (error) {

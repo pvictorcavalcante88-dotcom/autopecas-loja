@@ -1389,7 +1389,7 @@ document.addEventListener('change', (e) => {
 // ============================================================
 // 🏭 INTEGRAÇÃO TINY (Envia o pedido para o ERP)
 // ============================================================
-async function criarPedidoNoTiny(dadosCliente, carrinho) {
+async function criarPedidoNoTiny(dadosCliente, carrinho, valorTotalComJuros) {
     console.log("📤 Sincronizando valor de venda com o Tiny...");
     console.log("💰 Valor Final (com juros) recebido:", valorTotalComJuros); // Log para conferir
 

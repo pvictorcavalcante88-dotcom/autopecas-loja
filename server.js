@@ -2112,117 +2112,158 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
     }
 });
 
+// =================================================================
+// 🚀 ROTA: CRIAR PEDIDO NO TINY (CORRIGIDA)
+// =================================================================
 app.post('/admin/tiny/criar-pedido', async (req, res) => {
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
     try {
         const tokenFinal = await getValidToken();
-        // ⚠️ ADICIONEI 'valorTotal' NO DESTRUCTURING PARA CALCULAR JUROS
+        // Recebe o valorTotal do frontend (valor final do cartão com juros)
         const { itensCarrinho, cliente, valorFrete, valorTotal } = req.body; 
+
+        // Limpa o CPF
         const cpfLimpo = (cliente.documento || cliente.cpf || '').replace(/\D/g, '');
 
-        console.log("🚀 INICIANDO PEDIDO DIRETO PARA:", cliente.nome);
+        console.log("🚀 INICIANDO PEDIDO PARA:", cliente.nome);
+        console.log("💳 Total Pago (Cartão):", valorTotal);
 
+        // --- PASSO 1: IDENTIFICAR CLIENTE (Blindado) ---
         let idClienteFinal = null;
 
-        // --- PASSO 1: CLIENTE (Igual ao seu) ---
+        // Tenta buscar primeiro pelo CPF (Mais seguro que nome)
         try {
-            const resCriar = await axios.post(`https://api.tiny.com.br/public-api/v3/contatos`, {
-                nome: cliente.nome,
-                cpfCnpj: cpfLimpo,
-                tipoPessoa: 'F',
-                situacao: "A"
-            }, { headers: { 'Authorization': `Bearer ${tokenFinal}` } });
-            
-            idClienteFinal = resCriar.data.data?.id || resCriar.data.id;
-        } catch (error) {
-            console.log("⚠️ Cliente já existe ou erro. Buscando...");
-            const resBusca = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(cliente.nome)}`, {
+            const resBuscaCpf = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfLimpo}`, {
                 headers: { 'Authorization': `Bearer ${tokenFinal}` }
             });
-            idClienteFinal = resBusca.data.data?.[0]?.id;
+            if (resBuscaCpf.data.data && resBuscaCpf.data.data.length > 0) {
+                idClienteFinal = resBuscaCpf.data.data[0].id;
+                console.log("✅ Cliente encontrado por CPF:", idClienteFinal);
+            }
+        } catch (e) { /* Ignora erro de busca */ }
+
+        // Se não achou por CPF, tenta criar
+        if (!idClienteFinal) {
+            try {
+                const resCriar = await axios.post(`https://api.tiny.com.br/public-api/v3/contatos`, {
+                    nome: cliente.nome,
+                    cpfCnpj: cpfLimpo,
+                    tipoPessoa: 'F',
+                    situacao: "A",
+                    fone: cliente.telefone || "",
+                    email: cliente.email || ""
+                }, { headers: { 'Authorization': `Bearer ${tokenFinal}` } });
+                
+                idClienteFinal = resCriar.data.data?.id || resCriar.data.id;
+                console.log("✅ Cliente criado:", idClienteFinal);
+                await sleep(2000); // Espera o Tiny processar
+            } catch (error) {
+                console.log("⚠️ Erro ao criar cliente, tentando buscar por nome...");
+                // Última tentativa: busca por nome
+                const resBuscaNome = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(cliente.nome)}`, {
+                    headers: { 'Authorization': `Bearer ${tokenFinal}` }
+                });
+                idClienteFinal = resBuscaNome.data.data?.[0]?.id;
+            }
         }
 
-        if (!idClienteFinal) return res.status(429).json({ erro: "Erro ao identificar cliente no Tiny." });
-        
-        await sleep(1500);
+        if (!idClienteFinal) {
+            return res.status(400).json({ erro: "Tiny recusou o cliente. Verifique CPF/CNPJ." });
+        }
 
-        // --- PASSO 2: ITENS E CÁLCULO FINANCEIRO ---
-        let somaDosItens = 0; // Para calcular a diferença depois
+        // --- PASSO 2: ITENS E CÁLCULO DE JUROS ---
+        let somaDosItens = 0;
 
         const itensFormatados = await Promise.all(itensCarrinho.map(async (item, index) => {
+            // Tenta pegar ID de várias formas
             const idLocal = item.id || item.id_tiny || item.tinyId || item.produtoId;
-            if (!idLocal) return null;
+            
+            // Busca no banco para ter certeza do tinyId
+            let idFinal = idLocal;
+            if(idLocal) {
+                const prod = await prisma.produto.findUnique({ where: { id: parseInt(idLocal) } }).catch(()=>null);
+                if(prod && prod.tinyId) idFinal = prod.tinyId;
+            }
 
-            // Busca tinyId no banco
-            const produtoNoBanco = await prisma.produto.findUnique({
-                where: { id: parseInt(idLocal) }
-            }).catch(() => null); // Evita crash se ID não for numérico
+            if (!idFinal) {
+                console.error(`❌ Item sem ID na posição ${index}`);
+                return null;
+            }
 
-            const idFinalParaTiny = produtoNoBanco?.tinyId || idLocal;
             const qtd = parseInt(item.quantidade || item.qtd || 1);
             const preco = parseFloat(item.preco || item.unitario || 0);
-
-            // Soma para conferência
+            
             somaDosItens += (preco * qtd);
 
             return {
-                produto: { id: String(idFinalParaTiny) },
+                produto: { id: String(idFinal) }, // Converte pra string pra evitar erro
                 quantidade: qtd,
                 valorUnitario: preco
             };
         }));
 
         const itensValidos = itensFormatados.filter(i => i !== null);
+        if (itensValidos.length === 0) return res.status(400).json({ erro: "Nenhum produto válido identificado." });
 
-        if (itensValidos.length === 0) return res.status(400).json({ erro: "Sem itens válidos." });
-
-        // --- PASSO 3: CÁLCULO DE JUROS/DESCONTO (A MÁGICA 🧙‍♂️) ---
-        // Compara a soma dos produtos com o total que o cliente pagou
+        // --- PASSO 3: CÁLCULO FINAL (JUROS vs DESCONTO) ---
         let valorOutrasDespesas = 0;
         let valorDesconto = 0;
 
-        // Se o frontend mandou o valorTotal pago
         if (valorTotal) {
-            // Subtrai o frete da conta, pois o frete é somado à parte pelo Tiny
-            const totalPagoSemFrete = parseFloat(valorTotal) - parseFloat(valorFrete || 0);
-            const diferenca = totalPagoSemFrete - somaDosItens;
+            // Garante que é número e troca vírgula por ponto se vier string BR
+            const totalPago = typeof valorTotal === 'string' 
+                ? parseFloat(valorTotal.replace(',', '.')) 
+                : parseFloat(valorTotal);
+                
+            const frete = parseFloat(valorFrete || 0);
+            
+            // A conta é: O que pagou - (Produtos + Frete)
+            // Se sobrar, é Juros. Se faltar, é Desconto.
+            const diferenca = totalPago - (somaDosItens + frete);
+
+            console.log(`🧮 Conta: ${totalPago} (Pago) - [${somaDosItens} (Itens) + ${frete} (Frete)] = ${diferenca.toFixed(2)}`);
 
             if (diferenca > 0.05) {
-                valorOutrasDespesas = diferenca.toFixed(2); // É Juros
+                valorOutrasDespesas = parseFloat(diferenca.toFixed(2));
+                console.log(`💰 Juros aplicados: R$ ${valorOutrasDespesas}`);
             } else if (diferenca < -0.05) {
-                valorDesconto = Math.abs(diferenca).toFixed(2); // É Desconto
+                valorDesconto = parseFloat(Math.abs(diferenca).toFixed(2));
+                console.log(`📉 Desconto aplicado: R$ ${valorDesconto}`);
             }
         }
 
-        // --- PASSO 4: MONTAR E ENVIAR PEDIDO ---
-        const payloadPedido = {
+        // --- PASSO 4: ENVIAR ---
+        const payload = {
             data: new Date().toISOString().split('T')[0],
             idContato: idClienteFinal,
             itens: itensValidos,
             naturezaOperacao: { id: 335900648 },
             valorFrete: parseFloat(valorFrete || 0),
-            
-            // Aqui entram os ajustes para bater o valor do cartão
-            valorOutrasDespesas: parseFloat(valorOutrasDespesas), 
-            valorDesconto: parseFloat(valorDesconto),
-
-            situacao: 0, // 0 = Em aberto
-            obs: "Pedido via Site (Checkout Direto)"
+            valorOutrasDespesas: valorOutrasDespesas, // Aqui vai o Juros
+            valorDesconto: valorDesconto,             // Aqui vai o Desconto
+            situacao: 0,
+            obs: `Pedido Online. Pago: R$ ${valorTotal}`
         };
 
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/pedidos`, 
-            payloadPedido,
+            payload,
             { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
         );
 
-        console.log("🎉 PEDIDO CRIADO:", response.data.data?.numero);
+        console.log("✅ PEDIDO CRIADO NO TINY:", response.data.data?.numero);
         res.json({ sucesso: true, numero: response.data.data?.numero });
 
     } catch (error) {
-        console.error("❌ ERRO TINY:", error.response?.data || error.message);
-        res.status(500).json({ erro: "Erro ao criar pedido", detalhes: error.response?.data });
+        // Log detalhado do erro do Tiny para sabermos exatamente o que foi
+        const erroTiny = error.response?.data?.detalhes || error.response?.data || error.message;
+        console.error("❌ ERRO NO TINY:", JSON.stringify(erroTiny, null, 2));
+        
+        res.status(500).json({ 
+            erro: "Tiny recusou o pedido", 
+            detalhes: erroTiny 
+        });
     }
 });
 // ROTA: RAIO-X COMPLETO (SEM FILTROS)

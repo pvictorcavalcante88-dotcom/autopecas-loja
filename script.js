@@ -1205,8 +1205,9 @@ async function finalizarCompraAsaas() {
         const data = await res.json();
 
         if (res.ok) {
+        
             // ✅ SUCESSO NO PAGAMENTO! AGORA DISPARAMOS O TINY EM PARALELO
-            
+            const totalRealDoPedido = data.valorFinal || 0;
             // 🔥 INTEGRAÇÃO TINY AQUI 🔥
             // Preparamos o objeto completo para a função criarPedidoNoTiny
             const dadosClienteTiny = {

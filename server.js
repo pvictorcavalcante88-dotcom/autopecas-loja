@@ -2522,6 +2522,49 @@ app.get('/api/admin/lista-compras', async (req, res) => {
     }
 });
 
+// =================================================================
+// 🧹 ROTA DA VASSOURA: LIMPEZA GERAL PARA PRODUÇÃO
+// =================================================================
+app.delete('/admin/limpar-banco-testes', authenticateToken, async (req, res) => {
+    // 1. SEGURANÇA MÁXIMA: Só Admin pode fazer isso
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ erro: "Você não tem permissão para isso." });
+    }
+
+    try {
+        console.log("🔥 INICIANDO LIMPEZA DO BANCO DE DADOS...");
+
+        // Usamos transaction para garantir que ou apaga tudo ou não apaga nada (segurança)
+        await prisma.$transaction([
+            // 1. Apaga itens dependentes primeiro (filhos)
+            prisma.saque.deleteMany({}),      // Apaga saques
+            prisma.mensagem.deleteMany({}),   // Apaga mensagens
+            prisma.sugestao.deleteMany({}),   // Apaga sugestões
+            prisma.orcamento.deleteMany({}),  // Apaga orçamentos salvos
+            
+            // 2. Apaga Pedidos (O coração das vendas)
+            prisma.pedido.deleteMany({}),     
+
+            // 3. Apaga Clientes de Afiliados (CRM)
+            prisma.clienteAfiliado.deleteMany({}),
+
+            // 4. Apaga Afiliados de Teste (OPCIONAL - Se quiser manter algum, comente essa linha)
+            prisma.afiliado.deleteMany({}),   
+        ]);
+
+        console.log("✨ BANCO DE DADOS LIMPO COM SUCESSO!");
+
+        res.json({ 
+            sucesso: true, 
+            mensagem: "Todos os dados de teste (Vendas, Saques, Afiliados, Msgs) foram apagados! Produtos e Admin foram mantidos." 
+        });
+
+    } catch (error) {
+        console.error("❌ Erro na limpeza:", error);
+        res.status(500).json({ erro: "Erro ao limpar banco: " + error.message });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);

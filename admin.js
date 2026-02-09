@@ -477,3 +477,23 @@ function mudarStatusModal(status) {
                 document.getElementById('total-recuperar').innerText = "Erro";
             }
         }
+
+
+async function limparBancoDeTestes() {
+    if (!confirm("TEM CERTEZA ABSOLUTA? Isso apagará todas as vendas, saques e afiliados de teste!")) return;
+    if (!confirm("Última chance: Isso não tem volta. Produtos e Admin serão mantidos. Continuar?")) return;
+
+    const token = localStorage.getItem('token'); // Ou onde você guarda o token admin
+
+    const res = await fetch('/admin/limpar-banco-testes', {
+        method: 'DELETE',
+        headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    });
+
+    const dados = await res.json();
+    alert(dados.mensagem || dados.erro);
+    if(dados.sucesso) window.location.reload();
+}

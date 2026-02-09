@@ -2117,14 +2117,15 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
 
     try {
         const tokenFinal = await getValidToken();
-        const { itensCarrinho, cliente, valorFrete } = req.body;
+        // ⚠️ ADICIONEI 'valorTotal' NO DESTRUCTURING PARA CALCULAR JUROS
+        const { itensCarrinho, cliente, valorFrete, valorTotal } = req.body; 
         const cpfLimpo = (cliente.documento || cliente.cpf || '').replace(/\D/g, '');
 
         console.log("🚀 INICIANDO PEDIDO DIRETO PARA:", cliente.nome);
 
         let idClienteFinal = null;
 
-        // --- PASSO 1: TENTA CRIAR OU PEGAR ID ---
+        // --- PASSO 1: CLIENTE (Igual ao seu) ---
         try {
             const resCriar = await axios.post(`https://api.tiny.com.br/public-api/v3/contatos`, {
                 nome: cliente.nome,
@@ -2135,65 +2136,79 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             
             idClienteFinal = resCriar.data.data?.id || resCriar.data.id;
         } catch (error) {
-            // Se der 429 ou erro de duplicado, tentamos achar qualquer ID com esse nome
-            console.log("⚠️ Bloqueio ou duplicidade no cadastro. Buscando ID existente...");
+            console.log("⚠️ Cliente já existe ou erro. Buscando...");
             const resBusca = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(cliente.nome)}`, {
                 headers: { 'Authorization': `Bearer ${tokenFinal}` }
             });
             idClienteFinal = resBusca.data.data?.[0]?.id;
         }
 
-        if (!idClienteFinal) {
-            return res.status(429).json({ erro: "Tiny ainda está processando. Aguarde 1 minuto." });
-        }
+        if (!idClienteFinal) return res.status(429).json({ erro: "Erro ao identificar cliente no Tiny." });
+        
+        await sleep(1500);
 
-        console.log("✅ ID Cliente definido:", idClienteFinal);
-        await sleep(2000); // Respiro de segurança
+        // --- PASSO 2: ITENS E CÁLCULO FINANCEIRO ---
+        let somaDosItens = 0; // Para calcular a diferença depois
 
-        // --- PASSO 2: FORMATAR ITENS (USANDO O tinyId DO PRISMA) ---
-        // --- 2. FORMATAR ITENS (BLINDADO CONTRA CAMPOS INDEFINIDOS) ---
         const itensFormatados = await Promise.all(itensCarrinho.map(async (item, index) => {
-            // Tenta pegar o ID de qualquer lugar que o front-end possa ter enviado
-            // i.id (padrão), i.id_tiny (seu script), i.produtoId (backup)
             const idLocal = item.id || item.id_tiny || item.tinyId || item.produtoId;
+            if (!idLocal) return null;
 
-            if (!idLocal) {
-                console.error(`❌ Item na posição ${index} chegou sem ID do front-end!`, item);
-                return null; 
-            }
-
-            console.log(`🔎 Buscando ID Tiny no banco para o produto local: ${idLocal}`);
-
-            // Busca o tinyId real no banco de dados (Prisma)
+            // Busca tinyId no banco
             const produtoNoBanco = await prisma.produto.findUnique({
                 where: { id: parseInt(idLocal) }
-            });
+            }).catch(() => null); // Evita crash se ID não for numérico
 
-            // Se o banco tiver o tinyId, usamos. Se não, usamos o idLocal como última tentativa.
             const idFinalParaTiny = produtoNoBanco?.tinyId || idLocal;
+            const qtd = parseInt(item.quantidade || item.qtd || 1);
+            const preco = parseFloat(item.preco || item.unitario || 0);
+
+            // Soma para conferência
+            somaDosItens += (preco * qtd);
 
             return {
                 produto: { id: String(idFinalParaTiny) },
-                quantidade: parseInt(item.quantidade || item.qtd || 1),
-                valorUnitario: parseFloat(item.preco || item.unitario || 0)
+                quantidade: qtd,
+                valorUnitario: preco
             };
         }));
 
-        // Remove nulos (itens que vieram sem ID)
         const itensValidos = itensFormatados.filter(i => i !== null);
 
-        if (itensValidos.length === 0) {
-            return res.status(400).json({ erro: "Nenhum item válido encontrado no pedido." });
+        if (itensValidos.length === 0) return res.status(400).json({ erro: "Sem itens válidos." });
+
+        // --- PASSO 3: CÁLCULO DE JUROS/DESCONTO (A MÁGICA 🧙‍♂️) ---
+        // Compara a soma dos produtos com o total que o cliente pagou
+        let valorOutrasDespesas = 0;
+        let valorDesconto = 0;
+
+        // Se o frontend mandou o valorTotal pago
+        if (valorTotal) {
+            // Subtrai o frete da conta, pois o frete é somado à parte pelo Tiny
+            const totalPagoSemFrete = parseFloat(valorTotal) - parseFloat(valorFrete || 0);
+            const diferenca = totalPagoSemFrete - somaDosItens;
+
+            if (diferenca > 0.05) {
+                valorOutrasDespesas = diferenca.toFixed(2); // É Juros
+            } else if (diferenca < -0.05) {
+                valorDesconto = Math.abs(diferenca).toFixed(2); // É Desconto
+            }
         }
 
-        // --- PASSO 3: CRIAR PEDIDO ---
+        // --- PASSO 4: MONTAR E ENVIAR PEDIDO ---
         const payloadPedido = {
             data: new Date().toISOString().split('T')[0],
             idContato: idClienteFinal,
             itens: itensValidos,
             naturezaOperacao: { id: 335900648 },
             valorFrete: parseFloat(valorFrete || 0),
-            situacao: 0
+            
+            // Aqui entram os ajustes para bater o valor do cartão
+            valorOutrasDespesas: parseFloat(valorOutrasDespesas), 
+            valorDesconto: parseFloat(valorDesconto),
+
+            situacao: 0, // 0 = Em aberto
+            obs: "Pedido via Site (Checkout Direto)"
         };
 
         const response = await axios.post(
@@ -2202,12 +2217,12 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
         );
 
-        console.log("🎉 PEDIDO CRIADO COM SUCESSO:", response.data.data?.numero);
+        console.log("🎉 PEDIDO CRIADO:", response.data.data?.numero);
         res.json({ sucesso: true, numero: response.data.data?.numero });
 
     } catch (error) {
-        console.error("❌ ERRO FINAL:", error.response?.data || error.message);
-        res.status(500).json({ erro: "Erro ao finalizar", detalhes: error.response?.data });
+        console.error("❌ ERRO TINY:", error.response?.data || error.message);
+        res.status(500).json({ erro: "Erro ao criar pedido", detalhes: error.response?.data });
     }
 });
 // ROTA: RAIO-X COMPLETO (SEM FILTROS)

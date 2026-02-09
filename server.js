@@ -2120,8 +2120,9 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
 
     try {
         const tokenFinal = await getValidToken();
-        // ⬇️ ADICIONADO: 'valorTotal' para saber quanto foi cobrado no cartão
-        const { itensCarrinho, cliente, valorFrete, valorTotal } = req.body; 
+        // ⬇️ ADICIONEI APENAS O 'valorTotal' AQUI NO INÍCIO
+        const { itensCarrinho, cliente, valorFrete, valorTotal } = req.body;
+        
         const cpfLimpo = (cliente.documento || cliente.cpf || '').replace(/\D/g, '');
 
         console.log("🚀 INICIANDO PEDIDO DIRETO PARA:", cliente.nome);
@@ -2139,6 +2140,7 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             
             idClienteFinal = resCriar.data.data?.id || resCriar.data.id;
         } catch (error) {
+            // Se der 429 ou erro de duplicado, tentamos achar qualquer ID com esse nome
             console.log("⚠️ Bloqueio ou duplicidade no cadastro. Buscando ID existente...");
             const resBusca = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(cliente.nome)}`, {
                 headers: { 'Authorization': `Bearer ${tokenFinal}` }
@@ -2151,11 +2153,9 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
         }
 
         console.log("✅ ID Cliente definido:", idClienteFinal);
-        await sleep(2000); 
+        await sleep(2000); // Respiro de segurança
 
-        // --- PASSO 2: FORMATAR ITENS ---
-        let somaDosItens = 0; // ⬇️ ADICIONADO: Acumulador para o cálculo
-
+        // --- PASSO 2: FORMATAR ITENS (SUA LÓGICA ORIGINAL) ---
         const itensFormatados = await Promise.all(itensCarrinho.map(async (item, index) => {
             const idLocal = item.id || item.id_tiny || item.tinyId || item.produtoId;
 
@@ -2171,18 +2171,11 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             });
 
             const idFinalParaTiny = produtoNoBanco?.tinyId || idLocal;
-            
-            // Tratamento de números
-            const qtd = parseInt(item.quantidade || item.qtd || 1);
-            const preco = parseFloat(item.preco || item.unitario || 0);
-
-            // ⬇️ ADICIONADO: Soma para conferência
-            somaDosItens += (preco * qtd);
 
             return {
                 produto: { id: String(idFinalParaTiny) },
-                quantidade: qtd,
-                valorUnitario: preco
+                quantidade: parseInt(item.quantidade || item.qtd || 1),
+                valorUnitario: parseFloat(item.preco || item.unitario || 0)
             };
         }));
 
@@ -2192,24 +2185,34 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             return res.status(400).json({ erro: "Nenhum item válido encontrado no pedido." });
         }
 
-        // --- ⬇️ PASSO NOVO: CÁLCULO DE JUROS/DESCONTO ---
+        // ====================================================================
+        // 🔢 AQUI ENTRA A MATEMÁTICA DO JUROS (SEM MUDAR O RESTO)
+        // ====================================================================
         let valorOutrasDespesas = 0;
         let valorDesconto = 0;
 
         if (valorTotal) {
-            const totalPago = parseFloat(valorTotal);
-            const frete = parseFloat(valorFrete || 0);
-            
-            // Diferença = Total Pago - (Soma dos Produtos + Frete)
-            const diferenca = totalPago - (somaDosItens + frete);
+            // 1. Calcula a soma dos itens (Preço x Quantidade)
+            let somaItens = 0;
+            itensValidos.forEach(i => {
+                somaItens += (i.quantidade * i.valorUnitario);
+            });
 
-            // Margem de 5 centavos para ignorar arredondamento
+            // 2. Calcula a diferença: O que pagou - (Produtos + Frete)
+            const frete = parseFloat(valorFrete || 0);
+            const totalPago = parseFloat(valorTotal); // Total do cartão com juros
+            const diferenca = totalPago - (somaItens + frete);
+
+            // 3. Define se é Juros ou Desconto
             if (diferenca > 0.05) {
-                valorOutrasDespesas = parseFloat(diferenca.toFixed(2)); // É Juros
+                valorOutrasDespesas = parseFloat(diferenca.toFixed(2));
+                console.log(`💰 Juros (Outras Desp.): R$ ${valorOutrasDespesas}`);
             } else if (diferenca < -0.05) {
-                valorDesconto = parseFloat(Math.abs(diferenca).toFixed(2)); // É Desconto
+                valorDesconto = parseFloat(Math.abs(diferenca).toFixed(2));
+                console.log(`📉 Desconto: R$ ${valorDesconto}`);
             }
         }
+        // ====================================================================
 
         // --- PASSO 3: CRIAR PEDIDO ---
         const payloadPedido = {
@@ -2219,12 +2222,11 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
             naturezaOperacao: { id: 335900648 },
             valorFrete: parseFloat(valorFrete || 0),
             
-            // ⬇️ ADICIONADO: Campos financeiros calculados
+            // ⬇️ INJETANDO OS VALORES CALCULADOS
             valorOutrasDespesas: valorOutrasDespesas,
             valorDesconto: valorDesconto,
-            
-            situacao: 0,
-            obs: `Pedido Online. Total Pago: R$ ${valorTotal || 'N/A'}`
+
+            situacao: 0
         };
 
         const response = await axios.post(

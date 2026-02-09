@@ -1225,7 +1225,7 @@ async function finalizarCompraAsaas() {
             // Chamamos a função sem 'await' para não travar a tela do usuário
             // O pedido será criado no Tiny em segundo plano
             if (typeof criarPedidoNoTiny === 'function') {
-                criarPedidoNoTiny(dadosClienteTiny, carrinho).then(tinyId => {
+                criarPedidoNoTiny(dadosClienteTiny, carrinho, totalRealDoPedido).then(tinyId => {
                     console.log("🛒 Pedido Tiny processado. ID/Número: ", tinyId);
                 });
             } else {
@@ -1390,6 +1390,7 @@ document.addEventListener('change', (e) => {
 // ============================================================
 async function criarPedidoNoTiny(dadosCliente, carrinho) {
     console.log("📤 Sincronizando valor de venda com o Tiny...");
+    console.log("💰 Valor Final (com juros) recebido:", valorTotalComJuros); // Log para conferir
 
     try {
         const margemGlobal = parseFloat(localStorage.getItem('minhaMargem') || 0);
@@ -1431,7 +1432,8 @@ async function criarPedidoNoTiny(dadosCliente, carrinho) {
                 uf: dadosCliente.uf
             },
             itensCarrinho: itensFormatados,
-            valorFrete: 0 
+            valorFrete: 0,
+            valorTotal: valorTotalComJuros
         };
 
         const response = await fetch(`${API_URL}/admin/tiny/criar-pedido`, {

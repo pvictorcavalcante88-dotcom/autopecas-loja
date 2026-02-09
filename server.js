@@ -1521,6 +1521,7 @@ app.post('/api/checkout/pix', async (req, res) => {
         res.json({
             sucesso: true,
             pedidoId: novoPedido.id,
+            valorFinal: novoPedido.valorTotal,
             pix: {
                 payload: dadosAsaas.payload,           
                 encodedImage: dadosAsaas.encodedImage  

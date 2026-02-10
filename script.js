@@ -1675,3 +1675,72 @@ function resolverEstoque(aceitarNovoCarrinho) {
         window.location.reload();
     }
 }
+
+// ============================================================
+// 📍 BUSCA AUTOMÁTICA DE CEP (VIACEP)
+// ============================================================
+const inputCep = document.getElementById('cep');
+
+if (inputCep) {
+    inputCep.addEventListener('blur', async function() {
+        // 1. Limpa o CEP (deixa só números)
+        const cep = this.value.replace(/\D/g, '');
+
+        // 2. Valida se tem 8 dígitos
+        if (cep.length === 8) {
+            
+            // Avisa o usuário que está buscando...
+            document.getElementById('rua').value = "...";
+            document.getElementById('input-bairro').value = "...";
+            document.getElementById('input-cidade').value = "...";
+            document.getElementById('uf').value = "...";
+
+            try {
+                // 3. Consulta a API do ViaCEP
+                const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+                const data = await response.json();
+
+                if (!data.erro) {
+                    // ✅ ACHOU! Preenche os campos
+                    document.getElementById('rua').value = data.logradouro;
+                    document.getElementById('input-bairro').value = data.bairro;
+                    document.getElementById('input-cidade').value = data.localidade;
+                    document.getElementById('uf').value = data.uf;
+
+                    // Foca no campo "Número" para o cliente digitar logo
+                    document.getElementById('numero').focus();
+                } else {
+                    // ❌ CEP não existe
+                    alert("CEP não encontrado.");
+                    limparCamposEndereco();
+                }
+            } catch (error) {
+                console.error("Erro ao buscar CEP:", error);
+                alert("Erro ao buscar endereço. Preencha manualmente.");
+                limparCamposEndereco();
+            }
+        } else {
+            // Se o cara digitou menos de 8 números
+            if(cep.length > 0) alert("CEP inválido.");
+        }
+    });
+}
+
+function limparCamposEndereco() {
+    document.getElementById('rua').value = "";
+    document.getElementById('input-bairro').value = "";
+    document.getElementById('input-cidade').value = "";
+    document.getElementById('uf').value = "";
+    document.getElementById('numero').value = "";
+}
+
+// Máscara para formatar o CEP enquanto digita (Ex: 57000-000)
+if (inputCep) {
+    inputCep.addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\D/g, '');
+        if (value.length > 5) {
+            value = value.substring(0, 5) + '-' + value.substring(5, 8);
+        }
+        e.target.value = value;
+    });
+}

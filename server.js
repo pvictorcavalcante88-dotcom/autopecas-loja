@@ -2114,134 +2114,52 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 });
 
 // =================================================================
-// 🚀 ROTA: CRIAR PEDIDO NO TINY (CORRIGIDA)
+// 🚀 ROTA: CRIAR PEDIDO NO TINY (AGORA USANDO O SERVICE CORRETO)
 // =================================================================
 app.post('/admin/tiny/criar-pedido', async (req, res) => {
-    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
     try {
-        const tokenFinal = await getValidToken();
-        // ⬇️ ADICIONEI APENAS O 'valorTotal' AQUI NO INÍCIO
         const { itensCarrinho, cliente, valorFrete, valorTotal } = req.body;
-        
-        const cpfLimpo = (cliente.documento || cliente.cpf || '').replace(/\D/g, '');
 
-        console.log("🚀 INICIANDO PEDIDO DIRETO PARA:", cliente.nome);
+        console.log("🚀 ROTA: Recebendo pedido para enviar ao Tiny:", cliente.nome);
 
-        let idClienteFinal = null;
-
-        // --- PASSO 1: TENTA CRIAR OU PEGAR ID (SUA LÓGICA ORIGINAL) ---
-        try {
-            const resCriar = await axios.post(`https://api.tiny.com.br/public-api/v3/contatos`, {
-                nome: cliente.nome,
-                cpfCnpj: cpfLimpo,
-                tipoPessoa: 'F',
-                situacao: "A"
-            }, { headers: { 'Authorization': `Bearer ${tokenFinal}` } });
+        // 1. Mapeamos o JSON do Frontend para o formato que o Service entende
+        // O Service espera um objeto parecido com o do Banco de Dados (Prisma)
+        const pedidoFormatado = {
+            id: Date.now(), // ID temporário para logs
+            valorTotal: valorTotal,
+            metodoPagamento: "CARTAO/PIX", // Ou pegar do body se tiver
             
-            idClienteFinal = resCriar.data.data?.id || resCriar.data.id;
-        } catch (error) {
-            // Se der 429 ou erro de duplicado, tentamos achar qualquer ID com esse nome
-            console.log("⚠️ Bloqueio ou duplicidade no cadastro. Buscando ID existente...");
-            const resBusca = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(cliente.nome)}`, {
-                headers: { 'Authorization': `Bearer ${tokenFinal}` }
-            });
-            idClienteFinal = resBusca.data.data?.[0]?.id;
-        }
-
-        if (!idClienteFinal) {
-            return res.status(429).json({ erro: "Tiny ainda está processando. Aguarde 1 minuto." });
-        }
-
-        console.log("✅ ID Cliente definido:", idClienteFinal);
-        await sleep(2000); // Respiro de segurança
-
-        // --- PASSO 2: FORMATAR ITENS (SUA LÓGICA ORIGINAL) ---
-        const itensFormatados = await Promise.all(itensCarrinho.map(async (item, index) => {
-            const idLocal = item.id || item.id_tiny || item.tinyId || item.produtoId;
-
-            if (!idLocal) {
-                console.error(`❌ Item na posição ${index} chegou sem ID do front-end!`, item);
-                return null; 
-            }
-
-            console.log(`🔎 Buscando ID Tiny no banco para o produto local: ${idLocal}`);
-
-            const produtoNoBanco = await prisma.produto.findUnique({
-                where: { id: parseInt(idLocal) }
-            });
-
-            const idFinalParaTiny = produtoNoBanco?.tinyId || idLocal;
-
-            return {
-                produto: { id: String(idFinalParaTiny) },
-                quantidade: parseInt(item.quantidade || item.qtd || 1),
-                valorUnitario: parseFloat(item.preco || item.unitario || 0)
-            };
-        }));
-
-        const itensValidos = itensFormatados.filter(i => i !== null);
-
-        if (itensValidos.length === 0) {
-            return res.status(400).json({ erro: "Nenhum item válido encontrado no pedido." });
-        }
-
-        // ====================================================================
-        // 🔢 AQUI ENTRA A MATEMÁTICA DO JUROS (SEM MUDAR O RESTO)
-        // ====================================================================
-        let valorOutrasDespesas = 0;
-        let valorDesconto = 0;
-
-        if (valorTotal) {
-            // 1. Calcula a soma dos itens (Preço x Quantidade)
-            let somaItens = 0;
-            itensValidos.forEach(i => {
-                somaItens += (i.quantidade * i.valorUnitario);
-            });
-
-            // 2. Calcula a diferença: O que pagou - (Produtos + Frete)
-            const frete = parseFloat(valorFrete || 0);
-            const totalPago = parseFloat(valorTotal); // Total do cartão com juros
-            const diferenca = totalPago - (somaItens + frete);
-
-            // 3. Define se é Juros ou Desconto
-            if (diferenca > 0.05) {
-                valorOutrasDespesas = parseFloat(diferenca.toFixed(2));
-                console.log(`💰 Juros (Outras Desp.): R$ ${valorOutrasDespesas}`);
-            } else if (diferenca < -0.05) {
-                valorDesconto = parseFloat(Math.abs(diferenca).toFixed(2));
-                console.log(`📉 Desconto: R$ ${valorDesconto}`);
-            }
-        }
-        // ====================================================================
-
-        // --- PASSO 3: CRIAR PEDIDO ---
-        const payloadPedido = {
-            data: new Date().toISOString().split('T')[0],
-            idContato: idClienteFinal,
-            itens: itensValidos,
-            naturezaOperacao: { id: 335900648 },
-            valorFrete: parseFloat(valorFrete || 0),
+            // Mapeamento dos Dados do Cliente
+            clienteNome: cliente.nome,
+            clienteDoc: cliente.documento || cliente.cpf,
+            clienteEmail: cliente.email,
+            clienteTelefone: cliente.telefone,
             
-            // ⬇️ INJETANDO OS VALORES CALCULADOS
-            valorOutrasDespesas: valorOutrasDespesas,
-            valorDesconto: valorDesconto,
+            // ✅ AQUI GARANTIMOS QUE O ENDEREÇO VAI PRO SERVICE
+            clienteEndereco: cliente.endereco, // Rua
+            clienteNumero: cliente.numero,
+            clienteBairro: cliente.bairro,
+            clienteCidade: cliente.cidade,     // Maceio
+            clienteUf: cliente.uf,             // AL
+            clienteCep: cliente.cep,
 
-            situacao: 0
+            // Itens
+            itens: itensCarrinho // O Service já sabe lidar com array JSON
         };
 
-        const response = await axios.post(
-            `https://api.tiny.com.br/public-api/v3/pedidos`, 
-            payloadPedido,
-            { headers: { 'Authorization': `Bearer ${tokenFinal}` } }
-        );
+        // 2. CHAMAMOS O ESPECIALISTA (O arquivo tinyService.js)
+        // Ele vai fazer o PUT (Atualizar endereço) e depois criar o pedido com Juros
+        const resultado = await enviarPedidoParaTiny(pedidoFormatado);
 
-        console.log("🎉 PEDIDO CRIADO COM SUCESSO:", response.data.data?.numero);
-        res.json({ sucesso: true, numero: response.data.data?.numero });
+        if (resultado.success) {
+            res.json({ sucesso: true, numero: resultado.tinyId }); // Retorna o ID ou Número
+        } else {
+            res.status(500).json({ erro: resultado.erro });
+        }
 
     } catch (error) {
-        console.error("❌ ERRO FINAL:", error.response?.data || error.message);
-        res.status(500).json({ erro: "Erro ao finalizar", detalhes: error.response?.data });
+        console.error("❌ Erro na rota do Tiny:", error.message);
+        res.status(500).json({ erro: "Erro interno ao processar Tiny." });
     }
 });
 // ROTA: RAIO-X COMPLETO (SEM FILTROS)

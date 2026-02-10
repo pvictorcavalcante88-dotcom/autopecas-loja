@@ -47,16 +47,31 @@ async function resolverCliente(pedido, token) {
                 
                 // 🔥 O PULO DO GATO: PUT (ATUALIZAR)
                 // Usa o ID encontrado para preencher o endereço que faltava
-                try {
-                    await axios.put(
-                        `https://api.tiny.com.br/public-api/v3/contatos/${idContato}`, 
-                        dadosCliente,
-                        { headers: { 'Authorization': `Bearer ${token}` } }
-                    );
-                    console.log("✅ Cadastro do cliente atualizado com sucesso!");
-                } catch (errUpdate) {
-                    console.error("⚠️ Aviso: Erro ao tentar atualizar (seguiremos com o ID existente):", errUpdate.message);
-                }
+                    try {
+                        console.log("🆕 Cliente não existe. Criando novo...");
+
+                        // 🕵️ LOG ESPIÃO 1: O que estamos enviando?
+                        console.log("📦 PAYLOAD ENVIADO AO TINY:", JSON.stringify(dadosCliente, null, 2));
+
+                        const resCriar = await axios.post(
+                            `https://api.tiny.com.br/public-api/v3/contatos`, 
+                            dadosCliente, 
+                            { headers: { 'Authorization': `Bearer ${token}` } }
+                        );
+                        return resCriar.data.data?.id || resCriar.data.id;
+
+                    } catch (error) {
+                        // 🕵️ LOG ESPIÃO 2: Por que o Tiny recusou?
+                        console.error("❌ ERRO DETALHADO DO TINY:", JSON.stringify(error.response?.data || error.message, null, 2));
+
+                        console.log("⚠️ Erro ao criar. Tentando buscar por nome como última chance...");
+                        try {
+                            const resBuscaNome = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(nome)}`, {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                            return resBuscaNome.data.data?.[0]?.id;
+                        } catch (e) { return null; }
+                    }
                 
                 return idContato;
             }

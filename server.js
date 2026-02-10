@@ -2121,6 +2121,13 @@ app.post('/admin/tiny/criar-pedido', async (req, res) => {
         const { itensCarrinho, cliente, valorFrete, valorTotal } = req.body;
 
         console.log("🚀 ROTA: Recebendo pedido para enviar ao Tiny:", cliente.nome);
+        console.log("🔍 ESPIÃO SERVER: O que chegou do Frontend?");
+        console.log("Nome:", cliente.nome);
+        console.log("Endereço:", cliente.endereco);
+        console.log("Número:", cliente.numero);
+        console.log("Bairro:", cliente.bairro);
+        console.log("Cidade (Front):", cliente.cidade); // <--- ONDE DEVIA ESTAR A CIDADE
+        console.log("CEP:", cliente.cep);
 
         // 1. Mapeamos o JSON do Frontend para o formato que o Service entende
         // O Service espera um objeto parecido com o do Banco de Dados (Prisma)

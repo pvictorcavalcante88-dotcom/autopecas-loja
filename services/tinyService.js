@@ -10,79 +10,31 @@ async function resolverCliente(pedido, token) {
     const cpfLimpo = (pedido.clienteDoc || '').replace(/\D/g, '');
     const nome = pedido.clienteNome;
 
-    // 📦 MONTAGEM DO JSON (Baseado na Documentação V3 que você enviou)
     const dadosCliente = {
         nome: nome,
         cpfCnpj: cpfLimpo,
         tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
-        situacao: "A", // A = Ativo
+        situacao: "A",
         fone: pedido.clienteTelefone,
         email: pedido.clienteEmail,
-        
-        // ✅ AQUI ESTÁ A ESTRUTURA DO CURL DO PUT/POST
         endereco: {
             endereco: pedido.clienteEndereco,
             numero: pedido.clienteNumero || "S/N",
-            complemento: "",
             bairro: pedido.clienteBairro || "Centro",
-            municipio: pedido.clienteCidade || "Maceio", // V3 exige 'municipio'
+            municipio: pedido.clienteCidade || "Maceio",
             cep: (pedido.clienteCep || "").replace(/\D/g, ''),
             uf: pedido.clienteUf || "AL",
             pais: "Brasil"
         }
     };
 
-    let idContato = null;
+    // LOG PARA VER SE O DADO CHEGOU AQUI
+    console.log("📦 DADOS PRONTOS PARA O TINY:", JSON.stringify(dadosCliente.endereco, null, 2));
 
-    // 1. TENTATIVA: BUSCAR POR CPF
-    if (cpfLimpo) {
-        try {
-            const resBusca = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfLimpo}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            if (resBusca.data.data && resBusca.data.data.length > 0) {
-                idContato = resBusca.data.data[0].id;
-                console.log(`🔎 Cliente encontrado (ID: ${idContato}). Atualizando dados conforme documentação...`);
-                
-                // 🔥 O PULO DO GATO: PUT (ATUALIZAR)
-                // Usa o ID encontrado para preencher o endereço que faltava
-                    try {
-                        console.log("🆕 Cliente não existe. Criando novo...");
+    // ... lógica de busca por CPF ...
 
-                        // 🕵️ LOG ESPIÃO 1: O que estamos enviando?
-                        console.log("📦 PAYLOAD ENVIADO AO TINY:", JSON.stringify(dadosCliente, null, 2));
-
-                        const resCriar = await axios.post(
-                            `https://api.tiny.com.br/public-api/v3/contatos`, 
-                            dadosCliente, 
-                            { headers: { 'Authorization': `Bearer ${token}` } }
-                        );
-                        return resCriar.data.data?.id || resCriar.data.id;
-
-                    } catch (error) {
-                        // 🕵️ LOG ESPIÃO 2: Por que o Tiny recusou?
-                        console.error("❌ ERRO DETALHADO DO TINY:", JSON.stringify(error.response?.data || error.message, null, 2));
-
-                        console.log("⚠️ Erro ao criar. Tentando buscar por nome como última chance...");
-                        try {
-                            const resBuscaNome = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(nome)}`, {
-                                headers: { 'Authorization': `Bearer ${token}` }
-                            });
-                            return resBuscaNome.data.data?.[0]?.id;
-                        } catch (e) { return null; }
-                    }
-                
-                return idContato;
-            }
-        } catch (e) {
-            console.log("Erro na busca por CPF:", e.message);
-        }
-    }
-
-    // 2. SE NÃO ACHOU, CRIA UM NOVO (POST)
+    // TENTATIVA DE CRIAÇÃO (Se cair aqui, queremos ver o erro)
     try {
-        console.log("🆕 Cliente não existe. Criando novo...");
         const resCriar = await axios.post(
             `https://api.tiny.com.br/public-api/v3/contatos`, 
             dadosCliente, 
@@ -91,13 +43,11 @@ async function resolverCliente(pedido, token) {
         return resCriar.data.data?.id || resCriar.data.id;
 
     } catch (error) {
-        console.log("⚠️ Erro ao criar. Tentando buscar por nome como última chance...");
-        try {
-            const resBuscaNome = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(nome)}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            return resBuscaNome.data.data?.[0]?.id;
-        } catch (e) { return null; }
+        // 🔥 AQUI ESTÁ O QUE PRECISAMOS VER
+        console.error("❌ O TINY REJEITOU! MOTIVO:", JSON.stringify(error.response?.data || error.message, null, 2));
+        
+        // ... fallback da busca por nome ...
+        return null; // Retorne null para forçar o erro e não tentar buscar nome agora
     }
 }
 

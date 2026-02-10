@@ -4,59 +4,79 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 // =================================================================
-// 🕵️ FUNÇÃO AUXILIAR: BUSCAR OU CRIAR CLIENTE (CORRIGIDA V3)
+// 🕵️ FUNÇÃO 1: RESOLVER CLIENTE (BUSCAR -> SE EXISTIR, ATUALIZA)
 // =================================================================
 async function resolverCliente(pedido, token) {
     const cpfLimpo = (pedido.clienteDoc || '').replace(/\D/g, '');
     const nome = pedido.clienteNome;
-    
+
+    // 📦 MONTAGEM DO JSON (Baseado na Documentação V3 que você enviou)
+    const dadosCliente = {
+        nome: nome,
+        cpfCnpj: cpfLimpo,
+        tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
+        situacao: "A", // A = Ativo
+        fone: pedido.clienteTelefone,
+        email: pedido.clienteEmail,
+        
+        // ✅ AQUI ESTÁ A ESTRUTURA DO CURL DO PUT/POST
+        endereco: {
+            endereco: pedido.clienteEndereco,
+            numero: pedido.clienteNumero || "S/N",
+            complemento: "",
+            bairro: pedido.clienteBairro || "Centro",
+            municipio: pedido.clienteCidade || "Maceio", // V3 exige 'municipio'
+            cep: (pedido.clienteCep || "").replace(/\D/g, ''),
+            uf: pedido.clienteUf || "AL",
+            pais: "Brasil"
+        }
+    };
+
+    let idContato = null;
+
     // 1. TENTATIVA: BUSCAR POR CPF
     if (cpfLimpo) {
         try {
             const resBusca = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfLimpo}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
+            
             if (resBusca.data.data && resBusca.data.data.length > 0) {
-                return resBusca.data.data[0].id;
+                idContato = resBusca.data.data[0].id;
+                console.log(`🔎 Cliente encontrado (ID: ${idContato}). Atualizando dados conforme documentação...`);
+                
+                // 🔥 O PULO DO GATO: PUT (ATUALIZAR)
+                // Usa o ID encontrado para preencher o endereço que faltava
+                try {
+                    await axios.put(
+                        `https://api.tiny.com.br/public-api/v3/contatos/${idContato}`, 
+                        dadosCliente,
+                        { headers: { 'Authorization': `Bearer ${token}` } }
+                    );
+                    console.log("✅ Cadastro do cliente atualizado com sucesso!");
+                } catch (errUpdate) {
+                    console.error("⚠️ Aviso: Erro ao tentar atualizar (seguiremos com o ID existente):", errUpdate.message);
+                }
+                
+                return idContato;
             }
-        } catch (e) {}
+        } catch (e) {
+            console.log("Erro na busca por CPF:", e.message);
+        }
     }
 
-    // 2. TENTATIVA: CRIAR (Agora com a estrutura aninhada correta)
+    // 2. SE NÃO ACHOU, CRIA UM NOVO (POST)
     try {
-        const payloadCliente = {
-            nome: nome,
-            cpfCnpj: cpfLimpo,
-            tipoPessoa: cpfLimpo.length > 11 ? 'J' : 'F',
-            situacao: "A",
-            fone: pedido.clienteTelefone,
-            email: pedido.clienteEmail,
-            
-            // 🔴 AQUI ESTAVA O ERRO: O endereço tem que ser um OBJETO
-            endereco: {
-                endereco: pedido.clienteEndereco,       // Rua
-                numero: pedido.clienteNumero || "S/N",
-                complemento: "",
-                bairro: pedido.clienteBairro || "Centro",
-                cep: (pedido.clienteCep || "").replace(/\D/g, ''),
-                municipio: pedido.clienteCidade || "Maceio", // Na doc é 'municipio'
-                uf: pedido.clienteUf || "AL",
-                pais: "Brasil"
-            }
-        };
-
+        console.log("🆕 Cliente não existe. Criando novo...");
         const resCriar = await axios.post(
             `https://api.tiny.com.br/public-api/v3/contatos`, 
-            payloadCliente, 
+            dadosCliente, 
             { headers: { 'Authorization': `Bearer ${token}` } }
         );
         return resCriar.data.data?.id || resCriar.data.id;
 
     } catch (error) {
-        console.log("⚠️ Erro ao criar cliente (pode já existir). Buscando por nome...");
-        // Log para você ver o erro real se precisar
-        if(error.response) console.log("Detalhe Erro Tiny:", JSON.stringify(error.response.data));
-
+        console.log("⚠️ Erro ao criar. Tentando buscar por nome como última chance...");
         try {
             const resBuscaNome = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(nome)}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -67,7 +87,7 @@ async function resolverCliente(pedido, token) {
 }
 
 // =================================================================
-// 🚀 FUNÇÃO PRINCIPAL: ENVIAR PEDIDO (VERSÃO FINAL V3)
+// 🚀 FUNÇÃO 2: ENVIAR PEDIDO
 // =================================================================
 async function enviarPedidoParaTiny(pedido) {
     try {
@@ -75,11 +95,11 @@ async function enviarPedidoParaTiny(pedido) {
         
         const token = await getValidToken();
 
-        // 1. Resolve Cliente
+        // 1. Resolve (e agora ATUALIZA) o Cliente
         const idContato = await resolverCliente(pedido, token);
         if (!idContato) throw new Error("Não foi possível identificar o cliente no Tiny.");
 
-        // 2. Prepara Itens e Calcula Soma Base
+        // 2. Prepara Itens
         const listaItens = typeof pedido.itens === 'string' ? JSON.parse(pedido.itens) : pedido.itens;
         let somaProdutosBase = 0;
 
@@ -103,18 +123,14 @@ async function enviarPedidoParaTiny(pedido) {
             };
         }));
 
-        // 3. MATEMÁTICA DOS JUROS
+        // 3. Cálculos Financeiros
         const totalPagoNoCartao = parseFloat(pedido.valorTotal); 
         const valorFrete = 0; 
-
         let diferenca = parseFloat((totalPagoNoCartao - (somaProdutosBase + valorFrete)).toFixed(2));
-
         let valorOutrasDespesas = diferenca > 0 ? diferenca : 0;
         let valorDesconto = diferenca < 0 ? Math.abs(diferenca) : 0;
 
-        console.log(`🧮 Auditoria Tiny: Pago(R$${totalPagoNoCartao}) - Soma(R$${somaProdutosBase}) = Dif(R$${diferenca})`);
-
-        // 4. Monta Payload V3 (COM A CORREÇÃO DO ENDEREÇO)
+        // 4. Monta Payload do Pedido V3
         const payload = {
             data: new Date().toISOString().split('T')[0],
             idContato: idContato,
@@ -123,11 +139,10 @@ async function enviarPedidoParaTiny(pedido) {
             valorFrete: valorFrete,
             valorOutrasDespesas: valorOutrasDespesas, 
             valorDesconto: valorDesconto, 
-            
             situacao: 1, // 1 = Aberto
-            obs: `Pedido #${pedido.id}. Pagamento: ${pedido.metodoPagamento}. Total Pago: R$ ${totalPagoNoCartao}`,
+            obs: `Pedido #${pedido.id}. Pagamento: ${pedido.metodoPagamento}.`,
 
-            // 🚨 AQUI ESTÁ A DIFERENÇA CRUCIAL:
+            // Reforço: Mandamos o endereço também no pedido para garantir a NFe
             enderecoEntrega: {
                 tipoPessoa: (pedido.clienteDoc && pedido.clienteDoc.length > 11) ? "J" : "F",
                 cpfCnpj: (pedido.clienteDoc || "").replace(/\D/g, ''),
@@ -135,29 +150,23 @@ async function enviarPedidoParaTiny(pedido) {
                 numero: pedido.clienteNumero || "S/N",
                 complemento: "",
                 bairro: pedido.clienteBairro || "Centro",
+                municipio: pedido.clienteCidade || "Maceio", 
                 cep: (pedido.clienteCep || "00000000").replace(/\D/g, ''),
-                municipio: pedido.clienteCidade || "Maceio", // Correto: municipio
                 uf: pedido.clienteUf || "AL",
-                pais: "Brasil" // Correto: pais
+                pais: "Brasil"
             }
         };
 
-        // 5. Envia
+        // 5. Envia Pedido
         const response = await axios.post(
             `https://api.tiny.com.br/public-api/v3/pedidos`, 
             payload,
             { headers: { 'Authorization': `Bearer ${token}` } }
         );
 
-        // Tratamento robusto da resposta (pode vir em .data ou .data.data)
         const dadosResposta = response.data.data || response.data;
         const idTinyPedido = dadosResposta?.id;
         const numeroTiny = dadosResposta?.numero;
-
-        if (!idTinyPedido) {
-            console.error("❌ Tiny respondeu sem ID:", JSON.stringify(response.data));
-            throw new Error("Erro ao obter ID do pedido no Tiny.");
-        }
 
         console.log(`✅ Sucesso Tiny! ID: ${idTinyPedido} | Nota: ${numeroTiny}`);
 
@@ -175,7 +184,5 @@ async function enviarPedidoParaTiny(pedido) {
         return { success: false, erro: msg };
     }
 }
-
-module.exports = { enviarPedidoParaTiny };
 
 module.exports = { enviarPedidoParaTiny };

@@ -1982,6 +1982,9 @@ app.get('/admin/resetar-status-tiny', authenticateToken, async (req, res) => {
     }
 });
 
+// =================================================================
+// 🔄 ROTA DE SINCRONIZAÇÃO (ID LOCAL = ID TINY)
+// =================================================================
 app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
 
@@ -1990,22 +1993,12 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
         let pagina = 1;
         let totalPaginas = 1;
         let processados = 0;
-
-        console.log("🔄 Iniciando Sincronização Global com Tiny...");
-
-        // Loop para percorrer todas as páginas do Tiny
-            console.log("🔄 Iniciando Sincronização Inteligente...");
-                    
-            console.log("🔄 Iniciando Sincronização (Somente Ativos)...");
-
-        console.log("🔄 Iniciando Sincronização (Correção de SKU)...");
-
-        // Função de "Respiro" (Pausa de X milissegundos)
         const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-        console.log("🔄 Iniciando Sincronização com Pausa...");
+        console.log("🔄 Iniciando Sincronização: ID LOCAL = ID TINY...");
 
         do {
+            // Busca lista de produtos
             const response = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos?pagina=${pagina}&limite=100&situacao=A`, {
                 headers: { 'Authorization': `Bearer ${tokenFinal}` }
             });
@@ -2013,103 +2006,87 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
             const corpo = response.data;
             const dados = corpo.data || corpo; 
             const itens = dados.itens || [];
-            
-            totalPaginas = dados.paginacao?.total_paginas || dados.total_paginas || 1;
+            totalPaginas = dados.paginacao?.total_paginas || 1;
 
-            console.log(`Página ${pagina}: Encontrei ${itens.length} itens.`);
+            console.log(`📄 Página ${pagina}: Processando ${itens.length} itens...`);
 
             for (const item of itens) {
-                const idTiny = String(item.id);
+                // ID DO TINY É A CHAVE DE TUDO AGORA
+                const idTinyReal = parseInt(item.id); 
                 const sku = item.sku || item.codigo; 
 
-                if (!sku) {
-                    console.log(`⚠️ Item ID ${idTiny} ignorado (Sem SKU).`);
-                    continue;
-                }
+                if (!sku) continue;
 
-                // --- O SEGREDO DO SUCESSO ---
-                // Espera 1 segundo antes de chamar o Tiny de novo para não tomar erro 429
-                await sleep(1000); 
-                // -----------------------------
+                await sleep(500); // Pausa leve para não bloquear
 
                 try {
-                    const detalhe = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos/${idTiny}`, {
+                    // Busca detalhes para pegar estoque e custo
+                    const detalhe = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos/${idTinyReal}`, {
                         headers: { 'Authorization': `Bearer ${tokenFinal}` }
                     });
                     
-                    const corpoDetalhe = detalhe.data;
-                    const p = corpoDetalhe.data || corpoDetalhe;
+                    const p = detalhe.data.data || detalhe.data;
 
-                    console.log(`📦 Dados do SKU ${sku}:`, JSON.stringify(p));
+                    const novoPreco = parseFloat(p.precos?.preco || p.preco || 0);
+                    const novoCusto = parseFloat(p.precos?.precoCusto || p.precoCusto || p.precos?.preco_custo || 0);
+                    const novoEstoque = parseInt(p.estoque?.quantidade || p.saldo || 0);
 
-                    // 1. PREÇO DE VENDA
-                    const novoPreco = parseFloat(p.precos?.preco) || parseFloat(p.preco) || 0;
-                    
-                    // 2. CORREÇÃO DO PREÇO DE CUSTO (Tiny V3 manda 'precoCusto')
-                    const novoCusto = parseFloat(p.precos?.precoCusto) || parseFloat(p.precoCusto) || parseFloat(p.precos?.preco_custo) || 0;
-
-                    // 3. ESTOQUE
-                    const novoEstoque = parseInt(p.estoque?.quantidade) || parseInt(p.saldo) || parseInt(p.saldo_fisico) || 0;
-
-                    console.log(`   -> Processando ${sku} | Preço: ${novoPreco} | Custo: ${novoCusto} | Estoque: ${novoEstoque}`);
-
-                    const produtoExistente = await prisma.produto.findFirst({
-                        where: { sku: sku }
+                    // 🔍 TENTA ACHAR PELO ID REAL DO TINY
+                    const produtoExistente = await prisma.produto.findUnique({
+                        where: { id: idTinyReal } 
                     });
 
+                    const dadosProduto = {
+                        titulo: p.nome || item.descricao,
+                        sku: sku,
+                        referencia: sku,
+                        preco_novo: novoPreco,
+                        preco_custo: novoCusto,
+                        estoque: novoEstoque,
+                        tinyId: String(idTinyReal), // Mantemos string aqui por compatibilidade
+                        categoria: p.categoria || "Geral",
+                        // Só atualiza a imagem se não tiver, ou força se quiser
+                        // imagem: ... 
+                    };
+
                     if (produtoExistente) {
-                        // ATUALIZAR
+                        // ATUALIZA
                         await prisma.produto.update({
-                            where: { id: produtoExistente.id },
-                            data: {
-                                preco_novo: novoPreco,
-                                preco_custo: novoCusto, // Atualizando o custo corretamente
-                                estoque: novoEstoque,
-                                tinyId: idTiny
-                            }
+                            where: { id: idTinyReal }, // Usa o ID do Tiny como chave
+                            data: dadosProduto
                         });
-                        console.log(`✅ ${sku} Atualizado!`);
+                        console.log(`✅ [${idTinyReal}] ${sku} Atualizado`);
                     } else {
-                        // CRIAR
+                        // CRIA (FORÇANDO O ID)
                         await prisma.produto.create({
                             data: {
-                                titulo: p.nome || item.descricao,
-                                sku: sku,
-                                referencia: sku,
-                                preco_novo: novoPreco,
-                                preco_custo: novoCusto, // Gravando o custo
-                                estoque: novoEstoque,
-                                tinyId: idTiny,
-                                categoria: p.categoria || "Geral",
-                                imagem: "https://placehold.co/600x400?text=Falta+Foto"
+                                id: idTinyReal, // 🔥 AQUI ESTÁ O SEGREDO! O ID local será igual ao do Tiny
+                                ...dadosProduto,
+                                imagem: "https://placehold.co/600x400?text=Sem+Foto"
                             }
                         });
-                        console.log(`✨ ${sku} Criado!`);
+                        console.log(`✨ [${idTinyReal}] ${sku} Criado com ID Sincronizado!`);
                     }
                     
                     processados++;
 
                 } catch (errDet) {
-                    if (errDet.response && errDet.response.status === 429) {
-                        console.error(`🛑 Bloqueio temporário (429). Esperando 5s...`);
-                        await sleep(5000); 
+                    if (errDet.response?.status === 429) {
+                        console.log(`⏳ 429 Detectado. Pausando 5s...`);
+                        await sleep(5000);
                     } else {
-                        console.error(`❌ Erro ao salvar ${sku}:`, errDet.message);
+                        console.error(`❌ Erro SKU ${sku}:`, errDet.message);
                     }
                 }
             }
-
             pagina++;
         } while (pagina <= totalPaginas);
 
-        res.json({ 
-            sucesso: true, 
-            msg: `Sincronização concluída! ${processados} produtos foram atualizados/criados.` 
-        });
+        res.json({ sucesso: true, msg: `Sincronização Finalizada! ${processados} produtos alinhados.` });
 
     } catch (error) {
-        console.error("❌ Erro Fatal na Importação:", error.response?.data || error.message);
-        res.status(500).json({ erro: "Falha ao sincronizar com Tiny" });
+        console.error(error);
+        res.status(500).json({ erro: "Erro na sincronização" });
     }
 });
 

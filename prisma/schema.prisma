@@ -47,7 +47,7 @@ model Afiliado {
 }
 
 model Produto {
-  id                  Int      @id @default(autoincrement())
+  id                  Int      @id
   titulo              String
   pesquisa            String?
   preco_custo           Float    @default(0.0)

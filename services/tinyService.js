@@ -67,7 +67,7 @@ async function resolverCliente(pedido, token) {
 }
 
 // =================================================================
-// 🚀 FUNÇÃO PRINCIPAL: ENVIAR PEDIDO
+// 🚀 FUNÇÃO PRINCIPAL: ENVIAR PEDIDO (VERSÃO FINAL V3)
 // =================================================================
 async function enviarPedidoParaTiny(pedido) {
     try {
@@ -79,12 +79,11 @@ async function enviarPedidoParaTiny(pedido) {
         const idContato = await resolverCliente(pedido, token);
         if (!idContato) throw new Error("Não foi possível identificar o cliente no Tiny.");
 
-        // 2. Prepara Itens e Calcula Soma Base dos Produtos
+        // 2. Prepara Itens e Calcula Soma Base
         const listaItens = typeof pedido.itens === 'string' ? JSON.parse(pedido.itens) : pedido.itens;
         let somaProdutosBase = 0;
 
         const itensFormatados = await Promise.all(listaItens.map(async (item) => {
-            // Lógica para garantir ID do produto
             let idFinal = item.tinyId;
             if (!idFinal && item.id) {
                 const prodDb = await prisma.produto.findUnique({ where: { id: parseInt(item.id) } });
@@ -104,52 +103,43 @@ async function enviarPedidoParaTiny(pedido) {
             };
         }));
 
-        // 3. MATEMÁTICA DOS JUROS (A Correção)
-        // Pegamos o valor total que o Asaas cobrou (com juros)
+        // 3. MATEMÁTICA DOS JUROS
         const totalPagoNoCartao = parseFloat(pedido.valorTotal); 
-        const valorFrete = 0; // Se tiver frete, coloque aqui
+        const valorFrete = 0; 
 
-        // Diferença = Total Pago - (Soma Produtos + Frete)
-        let diferenca = totalPagoNoCartao - (somaProdutosBase + valorFrete);
-        
-        // Arredonda para 2 casas decimais para evitar bugs de 0.0000001
-        diferenca = parseFloat(diferenca.toFixed(2));
+        let diferenca = parseFloat((totalPagoNoCartao - (somaProdutosBase + valorFrete)).toFixed(2));
 
-        let valorOutrasDespesas = 0;
-        let valorDesconto = 0;
+        let valorOutrasDespesas = diferenca > 0 ? diferenca : 0;
+        let valorDesconto = diferenca < 0 ? Math.abs(diferenca) : 0;
 
-        console.log(`🧮 Auditoria Tiny: Pago(R$${totalPagoNoCartao}) - SomaItens(R$${somaProdutosBase}) = Dif(R$${diferenca})`);
+        console.log(`🧮 Auditoria Tiny: Pago(R$${totalPagoNoCartao}) - Soma(R$${somaProdutosBase}) = Dif(R$${diferenca})`);
 
-        if (diferenca > 0) {
-            valorOutrasDespesas = diferenca;
-            console.log(`💰 JUROS APLICADO: R$ ${valorOutrasDespesas}`);
-        } else if (diferenca < 0) {
-            valorDesconto = Math.abs(diferenca);
-            console.log(`📉 DESCONTO APLICADO: R$ ${valorDesconto}`);
-        }
-
-        // 4. Monta Payload V3
+        // 4. Monta Payload V3 (COM A CORREÇÃO DO ENDEREÇO)
         const payload = {
             data: new Date().toISOString().split('T')[0],
             idContato: idContato,
             itens: itensFormatados,
             naturezaOperacao: { id: 335900648 },
             valorFrete: valorFrete,
-            
-            // Campos cruciais para o valor bater
             valorOutrasDespesas: valorOutrasDespesas, 
-            valorDesconto: valorDesconto,             
+            valorDesconto: valorDesconto, 
+            
+            situacao: 1, // 1 = Aberto
+            obs: `Pedido #${pedido.id}. Pagamento: ${pedido.metodoPagamento}. Total Pago: R$ ${totalPagoNoCartao}`,
+
+            // 🚨 AQUI ESTÁ A DIFERENÇA CRUCIAL:
             enderecoEntrega: {
+                tipoPessoa: (pedido.clienteDoc && pedido.clienteDoc.length > 11) ? "J" : "F",
+                cpfCnpj: (pedido.clienteDoc || "").replace(/\D/g, ''),
                 endereco: pedido.clienteEndereco,
                 numero: pedido.clienteNumero || "S/N",
+                complemento: "",
                 bairro: pedido.clienteBairro || "Centro",
                 cep: (pedido.clienteCep || "00000000").replace(/\D/g, ''),
-                cidade: pedido.clienteCidade || "Cidade",
-                uf: pedido.clienteUf || "UF"
-            },
-
-            situacao: 0, // 0 = Em aberto
-            obs: `Pedido #${pedido.id}. Pagamento: ${pedido.metodoPagamento}. Total Pago: R$ ${totalPagoNoCartao}`
+                municipio: pedido.clienteCidade || "Maceio", // Correto: municipio
+                uf: pedido.clienteUf || "AL",
+                pais: "Brasil" // Correto: pais
+            }
         };
 
         // 5. Envia
@@ -159,15 +149,22 @@ async function enviarPedidoParaTiny(pedido) {
             { headers: { 'Authorization': `Bearer ${token}` } }
         );
 
-        const idTinyPedido = response.data.data?.id || response.data.id;
-        const numeroTiny = response.data.data?.numero || response.data.numero;
+        // Tratamento robusto da resposta (pode vir em .data ou .data.data)
+        const dadosResposta = response.data.data || response.data;
+        const idTinyPedido = dadosResposta?.id;
+        const numeroTiny = dadosResposta?.numero;
+
+        if (!idTinyPedido) {
+            console.error("❌ Tiny respondeu sem ID:", JSON.stringify(response.data));
+            throw new Error("Erro ao obter ID do pedido no Tiny.");
+        }
 
         console.log(`✅ Sucesso Tiny! ID: ${idTinyPedido} | Nota: ${numeroTiny}`);
 
         // 6. Atualiza Banco Local
         await prisma.pedido.update({
             where: { id: pedido.id },
-            data: { tinyId: String(idTinyPedido), notaFiscal: String(numeroTiny) }
+            data: { tinyId: String(idTinyPedido), numeroNota: String(numeroTiny) }
         });
 
         return { success: true, tinyId: idTinyPedido };
@@ -178,5 +175,7 @@ async function enviarPedidoParaTiny(pedido) {
         return { success: false, erro: msg };
     }
 }
+
+module.exports = { enviarPedidoParaTiny };
 
 module.exports = { enviarPedidoParaTiny };

@@ -4,13 +4,13 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 // =================================================================
-// 🕵️ FUNÇÃO AUXILIAR: BUSCAR OU CRIAR CLIENTE (BLINDADA)
+// 🕵️ FUNÇÃO AUXILIAR: BUSCAR OU CRIAR CLIENTE (CORRIGIDA V3)
 // =================================================================
 async function resolverCliente(pedido, token) {
     const cpfLimpo = (pedido.clienteDoc || '').replace(/\D/g, '');
     const nome = pedido.clienteNome;
     
-    // 1. TENTATIVA: BUSCAR POR CPF (Mais rápido e seguro)
+    // 1. TENTATIVA: BUSCAR POR CPF
     if (cpfLimpo) {
         try {
             const resBusca = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?cpf_cnpj=${cpfLimpo}`, {
@@ -22,7 +22,7 @@ async function resolverCliente(pedido, token) {
         } catch (e) {}
     }
 
-    // 2. TENTATIVA: CRIAR
+    // 2. TENTATIVA: CRIAR (Agora com a estrutura aninhada correta)
     try {
         const payloadCliente = {
             nome: nome,
@@ -31,12 +31,18 @@ async function resolverCliente(pedido, token) {
             situacao: "A",
             fone: pedido.clienteTelefone,
             email: pedido.clienteEmail,
-            endereco: pedido.clienteEndereco, 
-            numero: pedido.clienteNumero || "S/N",
-            bairro: pedido.clienteBairro || "Centro",
-            cep: (pedido.clienteCep || "00000000").replace(/\D/g, ''),
-            cidade: pedido.clienteCidade || "Cidade",
-            uf: pedido.clienteUf || "UF"
+            
+            // 🔴 AQUI ESTAVA O ERRO: O endereço tem que ser um OBJETO
+            endereco: {
+                endereco: pedido.clienteEndereco,       // Rua
+                numero: pedido.clienteNumero || "S/N",
+                complemento: "",
+                bairro: pedido.clienteBairro || "Centro",
+                cep: (pedido.clienteCep || "").replace(/\D/g, ''),
+                municipio: pedido.clienteCidade || "Maceio", // Na doc é 'municipio'
+                uf: pedido.clienteUf || "AL",
+                pais: "Brasil"
+            }
         };
 
         const resCriar = await axios.post(
@@ -47,8 +53,10 @@ async function resolverCliente(pedido, token) {
         return resCriar.data.data?.id || resCriar.data.id;
 
     } catch (error) {
-        // Se falhar a criação (ex: duplicado), busca por nome como última chance
-        console.log("⚠️ Cliente já existe ou erro. Buscando por nome...");
+        console.log("⚠️ Erro ao criar cliente (pode já existir). Buscando por nome...");
+        // Log para você ver o erro real se precisar
+        if(error.response) console.log("Detalhe Erro Tiny:", JSON.stringify(error.response.data));
+
         try {
             const resBuscaNome = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(nome)}`, {
                 headers: { 'Authorization': `Bearer ${token}` }

@@ -31,12 +31,12 @@ async function resolverCliente(pedido, token) {
             situacao: "A",
             fone: pedido.clienteTelefone,
             email: pedido.clienteEmail,
-            endereco: pedido.clienteEndereco,
-            numero: "S/N", // Campo obrigatório
-            bairro: "Bairro", // Campo obrigatório
-            cep: "00000000",
-            cidade: "Cidade",
-            uf: "UF"
+            endereco: pedido.clienteEndereco, 
+            numero: pedido.clienteNumero || "S/N",
+            bairro: pedido.clienteBairro || "Centro",
+            cep: (pedido.clienteCep || "00000000").replace(/\D/g, ''),
+            cidade: pedido.clienteCidade || "Cidade",
+            uf: pedido.clienteUf || "UF"
         };
 
         const resCriar = await axios.post(
@@ -131,7 +131,15 @@ async function enviarPedidoParaTiny(pedido) {
             // Campos cruciais para o valor bater
             valorOutrasDespesas: valorOutrasDespesas, 
             valorDesconto: valorDesconto,             
-            
+            enderecoEntrega: {
+                endereco: pedido.clienteEndereco,
+                numero: pedido.clienteNumero || "S/N",
+                bairro: pedido.clienteBairro || "Centro",
+                cep: (pedido.clienteCep || "00000000").replace(/\D/g, ''),
+                cidade: pedido.clienteCidade || "Cidade",
+                uf: pedido.clienteUf || "UF"
+            },
+
             situacao: 0, // 0 = Em aberto
             obs: `Pedido #${pedido.id}. Pagamento: ${pedido.metodoPagamento}. Total Pago: R$ ${totalPagoNoCartao}`
         };

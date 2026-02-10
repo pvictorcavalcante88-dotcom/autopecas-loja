@@ -7,13 +7,12 @@ const prisma = new PrismaClient();
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 // =================================================================
-// 🕵️ FUNÇÃO 1: RESOLVER CLIENTE (COM SISTEMA ANTI-BLOQUEIO 429)
+// 🕵️ FUNÇÃO 1: RESOLVER CLIENTE
 // =================================================================
 async function resolverCliente(pedido, token) {
     const cpfLimpo = (pedido.clienteDoc || '').replace(/\D/g, '');
     const nome = pedido.clienteNome;
 
-    // Dados completos (com Endereço e Município)
     const dadosCliente = {
         nome: nome,
         cpfCnpj: cpfLimpo,
@@ -44,9 +43,8 @@ async function resolverCliente(pedido, token) {
             
             if (resBusca.data.data && resBusca.data.data.length > 0) {
                 idContato = resBusca.data.data[0].id;
-                console.log(`🔎 Cliente encontrado (ID: ${idContato}). Atualizando endereço...`);
+                console.log(`🔎 Cliente encontrado (ID: ${idContato}). Atualizando...`);
                 
-                // PUT: Atualiza o cadastro existente
                 try {
                     await axios.put(
                         `https://api.tiny.com.br/public-api/v3/contatos/${idContato}`, 
@@ -54,16 +52,8 @@ async function resolverCliente(pedido, token) {
                         { headers: { 'Authorization': `Bearer ${token}` } }
                     );
                 } catch (e) { 
-                    // Se der erro 429 no PUT, esperamos e tentamos uma vez mais
-                    if(e.response?.status === 429) {
-                        console.log("⏳ Tiny pediu calma (429). Esperando 3s para atualizar...");
-                        await sleep(3000);
-                        try {
-                             await axios.put(`https://api.tiny.com.br/public-api/v3/contatos/${idContato}`, dadosCliente, { headers: { 'Authorization': `Bearer ${token}` } });
-                        } catch(e2) {}
-                    }
+                    if(e.response?.status === 429) await sleep(2000); // Respira se der erro
                 }
-                
                 return idContato;
             }
         } catch (e) {}
@@ -80,38 +70,24 @@ async function resolverCliente(pedido, token) {
         return resCriar.data.data?.id || resCriar.data.id;
 
     } catch (error) {
-        // 🔥 TRATAMENTO DE ERRO 429 (MUITAS REQUISIÇÕES)
         if (error.response?.status === 429) {
-            console.log("🛑 ERRO 429: Bloqueio temporário do Tiny. Respirando por 4 segundos...");
-            await sleep(4000); // Espera 4 segundos
-            
+            console.log("🛑 Tiny bloqueou (429) ao criar cliente. Esperando 3s...");
+            await sleep(3000);
             try {
-                console.log("🔄 Tentando criar cliente novamente...");
-                const resRetry = await axios.post(
-                    `https://api.tiny.com.br/public-api/v3/contatos`, 
-                    dadosCliente, 
-                    { headers: { 'Authorization': `Bearer ${token}` } }
-                );
+                const resRetry = await axios.post(`https://api.tiny.com.br/public-api/v3/contatos`, dadosCliente, { headers: { 'Authorization': `Bearer ${token}` } });
                 return resRetry.data.data?.id || resRetry.data.id;
-            } catch (retryError) {
-                console.error("❌ Falha na segunda tentativa:", retryError.message);
-            }
+            } catch (e) {}
         }
-
-        console.error("❌ ERRO CLIENTE TINY DETALHADO:", JSON.stringify(error.response?.data || error.message, null, 2));
-        
-        // Fallback: busca por nome
+        // Fallback: Busca por nome
         try {
-            const resBuscaNome = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(nome)}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const resBuscaNome = await axios.get(`https://api.tiny.com.br/public-api/v3/contatos?pesquisa=${encodeURIComponent(nome)}`, { headers: { 'Authorization': `Bearer ${token}` } });
             return resBuscaNome.data.data?.[0]?.id;
         } catch (e) { return null; }
     }
 }
 
 // =================================================================
-// 🚀 FUNÇÃO 2: ENVIAR PEDIDO (COM CORREÇÃO DE ID INT)
+// 🚀 FUNÇÃO 2: ENVIAR PEDIDO (AGORA BLINDADA CONTRA 429)
 // =================================================================
 async function enviarPedidoParaTiny(pedido) {
     try {
@@ -120,9 +96,12 @@ async function enviarPedidoParaTiny(pedido) {
 
         // 1. Resolve Cliente
         const idContato = await resolverCliente(pedido, token);
-        if (!idContato) throw new Error("Não foi possível identificar o cliente no Tiny (Erro ou 429).");
+        if (!idContato) throw new Error("Não foi possível identificar o cliente no Tiny.");
 
-        // 2. Prepara Itens (COM A LÓGICA DE ID DO BANCO E VALOR)
+        // 💤 RESPIRA: Dá 1 segundo de folga pro Tiny antes de mandar o pedido
+        await sleep(1000); 
+
+        // 2. Prepara Itens
         const listaItens = typeof pedido.itens === 'string' ? JSON.parse(pedido.itens) : pedido.itens;
         let somaProdutosBase = 0;
 
@@ -135,20 +114,19 @@ async function enviarPedidoParaTiny(pedido) {
             if (!idFinal) idFinal = item.id || item.produtoId;
 
             const qtd = parseFloat(item.qtd || item.quantidade || 1);
-            // Pega o preço (prioridade: preco > unitario > valor_unitario)
             const unitario = parseFloat(item.preco || item.unitario || item.valor_unitario || 0);
             
             somaProdutosBase += (qtd * unitario);
             const valorFinalUnitario = unitario > 0 ? unitario : 0.01;
 
             return {
-                produto: { id: parseInt(idFinal) }, // ID como Inteiro
+                produto: { id: parseInt(idFinal) }, // ID Integer
                 quantidade: qtd,
                 valorUnitario: valorFinalUnitario
             };
         }));
 
-        // 3. Cálculos Financeiros
+        // 3. Cálculos
         const totalPago = parseFloat(pedido.valorTotal); 
         const frete = 0; 
         let diferenca = parseFloat((totalPago - (somaProdutosBase + frete)).toFixed(2));
@@ -179,11 +157,30 @@ async function enviarPedidoParaTiny(pedido) {
             }
         };
 
-        const response = await axios.post(
-            `https://api.tiny.com.br/public-api/v3/pedidos`, 
-            payload,
-            { headers: { 'Authorization': `Bearer ${token}` } }
-        );
+        // 5. ENVIO DO PEDIDO COM RETRY AUTOMÁTICO (CONTRA ERRO 429)
+        let response;
+        try {
+            response = await axios.post(
+                `https://api.tiny.com.br/public-api/v3/pedidos`, 
+                payload,
+                { headers: { 'Authorization': `Bearer ${token}` } }
+            );
+        } catch (erroEnvio) {
+            // 🔥 SE O TINY BLOQUEAR NA HORA DO PEDIDO
+            if (erroEnvio.response?.status === 429) {
+                console.log("⏳ Tiny bloqueou (429) na criação do PEDIDO. Esperando 5s...");
+                await sleep(5000); // Espera 5 segundos
+                
+                console.log("🔄 Tentando enviar pedido novamente...");
+                response = await axios.post(
+                    `https://api.tiny.com.br/public-api/v3/pedidos`, 
+                    payload,
+                    { headers: { 'Authorization': `Bearer ${token}` } }
+                );
+            } else {
+                throw erroEnvio; // Se for outro erro, lança pra fora
+            }
+        }
 
         const dados = response.data.data || response.data;
         console.log(`✅ Pedido Criado no Tiny: ${dados.numero}`);

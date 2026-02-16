@@ -1993,33 +1993,40 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
         let pagina = 1;
         let processados = 0;
         let continuarBuscando = true;
-        const idsProcessados = new Set(); // 🛡️ Escudo Anti-Repetição
+        const idsProcessados = new Set(); 
         const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-        console.log("🔄 Iniciando Sincronização Blindada...");
+        console.log("🔄 Iniciando Sincronização Blindada e Anti-Queda...");
 
         while (continuarBuscando) {
-            // 🔥 A MÁGICA NOVA: Calculando quantos produtos pular (offset)
             const limite = 100;
             const offset = (pagina - 1) * limite; 
-            
-            // Mandamos TUDO (pagina, page e offset) para obrigar a API V3 a obedecer
             const url = `https://api.tiny.com.br/public-api/v3/produtos?offset=${offset}&pagina=${pagina}&page=${pagina}&limite=${limite}&limit=${limite}&situacao=A`;
             
-            const response = await axios.get(url, {
-                headers: { 'Authorization': `Bearer ${tokenFinal}` }
-            });
+            let response;
+            let sucessoBuscaPagina = false;
+
+            // 🛡️ ESCUDO NOVO: Protege a busca da PÁGINA contra o Erro 429
+            while (!sucessoBuscaPagina) {
+                try {
+                    response = await axios.get(url, { headers: { 'Authorization': `Bearer ${tokenFinal}` } });
+                    sucessoBuscaPagina = true;
+                } catch (erroPagina) {
+                    if (erroPagina.response?.status === 429) {
+                        console.log(`⏳ Tiny 429 (Limite de requisições). O Tiny pediu para respirar. Aguardando 10s para buscar a página ${pagina}...`);
+                        await sleep(10000); 
+                    } else {
+                        // Se não for 429, é um erro grave, então passamos adiante
+                        throw erroPagina; 
+                    }
+                }
+            }
 
             const corpo = response.data;
             const dados = corpo.data || corpo; 
             const itens = dados.itens || [];
 
             console.log(`📄 Lendo Página ${pagina} (Tiny retornou ${itens.length} itens)`);
-            
-            // Log extra para investigar a mente do Tiny caso ele ainda teime
-            if (pagina === 1) {
-                console.log("🔎 Info de Paginação do Tiny:", JSON.stringify(dados.paginacao || dados.meta || dados.page || "Nenhuma"));
-            }
 
             if (itens.length === 0) {
                 console.log("🏁 Página vazia. Finalizando.");
@@ -2034,15 +2041,15 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 
                 if (!sku) continue;
 
-                // 🛡️ TRAVA DE SEGURANÇA MÁXIMA
                 if (idsProcessados.has(idTinyReal)) {
-                    console.log(`🚨 ERRO DO TINY: O produto [${idTinyReal}] ${sku} já veio na página anterior. O Tiny ignorou a paginação e ficou preso na Página 1! Forçando parada.`);
+                    console.log(`🚨 ERRO DO TINY: O produto [${idTinyReal}] ${sku} repetiu. Forçando parada.`);
                     repetiuProduto = true;
-                    break; // Para de processar essa página
+                    break; 
                 }
                 idsProcessados.add(idTinyReal);
 
-                await sleep(500); 
+                // ⏱️ Respiro um pouquinho maior para não irritar o servidor do Tiny
+                await sleep(600); 
 
                 try {
                     const detalhe = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos/${idTinyReal}`, {
@@ -2071,19 +2078,10 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                     };
 
                     if (produtoExistente) {
-                        await prisma.produto.update({
-                            where: { id: idTinyReal }, 
-                            data: dadosProduto
-                        });
+                        await prisma.produto.update({ where: { id: idTinyReal }, data: dadosProduto });
                         console.log(`✅ [${idTinyReal}] ${sku} Atualizado`);
                     } else {
-                        await prisma.produto.create({
-                            data: {
-                                id: idTinyReal, 
-                                ...dadosProduto,
-                                imagem: "https://placehold.co/600x400?text=Sem+Foto"
-                            }
-                        });
+                        await prisma.produto.create({ data: { id: idTinyReal, ...dadosProduto, imagem: "https://placehold.co/600x400?text=Sem+Foto" } });
                         console.log(`✨ [${idTinyReal}] ${sku} Criado!`);
                     }
                     
@@ -2091,7 +2089,7 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 
                 } catch (errDet) {
                     if (errDet.response?.status === 429) {
-                        console.log(`⏳ Tiny 429. Pausando 5s...`);
+                        console.log(`⏳ Tiny 429 no produto. Pausando 5s...`);
                         await sleep(5000);
                     } else {
                         console.error(`❌ Erro SKU ${sku}:`, errDet.message);
@@ -2099,7 +2097,6 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                 }
             }
 
-            // Se o Tiny repetiu os produtos ou enviou menos que o limite, nós paramos o loop geral com segurança
             if (repetiuProduto || itens.length < 100) {
                 console.log("🏁 Chegamos ao fim da lista real de produtos.");
                 continuarBuscando = false;
@@ -2108,10 +2105,10 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
             }
         }
 
-        res.json({ sucesso: true, msg: `Sincronização Finalizada! ${processados} produtos únicos processados.` });
+        res.json({ sucesso: true, msg: `Sincronização Finalizada! ${processados} produtos processados.` });
 
     } catch (error) {
-        console.error("❌ Erro fatal:", error.message);
+        console.error("❌ Erro fatal:", error.response?.data || error.message);
         res.status(500).json({ erro: "Erro na sincronização" });
     }
 });

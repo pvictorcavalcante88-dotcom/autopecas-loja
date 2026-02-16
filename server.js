@@ -1992,14 +1992,11 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
         const tokenFinal = await getValidToken();
         let pagina = 1;
         let processados = 0;
-        let continuarBuscando = true; // ✨ A MÁGICA NOVA ESTÁ AQUI
         const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-        console.log("🔄 Iniciando Sincronização: ID LOCAL = ID TINY...");
+        console.log("🔄 Iniciando Sincronização Inteligente...");
 
-        // Usamos um while que só para quando mandarmos
-        while (continuarBuscando) {
-            // Busca lista de produtos
+        do {
             const response = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos?pagina=${pagina}&limite=100&situacao=A`, {
                 headers: { 'Authorization': `Bearer ${tokenFinal}` }
             });
@@ -2008,12 +2005,12 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
             const dados = corpo.data || corpo; 
             const itens = dados.itens || [];
 
-            console.log(`📄 Página ${pagina}: Processando ${itens.length} itens...`);
+            console.log(`📄 Lendo Página ${pagina} (Tiny retornou ${itens.length} itens)`);
 
-            // 🛑 A MÁGICA DA PAGINAÇÃO:
-            // Se o Tiny enviou menos de 100 itens, essa é a última página! 
-            if (itens.length < 100) {
-                continuarBuscando = false; 
+            // 🛑 TRAVA 1: Se a página veio vazia, não tem mais nada, pode parar.
+            if (itens.length === 0) {
+                console.log("🏁 Nenhum produto nesta página. Sincronização finalizada.");
+                break;
             }
 
             for (const item of itens) {
@@ -2022,10 +2019,9 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 
                 if (!sku) continue;
 
-                await sleep(500); // Pausa leve para não tomar bloqueio do Tiny
+                await sleep(500); 
 
                 try {
-                    // Busca detalhes para pegar estoque e custo
                     const detalhe = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos/${idTinyReal}`, {
                         headers: { 'Authorization': `Bearer ${tokenFinal}` }
                     });
@@ -2036,7 +2032,6 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                     const novoCusto = parseFloat(p.precos?.precoCusto || p.precoCusto || p.precos?.preco_custo || 0);
                     const novoEstoque = parseInt(p.estoque?.quantidade || p.saldo || 0);
 
-                    // 🔍 TENTA ACHAR PELO ID REAL DO TINY
                     const produtoExistente = await prisma.produto.findUnique({
                         where: { id: idTinyReal } 
                     });
@@ -2053,14 +2048,12 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                     };
 
                     if (produtoExistente) {
-                        // ATUALIZA
                         await prisma.produto.update({
                             where: { id: idTinyReal }, 
                             data: dadosProduto
                         });
                         console.log(`✅ [${idTinyReal}] ${sku} Atualizado`);
                     } else {
-                        // CRIA (FORÇANDO O ID)
                         await prisma.produto.create({
                             data: {
                                 id: idTinyReal, 
@@ -2068,24 +2061,33 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                                 imagem: "https://placehold.co/600x400?text=Sem+Foto"
                             }
                         });
-                        console.log(`✨ [${idTinyReal}] ${sku} Criado com ID Sincronizado!`);
+                        console.log(`✨ [${idTinyReal}] ${sku} Criado!`);
                     }
                     
                     processados++;
 
                 } catch (errDet) {
                     if (errDet.response?.status === 429) {
-                        console.log(`⏳ 429 Detectado no detalhe do produto. Pausando 5s...`);
+                        console.log(`⏳ Tiny 429. Pausando 5s...`);
                         await sleep(5000);
-                        // Aqui idealmente poderíamos tentar de novo, mas ele vai pular esse item.
-                        // Na próxima sincronização ele pega.
                     } else {
                         console.error(`❌ Erro SKU ${sku}:`, errDet.message);
                     }
                 }
             }
-            pagina++; // Vai para a próxima página
-        }
+
+            // 🛑 TRAVA 2: Se vieram MENOS de 100 itens, significa que esta foi a ÚLTIMA página.
+            if (itens.length < 100) {
+                console.log("🏁 Última página alcançada (menos de 100 itens). Parando...");
+                break;
+            }
+
+            pagina++; // Vai para a próxima página apenas se vieram 100 itens redondos.
+            
+            // Trava de sanidade máxima (só pra garantir que nunca vai ficar infinito de novo)
+            if (pagina > 50) break; 
+
+        } while (true);
 
         res.json({ sucesso: true, msg: `Sincronização Finalizada! ${processados} produtos alinhados.` });
 

@@ -1991,13 +1991,14 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
     try {
         const tokenFinal = await getValidToken();
         let pagina = 1;
-        let totalPaginas = 1;
         let processados = 0;
+        let continuarBuscando = true; // ✨ A MÁGICA NOVA ESTÁ AQUI
         const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
         console.log("🔄 Iniciando Sincronização: ID LOCAL = ID TINY...");
 
-        do {
+        // Usamos um while que só para quando mandarmos
+        while (continuarBuscando) {
             // Busca lista de produtos
             const response = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos?pagina=${pagina}&limite=100&situacao=A`, {
                 headers: { 'Authorization': `Bearer ${tokenFinal}` }
@@ -2006,18 +2007,22 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
             const corpo = response.data;
             const dados = corpo.data || corpo; 
             const itens = dados.itens || [];
-            totalPaginas = dados.paginacao?.total_paginas || 1;
 
             console.log(`📄 Página ${pagina}: Processando ${itens.length} itens...`);
 
+            // 🛑 A MÁGICA DA PAGINAÇÃO:
+            // Se o Tiny enviou menos de 100 itens, essa é a última página! 
+            if (itens.length < 100) {
+                continuarBuscando = false; 
+            }
+
             for (const item of itens) {
-                // ID DO TINY É A CHAVE DE TUDO AGORA
                 const idTinyReal = parseInt(item.id); 
                 const sku = item.sku || item.codigo; 
 
                 if (!sku) continue;
 
-                await sleep(500); // Pausa leve para não bloquear
+                await sleep(500); // Pausa leve para não tomar bloqueio do Tiny
 
                 try {
                     // Busca detalhes para pegar estoque e custo
@@ -2043,16 +2048,14 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                         preco_novo: novoPreco,
                         preco_custo: novoCusto,
                         estoque: novoEstoque,
-                        tinyId: String(idTinyReal), // Mantemos string aqui por compatibilidade
-                        categoria: p.categoria || "Geral",
-                        // Só atualiza a imagem se não tiver, ou força se quiser
-                        // imagem: ... 
+                        tinyId: String(idTinyReal), 
+                        categoria: p.categoria || "Geral"
                     };
 
                     if (produtoExistente) {
                         // ATUALIZA
                         await prisma.produto.update({
-                            where: { id: idTinyReal }, // Usa o ID do Tiny como chave
+                            where: { id: idTinyReal }, 
                             data: dadosProduto
                         });
                         console.log(`✅ [${idTinyReal}] ${sku} Atualizado`);
@@ -2060,7 +2063,7 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                         // CRIA (FORÇANDO O ID)
                         await prisma.produto.create({
                             data: {
-                                id: idTinyReal, // 🔥 AQUI ESTÁ O SEGREDO! O ID local será igual ao do Tiny
+                                id: idTinyReal, 
                                 ...dadosProduto,
                                 imagem: "https://placehold.co/600x400?text=Sem+Foto"
                             }
@@ -2072,15 +2075,17 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
 
                 } catch (errDet) {
                     if (errDet.response?.status === 429) {
-                        console.log(`⏳ 429 Detectado. Pausando 5s...`);
+                        console.log(`⏳ 429 Detectado no detalhe do produto. Pausando 5s...`);
                         await sleep(5000);
+                        // Aqui idealmente poderíamos tentar de novo, mas ele vai pular esse item.
+                        // Na próxima sincronização ele pega.
                     } else {
                         console.error(`❌ Erro SKU ${sku}:`, errDet.message);
                     }
                 }
             }
-            pagina++;
-        } while (pagina <= totalPaginas);
+            pagina++; // Vai para a próxima página
+        }
 
         res.json({ sucesso: true, msg: `Sincronização Finalizada! ${processados} produtos alinhados.` });
 

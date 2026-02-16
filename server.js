@@ -1996,7 +1996,7 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
         const idsProcessados = new Set(); 
         const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-        console.log("🔄 Iniciando Sincronização Blindada e Anti-Queda...");
+        console.log("🔄 Iniciando Sincronização Suprema...");
 
         while (continuarBuscando) {
             const limite = 100;
@@ -2006,17 +2006,16 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
             let response;
             let sucessoBuscaPagina = false;
 
-            // 🛡️ ESCUDO NOVO: Protege a busca da PÁGINA contra o Erro 429
+            // 🛡️ ESCUDO 1: Protege a busca da PÁGINA 
             while (!sucessoBuscaPagina) {
                 try {
                     response = await axios.get(url, { headers: { 'Authorization': `Bearer ${tokenFinal}` } });
                     sucessoBuscaPagina = true;
                 } catch (erroPagina) {
                     if (erroPagina.response?.status === 429) {
-                        console.log(`⏳ Tiny 429 (Limite de requisições). O Tiny pediu para respirar. Aguardando 10s para buscar a página ${pagina}...`);
+                        console.log(`⏳ Tiny 429 (Página). Aguardando 10s...`);
                         await sleep(10000); 
                     } else {
-                        // Se não for 429, é um erro grave, então passamos adiante
                         throw erroPagina; 
                     }
                 }
@@ -2042,59 +2041,68 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                 if (!sku) continue;
 
                 if (idsProcessados.has(idTinyReal)) {
-                    console.log(`🚨 ERRO DO TINY: O produto [${idTinyReal}] ${sku} repetiu. Forçando parada.`);
+                    console.log(`🚨 ERRO DO TINY: O produto [${idTinyReal}] repetiu. Parando.`);
                     repetiuProduto = true;
                     break; 
                 }
                 idsProcessados.add(idTinyReal);
 
-                // ⏱️ Respiro um pouquinho maior para não irritar o servidor do Tiny
                 await sleep(600); 
 
-                try {
-                    const detalhe = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos/${idTinyReal}`, {
-                        headers: { 'Authorization': `Bearer ${tokenFinal}` }
-                    });
-                    
-                    const p = detalhe.data.data || detalhe.data;
+                // 🛡️ ESCUDO 2: Garante que NENHUM produto seja pulado por causa de 429
+                let sucessoDetalhe = false;
+                let p = null;
 
-                    const novoPreco = parseFloat(p.precos?.preco || p.preco || 0);
-                    const novoCusto = parseFloat(p.precos?.precoCusto || p.precoCusto || p.precos?.preco_custo || 0);
-                    const novoEstoque = parseInt(p.estoque?.quantidade || p.saldo || 0);
-
-                    const produtoExistente = await prisma.produto.findUnique({
-                        where: { id: idTinyReal } 
-                    });
-
-                    const dadosProduto = {
-                        titulo: p.nome || item.descricao,
-                        sku: sku,
-                        referencia: sku,
-                        preco_novo: novoPreco,
-                        preco_custo: novoCusto,
-                        estoque: novoEstoque,
-                        tinyId: String(idTinyReal), 
-                        categoria: p.categoria || "Geral"
-                    };
-
-                    if (produtoExistente) {
-                        await prisma.produto.update({ where: { id: idTinyReal }, data: dadosProduto });
-                        console.log(`✅ [${idTinyReal}] ${sku} Atualizado`);
-                    } else {
-                        await prisma.produto.create({ data: { id: idTinyReal, ...dadosProduto, imagem: "https://placehold.co/600x400?text=Sem+Foto" } });
-                        console.log(`✨ [${idTinyReal}] ${sku} Criado!`);
-                    }
-                    
-                    processados++;
-
-                } catch (errDet) {
-                    if (errDet.response?.status === 429) {
-                        console.log(`⏳ Tiny 429 no produto. Pausando 5s...`);
-                        await sleep(5000);
-                    } else {
-                        console.error(`❌ Erro SKU ${sku}:`, errDet.message);
+                while (!sucessoDetalhe) {
+                    try {
+                        const detalhe = await axios.get(`https://api.tiny.com.br/public-api/v3/produtos/${idTinyReal}`, {
+                            headers: { 'Authorization': `Bearer ${tokenFinal}` }
+                        });
+                        p = detalhe.data.data || detalhe.data;
+                        sucessoDetalhe = true; // Deu certo, sai do loop de tentativa
+                    } catch (errDet) {
+                        if (errDet.response?.status === 429) {
+                            console.log(`⏳ Tiny 429 no produto. Pausando 5s e TENTANDO DE NOVO o SKU ${sku}...`);
+                            await sleep(5000);
+                        } else {
+                            console.error(`❌ Erro grave no SKU ${sku}:`, errDet.message);
+                            break; // Se o erro não for 429, desiste desse produto e segue a vida
+                        }
                     }
                 }
+
+                // Se p for null, significa que deu um erro grave que não era 429, então pula esse item
+                if (!p) continue;
+
+                // Salva ou atualiza no banco
+                const novoPreco = parseFloat(p.precos?.preco || p.preco || 0);
+                const novoCusto = parseFloat(p.precos?.precoCusto || p.precoCusto || p.precos?.preco_custo || 0);
+                const novoEstoque = parseInt(p.estoque?.quantidade || p.saldo || 0);
+
+                const produtoExistente = await prisma.produto.findUnique({
+                    where: { id: idTinyReal } 
+                });
+
+                const dadosProduto = {
+                    titulo: p.nome || item.descricao,
+                    sku: sku,
+                    referencia: sku,
+                    preco_novo: novoPreco,
+                    preco_custo: novoCusto,
+                    estoque: novoEstoque,
+                    tinyId: String(idTinyReal), 
+                    categoria: p.categoria || "Geral"
+                };
+
+                if (produtoExistente) {
+                    await prisma.produto.update({ where: { id: idTinyReal }, data: dadosProduto });
+                    console.log(`✅ [${idTinyReal}] ${sku} Atualizado`);
+                } else {
+                    await prisma.produto.create({ data: { id: idTinyReal, ...dadosProduto, imagem: "https://placehold.co/600x400?text=Sem+Foto" } });
+                    console.log(`✨ [${idTinyReal}] ${sku} Criado!`);
+                }
+                
+                processados++;
             }
 
             if (repetiuProduto || itens.length < 100) {

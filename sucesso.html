@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pedido Realizado! - Vunn</title>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7fa; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; text-align: center; }
+        .success-container { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 500px; }
+        
+        .icon-circle { width: 80px; height: 80px; background: #27ae60; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 3rem; }
+        
+        h1 { color: #2c3e50; margin-bottom: 10px; }
+        p { color: #7f8c8d; font-size: 1.1rem; line-height: 1.6; }
+        
+        .order-box { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px dashed #bdc3c7; }
+        .order-num { font-weight: bold; color: #2c3e50; font-size: 1.2rem; }
+
+        .steps { text-align: left; margin: 20px 0; }
+        .step { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; color: #555; }
+        .step i { color: #27ae60; }
+
+        .btn-whatsapp {
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            background: #25D366; color: white; text-decoration: none;
+            padding: 15px; border-radius: 8px; font-weight: bold; font-size: 1.1rem;
+            transition: 0.3s; margin-top: 20px; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3);
+        }
+        .btn-whatsapp:hover { background: #1ebc57; transform: translateY(-2px); }
+
+        .btn-home { display: block; margin-top: 15px; color: #7f8c8d; text-decoration: none; font-size: 0.9rem; }
+        .btn-home:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+    <div class="success-container">
+        <div class="icon-circle">
+            <i class="ph ph-check"></i>
+        </div>
+
+        <h1>Parabéns pela compra!</h1>
+        <p>Seu pedido foi registrado com sucesso e já estamos separando seus itens.</p>
+
+        <div class="order-box">
+            Número do Pedido: <br>
+            <span class="order-num" id="numero-pedido">#Carregando...</span>
+        </div>
+
+        <div class="steps">
+            <div class="step"><i class="ph ph-number-circle-one"></i> Pagamento via PIX ou Cartão</div>
+            <div class="step"><i class="ph ph-number-circle-two"></i> Envie o comprovante no WhatsApp</div>
+            <div class="step"><i class="ph ph-number-circle-three"></i> Aguarde o envio/retirada</div>
+        </div>
+
+        <a href="#" id="btn-zap" class="btn-whatsapp">
+            <i class="ph ph-whatsapp-logo" style="font-size: 1.5rem;"></i>
+            Enviar Comprovante Agora
+        </a>
+
+        <a href="/" class="btn-home">Voltar para a Loja</a>
+    </div>
+
+    <script>
+        // 1. Pega os parâmetros da URL (que vamos enviar do checkout)
+        const params = new URLSearchParams(window.location.search);
+        const pedidoId = params.get('pedido');
+        const vendedorNome = params.get('vendedor') || "Atendimento";
+        const vendedorTel = params.get('tel') || "558299999999"; // Número padrão da loja caso não venha vendedor
+
+        // 2. Preenche a tela
+        document.getElementById('numero-pedido').innerText = `#${pedidoId || '---'}`;
+
+        // 3. Monta o link do WhatsApp
+        const msg = `Olá ${vendedorNome}! Acabei de fazer o pedido #${pedidoId} no site e estou enviando o comprovante.`;
+        const linkZap = `https://wa.me/${vendedorTel}?text=${encodeURIComponent(msg)}`;
+        
+        const btnZap = document.getElementById('btn-zap');
+        btnZap.href = linkZap;
+        btnZap.innerHTML = `<i class="ph ph-whatsapp-logo" style="font-size: 1.5rem;"></i> Falar com ${vendedorNome}`;
+
+        // Se não tiver ID do pedido, redireciona para a home (segurança)
+        if (!pedidoId) {
+            // Opcional: window.location.href = '/';
+        }
+    </script>
+
+</body>
+</html>

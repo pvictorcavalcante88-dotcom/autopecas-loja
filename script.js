@@ -1074,89 +1074,128 @@ function calcularTotalVisual(carrinho) {
 
 // 🟢 FUNÇÃO DE FINALIZAR COM ASAAS (ATUALIZADA COM SELEÇÃO DE PAGAMENTO)
 // 🟢 FUNÇÃO DE FINALIZAR COM ASAAS E TINY (ATUALIZADA)
-// ==============================================================
-// 🟢 1. FINALIZAR PEDIDO (LÓGICA CORRIGIDA: PIX VS CARTÃO)
-// ==============================================================
 async function finalizarCompraAsaas() {
-    // ... (Validações de Estoque e Campos continuam iguais) ...
-    const checkEstoque = await verificarEstoqueAntesDePagar();
-    if (!checkEstoque.aprovado) return; 
 
-    // CAPTURA DE DADOS (Igual ao anterior)
-    const nome = document.getElementById('nome_cliente').value.trim();
+    const checkEstoque = await verificarEstoqueAntesDePagar();
+    if (!checkEstoque.aprovado) {
+        return; // Para tudo se o estoque falhou. O Modal já abriu.
+    }
+    // 1. PEGAR DADOS DO FORMULÁRIO
+// 1. CAPTURA DOS INPUTS (Usando IDs que conferimos antes)
+    const nome = document.getElementById('nome_cliente').value.trim(); 
     const emailContato = document.getElementById('input-email-contato')?.value.trim() || '';
     const telefone = document.getElementById('input-telefone')?.value.trim() || '';
-    const endereco = document.getElementById('rua').value.trim();
+    const endereco = document.getElementById('rua').value.trim(); 
     const numero = document.getElementById('numero')?.value.trim();
     const bairro = document.getElementById('input-bairro')?.value.trim();
-    const cidade = document.getElementById('input-cidade')?.value.trim() || "Maceio";
-    const uf = document.getElementById('uf')?.value.trim() || "AL";
+    const cidadeInput = document.getElementById('input-cidade')?.value.trim();
+    const ufInput = document.getElementById('uf')?.value.trim();
     const cep = document.getElementById('cep')?.value.trim() || "00000000";
 
-    // Validações básicas (Igual)
-    if (!nome || !endereco || !numero || !bairro) return alert("Preencha o endereço completo.");
+    // 🔴 LOG DE TESTE NO NAVEGADOR (Aperte F12 para ver se aparece Maceió aqui)
+    console.log("Dados capturados no site:", { cidadeInput, ufInput });
 
+    // --- PROTEÇÃO PARA NÃO ENVIAR A PALAVRA "CIDADE" ---
+    // Se o campo estiver vazio ou for a palavra "Cidade", usamos Maceio como fallback
+    const cidade = (cidadeInput && cidadeInput.toLowerCase() !== "cidade") ? cidadeInput : "Maceio";
+    const uf = (ufInput && ufInput.toLowerCase() !== "uf") ? ufInput.toUpperCase() : "AL";
+    // ------------------------------------------
+
+    // ... restante das validações de CPF e botões ...
+    
+
+    // Tenta pegar o CPF do campo de busca ou do input específico
     let doc = document.getElementById('input-doc-cliente')?.value;
     if (!doc) doc = document.getElementById('doc-busca')?.value;
+    
+    // Validações Básicas
+    // 🔴 VALIDAÇÃO RIGOROSA (O Tiny exige isso)
+    if (!nome || !endereco || !numero || !bairro || !cidadeInput || !ufInput) {
+        return alert("⚠️ Por favor, preencha o endereço completo (Rua, Número, Bairro, Cidade e UF).");
+    }
+
     if (!doc) {
-        doc = prompt("CPF obrigatório para nota fiscal:");
+        doc = prompt("CPF obrigatório para nota fiscal. Digite apenas números:");
         if(!doc) return;
         if(document.getElementById('doc-busca')) document.getElementById('doc-busca').value = doc;
     }
+
+    // Limpa o CPF (deixa só números)
     const cpfLimpo = doc.replace(/\D/g,'');
     if (cpfLimpo.length < 11) return alert("CPF inválido.");
 
-    // Botão Carregando
+    // Atualiza botão para feedback visual
     const btn = document.getElementById('btn-finalizar-pix');
-    const textoOriginal = btn ? btn.innerHTML : "Finalizar";
-    if(btn) { btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Processando...'; btn.disabled = true; }
+    if(btn) { btn.innerHTML = "Processando..."; btn.disabled = true; }
 
     const carrinho = JSON.parse(localStorage.getItem('nossoCarrinho') || '[]');
 
     try {
-        // ... (Preparação do Payload igual ao anterior) ...
+        // Pega a margem global salva (fallback)
         const margemGlobal = parseFloat(localStorage.getItem('minhaMargem') || 0);
+
+        // Prepara os itens garantindo que a margem vá correta
         const itensParaEnviar = carrinho.map(i => {
-            let margemFinal = (i.customMargin !== undefined) ? i.customMargin : margemGlobal;
+            let margemFinal = (i.customMargin !== undefined && i.customMargin !== null) 
+                              ? i.customMargin 
+                              : margemGlobal;
+
             let precoBase = parseFloat(i.preco || i.preco_novo || 0);
             let precoComMargem = precoBase * (1 + (margemFinal / 100));  
             if (precoComMargem <= 0) precoComMargem = 0.01;              
-            return { id: i.id, tinyId: i.tinyId || null, quantidade: i.quantidade, preco: precoComMargem.toFixed(2), customMargin: parseFloat(margemFinal) };
+            
+            return { 
+                id: i.id, 
+                tinyId: i.tinyId || null, // ✅ AGORA PASSA O ID REAL DO TINY
+                quantidade: i.quantidade,
+                preco: precoComMargem.toFixed(2),
+                customMargin: parseFloat(margemFinal)
+            };
         });
 
-        // Verifica Pagamento
+        // Verifica se o cliente marcou a bolinha (radio button) do Cartão no HTML
         let metodoEscolhido = 'PIX'; 
         const radioCartao = document.getElementById('pagamento-cartao'); 
         let qtdeParcelas = 1;
+        const selectParcelas = document.getElementById('parcelas-select'); // Verifique se o ID no HTML é esse mesmo
+        
         if (radioCartao && radioCartao.checked) {
             metodoEscolhido = 'CARTAO';
-            qtdeParcelas = parseInt(document.getElementById('parcelas-select').value);
+            if (selectParcelas) {
+                qtdeParcelas = parseInt(selectParcelas.value);
+            }
         }
 
+        console.log(`Enviando método: ${metodoEscolhido} | Parcelas: ${qtdeParcelas}x`);
+
         const payload = {
-            cliente: { nome, documento: cpfLimpo, email: emailContato || 'cliente@sememail.com', telefone, endereco },
+            cliente: { 
+                nome: nome, 
+                documento: cpfLimpo, 
+                email: emailContato || 'cliente@sememail.com', 
+                telefone: telefone, 
+                endereco: endereco 
+            },
             itens: itensParaEnviar,
-            afiliadoId: null, afiliadoCodigo: null,
+            afiliadoId: null,
+            afiliadoCodigo: null,
             metodoPagamento: metodoEscolhido,
             parcelasSelecionadas: qtdeParcelas
         };
 
-        // Adiciona dados do afiliado
+        // Verifica se tem afiliado logado ou código de referência
         const afLogado = localStorage.getItem('afiliadoLogado');
         const refCode = localStorage.getItem('afiliadoCodigo');
-        let vendedorNome = "Vendedor";
-        let vendedorTelefone = "550000000000";
-
+        
         if(afLogado) {
             const dadosAf = JSON.parse(afLogado);
             payload.afiliadoId = dadosAf.id;
-            vendedorNome = dadosAf.nome;
-            vendedorTelefone = dadosAf.telefone;
         } else if (refCode) {
             payload.afiliadoCodigo = refCode;
         }
 
-        // ENVIA PRO BACKEND
+        // ENVIA PARA O BACKEND (Pagamento)
+        const API_URL = ''; // Ajuste se necessário
         const res = await fetch(`${API_URL}/api/checkout/pix`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1166,99 +1205,121 @@ async function finalizarCompraAsaas() {
         const data = await res.json();
 
         if (res.ok) {
+        
+            // ✅ SUCESSO NO PAGAMENTO! AGORA DISPARAMOS O TINY EM PARALELO
             const totalRealDoPedido = data.valorFinal || 0;
-            let numeroPedidoTiny = "---";
+            // 🔥 INTEGRAÇÃO TINY AQUI 🔥
+            // Preparamos o objeto completo para a função criarPedidoNoTiny
+            const dadosClienteTiny = {
+                nome: nome,
+                documento: doc.replace(/\D/g,''),
+                email: emailContato,
+                telefone: telefone,
+                endereco: endereco,
+                numero: numero || "0",
+                bairro: bairro || "Centro",
+                cep: cep,
+                cidade: cidade, // Agora vai Maceio ou o que você digitou
+                uf: uf          // Agora vai AL ou o que você digitou
+            };
 
-            // Cria no Tiny em segundo plano (com await para garantir numero)
+            // Chamamos a função sem 'await' para não travar a tela do usuário
+            // O pedido será criado no Tiny em segundo plano
             if (typeof criarPedidoNoTiny === 'function') {
-                try {
-                    const dadosTiny = { nome, documento: cpfLimpo, email: emailContato, telefone, endereco, numero, bairro, cep, cidade, uf };
-                    const tinyId = await criarPedidoNoTiny(dadosTiny, carrinho, totalRealDoPedido);
-                    if(tinyId) numeroPedidoTiny = tinyId;
-                } catch (e) { console.error(e); }
-            }
-
-            // LIMPA O CARRINHO
-            localStorage.removeItem('nossoCarrinho');
-
-            // 🔗 PREPARA A URL DE SUCESSO
-            const urlSucesso = `sucesso.html?pedido=${numeroPedidoTiny}&vendedor=${encodeURIComponent(vendedorNome)}&tel=${vendedorTelefone}`;
-
-            // 🚦 O GRANDE DIVISOR DE ÁGUAS
-            if (metodoEscolhido === 'PIX') {
-                // SE FOR PIX: Mostra o Modal primeiro para ele pagar!
-                // Passamos a URL de sucesso para o modal saber onde ir depois
-                mostrarModalPix(data.pix, null, 'PIX', urlSucesso);
-                
-                // Restaura o botão caso ele feche o modal sem querer
-                if(btn) { btn.innerHTML = "Ver QR Code Novamente"; btn.disabled = false; }
-                
+                criarPedidoNoTiny(dadosClienteTiny, carrinho, totalRealDoPedido).then(tinyId => {
+                    console.log("🛒 Pedido Tiny processado. ID/Número: ", tinyId);
+                });
             } else {
-                // SE FOR CARTÃO: Já vai direto para o parabéns
-                window.location.href = urlSucesso;
+                console.warn("Função criarPedidoNoTiny não encontrada.");
             }
+            // 🔥 FIM DA INTEGRAÇÃO TINY 🔥
 
+
+            // Mostra o Modal com o Link/QR Code
+            mostrarModalPix(data.pix, data.linkPagamento, metodoEscolhido);
+            
+            // Limpa o carrinho e avisa na tela
+            localStorage.removeItem('nossoCarrinho');
+            const containerBotoes = document.getElementById('container-botoes-dinamicos');
+            if(containerBotoes) containerBotoes.innerHTML = '<p style="color:#27ae60; text-align:center; font-weight:bold;">Pedido Realizado com Sucesso!</p>';
+        
         } else {
-            alert("Erro: " + (data.erro || "Falha ao processar."));
-            if(btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+            // ERRO DO SERVIDOR
+            alert("Erro: " + (data.erro || "Falha ao processar pedido."));
+            if(btn) { btn.disabled = false; btn.innerHTML = "Tentar Novamente"; }
         }
+
+        console.log("📤 PACOTE SENDO ENVIADO PRO SERVIDOR:", JSON.stringify(itensParaEnviar, null, 2));
+
     } catch (e) {
+        // ERRO DE CONEXÃO
         console.error(e);
-        alert("Erro de conexão.");
-        if(btn) { btn.disabled = false; btn.innerHTML = textoOriginal; }
+        alert("Erro de conexão com o servidor.");
+        if(btn) { btn.disabled = false; btn.innerHTML = "Tentar Novamente"; }
     }
+
 }
 
-// ==============================================================
-// 🟢 2. MODAL PIX (COM O BOTÃO DE "JÁ PAGUEI")
-// ==============================================================
-function mostrarModalPix(pixData, linkPagamento, metodo, urlDestinoSucesso) {
-    const modal = document.getElementById('modal-pix');
-    if (!modal) return;
+function mostrarModalPix(pixData, linkPagamento, metodoEscolhido) {
+    // LOG DE DEBUG para conferência no F12
+    console.log("Dados recebidos no Modal:", { pixData, metodoEscolhido });
 
     const imgPix = document.getElementById('pix-img');
     const txtCola = document.getElementById('pix-cola');
+    const btnLink = document.getElementById('btn-link-pagamento');
+    const btnCopiar = document.querySelector('button[onclick="copiarCodigo()"]');
     const titulo = document.querySelector('#modal-pix h3');
     const desc = document.querySelector('#modal-pix p');
-    
-    // Configura texto
-    if (titulo) titulo.innerText = "⚡ Pagamento via PIX Gerado";
-    if (desc) desc.innerText = "1. Abra seu app do banco\n2. Escolha Pagar com PIX > QR Code\n3. Escaneie abaixo:";
+    const modal = document.getElementById('modal-pix');
 
-    // Configura Imagem QR Code
-    if (imgPix && pixData) {
-        const qrCode = pixData.encodedImage || pixData.image;
-        if (qrCode) {
-            imgPix.src = `data:image/png;base64, ${qrCode}`;
-            imgPix.style.display = 'block';
+    if (!modal) return;
+
+    // --- CONFIGURAÇÃO PARA CARTÃO ---
+    if (metodoEscolhido === 'CARTAO') {
+        if (titulo) titulo.innerText = "🚀 Quase lá!";
+        if (desc) desc.innerText = "Clique no botão abaixo para finalizar seu pagamento com segurança via Cartão ou PIX no checkout.";
+        
+        if (imgPix) imgPix.style.display = 'none';
+        if (txtCola) txtCola.style.display = 'none';
+        if (btnCopiar) btnCopiar.style.display = 'none';
+
+        if (linkPagamento && btnLink) {
+            btnLink.href = linkPagamento;
+            btnLink.style.display = 'block'; 
+            btnLink.style.background = '#27ae60'; // Seu verde destaque
+            btnLink.innerHTML = `<i class="ph ph-credit-card"></i> IR PARA PAGAMENTO (CARTÃO / PIX)`;
         }
-    }
+    } 
+    // --- CONFIGURAÇÃO PARA PIX DIRETO ---
+    else {
+        if (titulo) titulo.innerText = "⚡ Pagamento via PIX";
+        if (desc) desc.innerText = "Escaneie o QR Code ou copie o código abaixo para confirmar sua compra na hora.";
+        
+        if (btnLink) btnLink.style.display = 'none';
 
-    // Configura Copia e Cola
-    if (txtCola && pixData) {
-        const payload = pixData.payload || pixData.text;
-        if (payload) {
-            txtCola.innerText = payload;
-            txtCola.style.display = 'block';
+        // Tratando a Imagem (QR Code) do Asaas
+        if (imgPix && pixData) {
+            const qrCode = pixData.encodedImage || (typeof pixData === 'string' ? null : pixData.image);
+            if (qrCode) {
+                imgPix.src = `data:image/png;base64, ${qrCode}`;
+                imgPix.style.display = 'block';
+            } else {
+                imgPix.style.display = 'none';
+            }
         }
-    }
 
-    // 🔥 O PULO DO GATO: Mudar o botão "Fechar" para "Já Paguei"
-    // Procure onde está o botão de fechar no seu HTML dentro do modal e vamos manipulá-lo via JS
-    // Como seu HTML tem um botão fixo no final, vamos recriar a área de botões dinamicamente:
-    
-    const areaBotoes = modal.querySelector('div[style*="border-top"]'); // Pega a div do rodapé do modal
-    if (areaBotoes) {
-        areaBotoes.innerHTML = `
-            <button onclick="window.location.href='${urlDestinoSucesso}'" 
-                style="background:#27ae60; color:white; border:none; padding:12px 20px; border-radius:5px; cursor:pointer; font-weight:bold; width:100%; font-size:1.1rem; margin-bottom:10px;">
-                <i class="ph ph-check"></i> Já Paguei / Enviar Comprovante
-            </button>
-            <button onclick="document.getElementById('modal-pix').style.display='none'" 
-                style="background:none; border:none; color:#777; cursor:pointer; font-size:0.9rem;">
-                Fechar e pagar depois
-            </button>
-        `;
+        // Tratando o Código Copia e Cola
+        if (txtCola && pixData) {
+            const payload = pixData.payload || (typeof pixData === 'string' ? pixData : pixData.text);
+            if (payload) {
+                txtCola.innerText = payload;
+                txtCola.style.display = 'block';
+            } else {
+                txtCola.innerText = "Erro ao carregar código. Tente novamente.";
+            }
+        }
+
+        if (btnCopiar) btnCopiar.style.display = 'inline-block';
     }
 
     modal.style.display = 'flex';

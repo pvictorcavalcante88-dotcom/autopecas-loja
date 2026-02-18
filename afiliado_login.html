@@ -20,9 +20,23 @@
         form { display: none; flex-direction: column; gap: 15px; }
         form.active { display: flex; }
         
-        input { padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; outline: none; transition: 0.3s; }
+        /* Container para o input de senha com ícone */
+        .password-wrapper { position: relative; display: flex; align-items: center; }
+        
+        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; outline: none; transition: 0.3s; box-sizing: border-box; }
         input:focus { border-color: #e67e22; }
         
+        /* Ícone do Olho */
+        .toggle-password {
+            position: absolute;
+            right: 15px;
+            cursor: pointer;
+            color: #777;
+            font-size: 1.2rem;
+            transition: 0.2s;
+        }
+        .toggle-password:hover { color: #e67e22; }
+
         button { padding: 12px; background: #2c3e50; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; font-weight: bold; transition: 0.3s; }
         button:hover { background: #34495e; }
         
@@ -59,7 +73,12 @@
 
         <form id="login-form" class="active">
             <input type="tel" id="login-telefone" placeholder="Seu Celular (apenas números)" required>
-            <input type="password" id="login-senha" placeholder="Sua Senha" required>
+            
+            <div class="password-wrapper">
+                <input type="password" id="login-senha" placeholder="Sua Senha" required>
+                <i class="ph ph-eye-slash toggle-password" onclick="toggleSenha('login-senha', this)"></i>
+            </div>
+
             <button type="button" onclick="fazerLogin()">Acessar Painel</button>
             
             <a onclick="abrirModalRecuperar()" class="forgot-link">Esqueci minha senha</a>
@@ -71,7 +90,12 @@
             <input type="text" id="reg-codigo" placeholder="Crie seu Código (Ex: joao10)" required>
             <p class="note">Este será seu link: site.com/?ref=<b>joao10</b></p>
             <input type="text" id="reg-pix" placeholder="Sua Chave PIX (para receber)">
-            <input type="password" id="reg-senha" placeholder="Crie uma Senha" required>
+            
+            <div class="password-wrapper">
+                <input type="password" id="reg-senha" placeholder="Crie uma Senha" required>
+                <i class="ph ph-eye-slash toggle-password" onclick="toggleSenha('reg-senha', this)"></i>
+            </div>
+
             <button type="button" onclick="fazerCadastro()">Cadastrar e Começar</button>
         </form>
     </div>
@@ -94,6 +118,21 @@
     <script>
         const API_URL = window.location.origin; // Se estiver local, deixe vazio.
 
+        // --- LÓGICA DO OLHO MÁGICO (MOSTRAR SENHA) ---
+        function toggleSenha(inputId, icon) {
+            const input = document.getElementById(inputId);
+            
+            if (input.type === "password") {
+                input.type = "text";
+                icon.classList.remove("ph-eye-slash");
+                icon.classList.add("ph-eye");
+            } else {
+                input.type = "password";
+                icon.classList.remove("ph-eye");
+                icon.classList.add("ph-eye-slash");
+            }
+        }
+
         // --- LÓGICA DAS ABAS ---
         function switchTab(tab) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -110,7 +149,6 @@
 
         // --- LÓGICA DO MODAL ---
         function abrirModalRecuperar() {
-            // Tenta pegar o telefone que o usuário já digitou no login
             const telDigitado = document.getElementById('login-telefone').value;
             if(telDigitado) document.getElementById('recuperar-telefone').value = telDigitado;
             
@@ -125,17 +163,14 @@
             const telefone = document.getElementById('recuperar-telefone').value;
             if(!telefone) return alert("Digite seu telefone.");
 
-            // SEU NÚMERO DE SUPORTE AQUI (ADMIN)
-            const numeroAdmin = "558287515891"; // <--- Coloque seu número aqui
+            const numeroAdmin = "558287515891"; // <--- Seu número
 
             const msg = `Olá Suporte! Sou afiliado (Tel: ${telefone}) e esqueci minha senha. Poderia redefinir?`;
-            
-            // Abre o WhatsApp
             window.open(`https://wa.me/${numeroAdmin}?text=${encodeURIComponent(msg)}`, '_blank');
             fecharModal();
         }
 
-        // --- LÓGICA DE LOGIN E CADASTRO (Chamando o Backend) ---
+        // --- LÓGICA DE LOGIN E CADASTRO (Backend) ---
         
         async function fazerLogin() {
             const telefone = document.getElementById('login-telefone').value;
@@ -147,6 +182,7 @@
             btn.innerText = "Entrando..."; btn.disabled = true;
 
             try {
+                // Tenta fazer login na rota de afiliados
                 const res = await fetch(`${API_URL}/afiliado/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -156,17 +192,18 @@
                 const data = await res.json();
 
                 if(res.ok) {
-                    // Salva token e dados
                     localStorage.setItem('afiliadoToken', data.token);
-                    // Opcional: Salvar objeto completo para compatibilidade
-                    localStorage.setItem('afiliadoLogado', JSON.stringify(data));
+                    // Opcional: Salvar objeto para uso futuro
+                    localStorage.setItem('afiliadoLogado', JSON.stringify(data)); 
                     
                     window.location.href = 'afiliado_dashboard.html';
                 } else {
                     alert(data.erro || "Erro ao entrar.");
                 }
             } catch(e) {
-                alert("Erro de conexão.");
+                // Caso a rota ainda não exista ou dê erro de conexão
+                alert("Erro de conexão com o servidor.");
+                console.error(e);
             } finally {
                 btn.innerText = "Acessar Painel"; btn.disabled = false;
             }
@@ -187,22 +224,17 @@
             btn.innerText = "Criando..."; btn.disabled = true;
 
             try {
-                // Precisamos criar essa rota /afiliado/cadastro no server.js se ainda não existir
-                // Se você ainda não tem, me avise que criamos!
-                // Vou assumir que vamos criar ou adaptar.
-                
-                // DICA: Você pode adaptar para enviar direto pro Zap se preferir aprovação manual
-                // Mas o ideal é salvar no banco como "aprovado: false"
-                
-                const res = await fetch(`${API_URL}/afiliado/cadastro`, { // Precisamos criar essa rota
+                const res = await fetch(`${API_URL}/afiliado/cadastro`, { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(dados)
                 });
 
                 if(res.ok) {
-                    alert("Cadastro realizado! Aguarde a aprovação do administrador.");
+                    alert("Cadastro realizado! Aguarde a aprovação ou faça login.");
                     switchTab('login');
+                    // Preenche o telefone automaticamente para facilitar
+                    document.getElementById('login-telefone').value = dados.telefone;
                 } else {
                     const err = await res.json();
                     alert("Erro: " + (err.erro || "Falha no cadastro"));
@@ -213,7 +245,6 @@
                 btn.innerText = "Cadastrar e Começar"; btn.disabled = false;
             }
         }
-
     </script>
 </body>
 </html>

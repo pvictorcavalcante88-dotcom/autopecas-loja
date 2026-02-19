@@ -2091,14 +2091,14 @@ app.get('/admin/importar-do-tiny', authenticateToken, async (req, res) => {
                     preco_custo: novoCusto,
                     estoque: novoEstoque,
                     tinyId: String(idTinyReal), 
-                    categoria: p.categoria || "Geral"
+                    //categoria: p.categoria || "Geral"
                 };
 
                 if (produtoExistente) {
                     await prisma.produto.update({ where: { id: idTinyReal }, data: dadosProduto });
                     console.log(`✅ [${idTinyReal}] ${sku} Atualizado`);
                 } else {
-                    await prisma.produto.create({ data: { id: idTinyReal, ...dadosProduto, imagem: "https://placehold.co/600x400?text=Sem+Foto" } });
+                    await prisma.produto.create({ data: { id: idTinyReal, ...dadosProduto, categoria: p.categoria || "Geral", imagem: "https://placehold.co/600x400?text=Sem+Foto" } });
                     console.log(`✨ [${idTinyReal}] ${sku} Criado!`);
                 }
                 

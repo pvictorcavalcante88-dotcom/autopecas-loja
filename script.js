@@ -58,20 +58,39 @@ function adicionarAoCarrinho(id, qtd) {
     const precoTexto = document.getElementById('prod-price')?.innerText || "0";
     const precoLimpo = limparPrecoBR(precoTexto);
 
-    // 🟢 NOVA CAPTURA: Captura o ID do Tiny (deve estar em um campo oculto ou global)
-    // Se você salvou o produto na página como um objeto global, use ele:
+    // 🟢 NOVA CAPTURA: Captura o ID do Tiny
     const tinyIdCapturado = window.currentProductTinyId || null; 
 
+    let teveAviso = false; // <-- Variável para controlar os alertas duplos
+
+    // --- BLOCO DE VALIDAÇÃO DE MÚLTIPLOS ---
+    if (nomeProduto && !nomeProduto.includes("Produto sem nome")) {
+        const qtdAtualNoCarrinho = item ? item.quantidade : 0;
+        const qtdFinalDesejada = qtdAtualNoCarrinho + qtd;
+
+        const validacao = validarMultiplosAutomotivos(nomeProduto, qtdFinalDesejada);
+
+        if (!validacao.valido) {
+            alert(validacao.msg); // Avisa o cliente da correção
+            teveAviso = true;     // Marca que já demos um aviso
+            
+            // Calcula quanto precisa adicionar de fato para chegar no número redondo
+            const diferenca = validacao.novaQtd - qtdAtualNoCarrinho;
+            qtd = diferenca > 0 ? diferenca : 1; 
+        }
+    }
+    // ----------------------------------------
+
+    // ATUALIZA OU CRIA O ITEM NO CARRINHO
     if (item) {
         item.quantidade = (item.quantidade || 1) + qtd;
         item.preco = precoLimpo; 
         item.nome = nomeProduto;
-        // Atualiza o tinyId caso não tenha
         if (!item.tinyId) item.tinyId = tinyIdCapturado;
     } else {
         c.push({ 
             id: parseInt(id), 
-            tinyId: tinyIdCapturado, // ✅ AGORA SALVAMOS O ID DO TINY NO CARRINHO
+            tinyId: tinyIdCapturado, 
             quantidade: qtd, 
             preco: precoLimpo, 
             nome: nomeProduto,
@@ -81,7 +100,11 @@ function adicionarAoCarrinho(id, qtd) {
     
     localStorage.setItem('nossoCarrinho', JSON.stringify(c));
     atualizarIconeCarrinho();
-    alert(`✅ ${nomeProduto} adicionado ao carrinho!`);
+    
+    // Só mostra o alerta de sucesso se não tiver mostrado o alerta de correção
+    if (!teveAviso) {
+        alert(`✅ ${nomeProduto} adicionado ao carrinho!`);
+    }
 }
 
 function limparPrecoBR(valor) {
@@ -1743,4 +1766,74 @@ if (inputCep) {
         }
         e.target.value = value;
     });
+}
+
+// ==============================================================
+// 🧠 INTELIGÊNCIA DE MÚLTIPLOS AUTOMOTIVOS
+// ==============================================================
+
+// Coloque aqui as referências que SÓ vendem de 3 em 3
+const VELAS_3_CILINDROS = ["LKR7D-DE", "LNAR7A-9G"]; 
+
+// Coloque aqui as referências que vendem tanto de 3 em 3 quanto de 4 em 4
+const VELAS_HIBRIDAS = ["LTR7A-10", "KER7A-8DEG"];
+
+function validarMultiplosAutomotivos(nomeProduto, qtdSolicitada) {
+    const nome = nomeProduto.toUpperCase();
+    
+    // 1. REGRA DO PAR (Discos, Tambores, Amortecedores)
+    if (nome.includes("DISCO") || nome.includes("TAMBOR")) {
+        if (qtdSolicitada % 2 !== 0) {
+            return {
+                valido: false,
+                novaQtd: qtdSolicitada + 1,
+                msg: `⚠️ ATENÇÃO: ${nomeProduto} é vendido apenas em PARES.\n\nAjustamos para ${qtdSolicitada + 1} unidades.`
+            };
+        }
+    }
+
+    // 2. REGRA DAS VELAS (Com listas de exceção)
+    if (nome.includes("VELA") || nome.includes("IGNICAO") || nome.includes("IGNIÇÃO")) {
+        
+        const ehHibrida = VELAS_HIBRIDAS.some(ref => nome.includes(ref));
+        const eh3Cilindros = VELAS_3_CILINDROS.some(ref => nome.includes(ref));
+
+        if (ehHibrida) {
+            // Aceita múltiplos de 3 OU 4
+            if (qtdSolicitada % 3 !== 0 && qtdSolicitada % 4 !== 0) {
+                let prox = qtdSolicitada;
+                while (prox % 3 !== 0 && prox % 4 !== 0) prox++; // Acha o próximo válido
+                return { 
+                    valido: false, 
+                    novaQtd: prox,
+                    msg: `⚠️ Esta vela atende motores de 3 ou 4 cilindros.\n\nA quantidade '${qtdSolicitada}' está incompleta. Ajustamos para ${prox} unidades.` 
+                };
+            }
+        } 
+        else if (eh3Cilindros) {
+            // Exclusivo 3 cilindros
+            if (qtdSolicitada % 3 !== 0) {
+                let prox = Math.ceil(qtdSolicitada / 3) * 3; // Arredonda pro próximo múltiplo de 3
+                return { 
+                    valido: false, 
+                    novaQtd: prox,
+                    msg: `⚠️ Esta vela é específica para motores 3 cilindros (Venda em trincas).\n\nAjustamos para ${prox} unidades.` 
+                };
+            }
+        } 
+        else {
+            // PADRÃO DA LOJA: 4 cilindros
+            if (qtdSolicitada % 4 !== 0) {
+                let prox = Math.ceil(qtdSolicitada / 4) * 4; // Arredonda pro próximo múltiplo de 4
+                return { 
+                    valido: false, 
+                    novaQtd: prox,
+                    msg: `⚠️ Velas padrão são vendidas em jogos de 4 unidades.\n\nAjustamos para ${prox} unidades.` 
+                };
+            }
+        }
+    }
+
+    // Se chegou até aqui, a quantidade digitada está correta!
+    return { valido: true };
 }

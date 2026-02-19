@@ -53,17 +53,21 @@ function adicionarAoCarrinho(id, qtd) {
     let item = c.find(p => p.id == id);
     const margemInicial = parseFloat(localStorage.getItem('minhaMargem') || 0);
 
-    // CAPTURA O TÍTULO E PREÇO
-    const nomeProduto = document.getElementById('prod-title')?.innerText.trim() || "Produto sem nome";
-    const precoTexto = document.getElementById('prod-price')?.innerText || "0";
-    const precoLimpo = limparPrecoBR(precoTexto);
+    // 🟢 CORREÇÃO 1: Busca o nome nos dois IDs possíveis ou pega o que já tá salvo
+    let nomeProduto = document.getElementById('product-title')?.innerText.trim() 
+                   || document.getElementById('prod-title')?.innerText.trim() 
+                   || (item ? item.nome : "Produto sem nome");
 
-    // 🟢 NOVA CAPTURA: Captura o ID do Tiny
+    const precoTexto = document.getElementById('prod-price')?.innerText 
+                    || document.getElementById('product-price-new')?.innerText 
+                    || "0";
+    
+    const precoLimpo = limparPrecoBR(precoTexto);
     const tinyIdCapturado = window.currentProductTinyId || null; 
 
-    let teveAviso = false; // <-- Variável para controlar os alertas duplos
+    let teveAviso = false;
 
-    // --- BLOCO DE VALIDAÇÃO DE MÚLTIPLOS ---
+    // 🛑 VALIDAÇÃO DE MÚLTIPLOS (Antes de entrar no carrinho)
     if (nomeProduto && !nomeProduto.includes("Produto sem nome")) {
         const qtdAtualNoCarrinho = item ? item.quantidade : 0;
         const qtdFinalDesejada = qtdAtualNoCarrinho + qtd;
@@ -71,21 +75,18 @@ function adicionarAoCarrinho(id, qtd) {
         const validacao = validarMultiplosAutomotivos(nomeProduto, qtdFinalDesejada);
 
         if (!validacao.valido) {
-            alert(validacao.msg); // Avisa o cliente da correção
-            teveAviso = true;     // Marca que já demos um aviso
+            alert(validacao.msg); 
+            teveAviso = true;     
             
-            // Calcula quanto precisa adicionar de fato para chegar no número redondo
             const diferenca = validacao.novaQtd - qtdAtualNoCarrinho;
             qtd = diferenca > 0 ? diferenca : 1; 
         }
     }
-    // ----------------------------------------
 
-    // ATUALIZA OU CRIA O ITEM NO CARRINHO
     if (item) {
         item.quantidade = (item.quantidade || 1) + qtd;
         item.preco = precoLimpo; 
-        item.nome = nomeProduto;
+        item.nome = nomeProduto; // Salva o nome correto agora
         if (!item.tinyId) item.tinyId = tinyIdCapturado;
     } else {
         c.push({ 
@@ -101,10 +102,7 @@ function adicionarAoCarrinho(id, qtd) {
     localStorage.setItem('nossoCarrinho', JSON.stringify(c));
     atualizarIconeCarrinho();
     
-    // Só mostra o alerta de sucesso se não tiver mostrado o alerta de correção
-    if (!teveAviso) {
-        alert(`✅ ${nomeProduto} adicionado ao carrinho!`);
-    }
+    if (!teveAviso) alert(`✅ ${nomeProduto} adicionado ao carrinho!`);
 }
 
 function limparPrecoBR(valor) {
@@ -885,7 +883,36 @@ async function finalizarPedido(itens) {
 }
 
 // RESTO (Busca, Slider, etc - MANTIDOS)
-function alterarQuantidade(id, delta) { let c = getCarrinho(); let i = c.find(p => p.id == id); if(i) { i.quantidade += delta; if(i.quantidade<=0) c = c.filter(p=>p.id!=id); localStorage.setItem('nossoCarrinho', JSON.stringify(c)); carregarPaginaCarrinho(); atualizarIconeCarrinho(); } }
+// ==============================================================
+// 🟢 CORREÇÃO 2: BLINDAGEM NOS BOTÕES DE + E - DO CARRINHO
+// ==============================================================
+function alterarQuantidade(id, delta) { 
+    let c = getCarrinho(); 
+    let item = c.find(p => p.id == id); 
+    
+    if (item) { 
+        let novaQtd = item.quantidade + delta; 
+        
+        if (novaQtd > 0) {
+            // 🛑 Chama a inteligência quando clicar no + ou -
+            const validacao = validarMultiplosAutomotivos(item.nome, novaQtd);
+            
+            if (!validacao.valido) {
+                alert(validacao.msg);
+                item.quantidade = validacao.novaQtd; // Força pro número arredondado
+            } else {
+                item.quantidade = novaQtd; // Deixa passar se estiver ok
+            }
+        } else {
+            // Se zerou, remove do carrinho
+            c = c.filter(p => p.id != id); 
+        }
+        
+        localStorage.setItem('nossoCarrinho', JSON.stringify(c)); 
+        carregarPaginaCarrinho(); 
+        atualizarIconeCarrinho(); 
+    } 
+}
 function removerItem(id) { let c = getCarrinho().filter(p => p.id != id); localStorage.setItem('nossoCarrinho', JSON.stringify(c)); carregarPaginaCarrinho(); atualizarIconeCarrinho(); }
 function setupGlobalSearch() {
     const btn = document.getElementById('search-button'); const input = document.getElementById('search-input');

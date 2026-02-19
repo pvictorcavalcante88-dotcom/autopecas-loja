@@ -551,7 +551,7 @@ function adicionarAoCarrinhoAtual() {
     // ==========================================================
     if (typeof validarMultiplosAutomotivos === 'function') {
         const qtdFinalDesejada = qtdJaNoCarrinho + qtdQueroAdicionar;
-        const validacao = validarMultiplosAutomotivos(PRODUTO_ATUAL.titulo, qtdFinalDesejada);
+        const validacao = validarMultiplosAutomotivos(PRODUTO_ATUAL.titulo, qtdFinalDesejada, PRODUTO_ATUAL.referencia);
 
         if (!validacao.valido) {
             alert(validacao.msg); // Avisa o cliente da regra (Ex: Vende de 4 em 4)

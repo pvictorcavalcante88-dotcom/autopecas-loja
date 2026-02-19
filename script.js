@@ -894,23 +894,23 @@ function alterarQuantidade(id, delta) {
         let novaQtd = item.quantidade + delta; 
         
         if (novaQtd > 0) {
-            // 🛑 Chama a inteligência quando clicar no + ou -
-            const validacao = validarMultiplosAutomotivos(item.nome, novaQtd);
+            // 🛡️ Passa o nome protegido. Se não tiver nome, passa vazio e a validação ignora!
+            const validacao = validarMultiplosAutomotivos(item.nome || "", novaQtd, item.referencia || "");
             
             if (!validacao.valido) {
                 alert(validacao.msg);
-                item.quantidade = validacao.novaQtd; // Força pro número arredondado
+                item.quantidade = validacao.novaQtd; 
             } else {
-                item.quantidade = novaQtd; // Deixa passar se estiver ok
+                item.quantidade = novaQtd; 
             }
         } else {
-            // Se zerou, remove do carrinho
             c = c.filter(p => p.id != id); 
         }
         
         localStorage.setItem('nossoCarrinho', JSON.stringify(c)); 
-        carregarPaginaCarrinho(); 
-        atualizarIconeCarrinho(); 
+        
+        if (typeof carregarPaginaCarrinho === 'function') carregarPaginaCarrinho(); 
+        if (typeof atualizarIconeCarrinho === 'function') atualizarIconeCarrinho(); 
     } 
 }
 function removerItem(id) { let c = getCarrinho().filter(p => p.id != id); localStorage.setItem('nossoCarrinho', JSON.stringify(c)); carregarPaginaCarrinho(); atualizarIconeCarrinho(); }
@@ -1805,31 +1805,37 @@ const VELAS_3_CILINDROS = ["LKR7D-DE", "LNAR7A-9G"];
 // Coloque aqui as referências que vendem tanto de 3 em 3 quanto de 4 em 4
 const VELAS_HIBRIDAS = ["LTR7A-10", "KER7A-8DEG"];
 
-function validarMultiplosAutomotivos(nomeProduto, qtdSolicitada) {
-    const nome = nomeProduto.toUpperCase();
+function validarMultiplosAutomotivos(nomeProduto, qtdSolicitada, referenciaProduto = "") {
+    // 🛡️ PROTEÇÃO CONTRA ITENS ANTIGOS: Impede que o carrinho quebre (Caso da Pastilha)
+    if (!nomeProduto) nomeProduto = "";
+    if (!referenciaProduto) referenciaProduto = "";
+
+    // 🧠 VISÃO RAIO-X: Junta o Nome e a Referência em um texto só!
+    const textoBusca = (nomeProduto + " " + referenciaProduto).toUpperCase();
     
     // 1. REGRA DO PAR (Discos, Tambores, Amortecedores)
-    if (nome.includes("DISCO") || nome.includes("TAMBOR")) {
+    // Ele vai achar a palavra "DISCO" mesmo se estiver só na referência (ex: D-DISCO-50)
+    if (textoBusca.includes("DISCO") || textoBusca.includes("TAMBOR") || textoBusca.includes("AMORTECEDOR")) {
         if (qtdSolicitada % 2 !== 0) {
             return {
                 valido: false,
                 novaQtd: qtdSolicitada + 1,
-                msg: `⚠️ ATENÇÃO: ${nomeProduto} é vendido apenas em PARES.\n\nAjustamos para ${qtdSolicitada + 1} unidades.`
+                msg: `⚠️ ATENÇÃO: Este item é vendido apenas em PARES.\n\nAjustamos para ${qtdSolicitada + 1} unidades.`
             };
         }
     }
 
-    // 2. REGRA DAS VELAS (Com listas de exceção)
-    if (nome.includes("VELA") || nome.includes("IGNICAO") || nome.includes("IGNIÇÃO")) {
+    // 2. REGRA DAS VELAS
+    if (textoBusca.includes("VELA") || textoBusca.includes("IGNICAO") || textoBusca.includes("IGNIÇÃO")) {
         
-        const ehHibrida = VELAS_HIBRIDAS.some(ref => nome.includes(ref));
-        const eh3Cilindros = VELAS_3_CILINDROS.some(ref => nome.includes(ref));
+        // Verifica as listas usando o texto completo (Nome + Referencia)
+        const ehHibrida = VELAS_HIBRIDAS.some(ref => textoBusca.includes(ref.toUpperCase()));
+        const eh3Cilindros = VELAS_3_CILINDROS.some(ref => textoBusca.includes(ref.toUpperCase()));
 
         if (ehHibrida) {
-            // Aceita múltiplos de 3 OU 4
             if (qtdSolicitada % 3 !== 0 && qtdSolicitada % 4 !== 0) {
                 let prox = qtdSolicitada;
-                while (prox % 3 !== 0 && prox % 4 !== 0) prox++; // Acha o próximo válido
+                while (prox % 3 !== 0 && prox % 4 !== 0) prox++;
                 return { 
                     valido: false, 
                     novaQtd: prox,
@@ -1838,9 +1844,8 @@ function validarMultiplosAutomotivos(nomeProduto, qtdSolicitada) {
             }
         } 
         else if (eh3Cilindros) {
-            // Exclusivo 3 cilindros
             if (qtdSolicitada % 3 !== 0) {
-                let prox = Math.ceil(qtdSolicitada / 3) * 3; // Arredonda pro próximo múltiplo de 3
+                let prox = Math.ceil(qtdSolicitada / 3) * 3;
                 return { 
                     valido: false, 
                     novaQtd: prox,
@@ -1849,9 +1854,8 @@ function validarMultiplosAutomotivos(nomeProduto, qtdSolicitada) {
             }
         } 
         else {
-            // PADRÃO DA LOJA: 4 cilindros
             if (qtdSolicitada % 4 !== 0) {
-                let prox = Math.ceil(qtdSolicitada / 4) * 4; // Arredonda pro próximo múltiplo de 4
+                let prox = Math.ceil(qtdSolicitada / 4) * 4;
                 return { 
                     valido: false, 
                     novaQtd: prox,
@@ -1861,6 +1865,5 @@ function validarMultiplosAutomotivos(nomeProduto, qtdSolicitada) {
         }
     }
 
-    // Se chegou até aqui, a quantidade digitada está correta!
     return { valido: true };
 }

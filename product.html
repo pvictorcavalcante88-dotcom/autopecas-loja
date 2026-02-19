@@ -530,11 +530,11 @@ function renderizarRelacionados(lista) {
             atualizarPrecoTela();
         }
 
-       function adicionarAoCarrinhoAtual() {
+function adicionarAoCarrinhoAtual() {
     if(!PRODUTO_ATUAL) return;
 
     const estoqueMax = parseInt(PRODUTO_ATUAL.estoque || 0);
-    const qtdQueroAdicionar = parseInt(document.getElementById('qtd').value);
+    let qtdQueroAdicionar = parseInt(document.getElementById('qtd').value);
     
     // 1. Pega o carrinho atual
     let carrinho = JSON.parse(localStorage.getItem('nossoCarrinho') || '[]');
@@ -545,6 +545,27 @@ function renderizarRelacionados(lista) {
     if (index > -1) {
         qtdJaNoCarrinho = carrinho[index].quantidade;
     }
+
+    // ==========================================================
+    // 🛑 NOVA INTELIGÊNCIA: VALIDAÇÃO DE MÚLTIPLOS
+    // ==========================================================
+    if (typeof validarMultiplosAutomotivos === 'function') {
+        const qtdFinalDesejada = qtdJaNoCarrinho + qtdQueroAdicionar;
+        const validacao = validarMultiplosAutomotivos(PRODUTO_ATUAL.titulo, qtdFinalDesejada);
+
+        if (!validacao.valido) {
+            alert(validacao.msg); // Avisa o cliente da regra (Ex: Vende de 4 em 4)
+            
+            // Ajusta a quantidade para o número correto exigido pela regra
+            const diferenca = validacao.novaQtd - qtdJaNoCarrinho;
+            qtdQueroAdicionar = diferenca > 0 ? diferenca : 1; 
+
+            // Atualiza o número na caixinha da tela e recalcula o valor
+            document.getElementById('qtd').value = qtdQueroAdicionar;
+            if (typeof atualizarPrecoTela === 'function') atualizarPrecoTela(); 
+        }
+    }
+    // ==========================================================
 
     // 3. 🟢 VALIDAÇÃO DE ESTOQUE ANTES DE ADICIONAR
     if ((qtdJaNoCarrinho + qtdQueroAdicionar) > estoqueMax) {

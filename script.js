@@ -1387,40 +1387,69 @@ function copiarCodigo() {
 
 // script.js
 
-function calcularSimulacaoLiquida(precoBase, margemPorcentagem, parcelas = 1) {
-    const margem = parseFloat(margemPorcentagem);
+function calcularSimulacaoLiquida(precoBase, margemPorcentagem, parcelas = 1, precoCusto = null) {
+    const margem = parseFloat(margemPorcentagem) || 0;
+    const numParcelas = parseInt(parcelas) || 1;
     
-    // 1. Preço Original (À Vista) - É aqui que o lucro é gerado
-    const precoVendaAVista = precoBase * (1 + (margem / 100));
-    const lucroBrutoOriginal = precoVendaAVista - precoBase;
+    // 1. Definição da Base de Custos (Mesma lógica do Backend)
+    const precoLoja = parseFloat(precoBase);
+    // Se o carrinho não tiver o preço de custo salvo, ele usa a regra dos 80% do backend
+    const custoPeca = precoCusto ? parseFloat(precoCusto) : (precoLoja * 0.8);
+    
+    // 2. Preço Original (À Vista) - É AQUI que a comissão real nasce e trava!
+    const precoVendaAVista = precoLoja * (1 + (margem / 100));
+    
+    // Lucros Brutos puros (sem a ilusão dos juros)
+    const lucroBrutoAfiliado = precoVendaAVista - precoLoja;
+    const lucroBrutoLoja = precoLoja - custoPeca;
+    const lucroOperacionalTotal = lucroBrutoLoja + lucroBrutoAfiliado;
 
-    // 2. Cálculo dos Juros de Antecipação (Apenas para parcelas > 2)
-    // Esse valor é cobrado do cliente, mas repassado integralmente para o custo financeiro
-    let jurosAntecipacaoTotal = 0;
-    if (parcelas > 2) {
-        const taxaAntecipacaoEstimada = 0.0249; // Sua taxa de antecipação
-        jurosAntecipacaoTotal = precoVendaAVista * (taxaAntecipacaoEstimada * (parcelas - 2));
+    // 3. Cálculo dos Juros (Aplicado apenas no valor final pro cliente)
+    let valorFinalCobranca = precoVendaAVista;
+    let jurosAcrescentado = 0;
+    
+    // Mesma regra do backend: Juros apenas se for maior que 2x
+    if (numParcelas > 2) {
+        const taxaJurosMensal = 0.035; // 3.5% a.m (Igual ao Backend)
+        valorFinalCobranca = precoVendaAVista * (1 + (taxaJurosMensal * numParcelas));
+        jurosAcrescentado = valorFinalCobranca - precoVendaAVista;
     }
 
-    // 3. Preço Final que o cliente paga na tela
-    const precoFinalVenda = precoVendaAVista + jurosAntecipacaoTotal;
-
-    // 4. Rateio de Taxas Operacionais (Impostos + Taxa Fixa Asaas)
-    // Aplicado apenas sobre o lucro original da venda para não inflar a comissão
-    const FATOR_TAXAS_OPERACIONAIS = 0.30; 
-    const descontoTaxasOperacionais = lucroBrutoOriginal * FATOR_TAXAS_OPERACIONAIS;
+    // 4. Cálculo das Taxas Reais (Governo + Asaas) sobre o Valor Final Inflado
+    const impostoGoverno = valorFinalCobranca * 0.06; // 6% de NF
     
-    // 5. Lucro Líquido Real (Protegido)
-    // O juros entra como "Ganho Bruto" mas sai como "Taxa", ficando neutro para o afiliado
-    const lucroLiquidoFinal = lucroBrutoOriginal - descontoTaxasOperacionais;
+    let taxaGateway = 0.99; // Assume PIX/Boleto como padrão para 1x
+    if (numParcelas > 1) {
+        // Se parcelou, a taxa muda para a de Cartão (5.5% + R$ 0,49)
+        taxaGateway = (valorFinalCobranca * 0.055) + 0.49;
+    }
+    
+    const custoTaxasTotal = impostoGoverno + taxaGateway;
 
+    // 5. Rateio de Taxas (A Balança da Justiça)
+    let parteTaxaAfiliado = 0;
+    let comissaoLiquidaAfiliado = 0;
+
+    if (lucroOperacionalTotal > 0 && lucroBrutoAfiliado > 0) {
+        // O peso do afiliado é medido pelo lucro puro dele
+        const pesoAfiliado = lucroBrutoAfiliado / lucroOperacionalTotal;
+        
+        // Ele absorve as taxas (incluindo as taxas sobre os juros) na mesma proporção
+        parteTaxaAfiliado = custoTaxasTotal * pesoAfiliado;
+        comissaoLiquidaAfiliado = lucroBrutoAfiliado - parteTaxaAfiliado;
+    }
+    
+    // Trava anti-prejuízo (Se a taxa engolir tudo, ele ganha 0, não fica negativo)
+    if (comissaoLiquidaAfiliado < 0) comissaoLiquidaAfiliado = 0;
+
+    // 6. Retorno padronizado para a interface do Cart.html
     return {
-        precoFinal: precoFinalVenda,
-        valorParcela: precoFinalVenda / parcelas,
-        lucroBruto: lucroBrutoOriginal, // Agora fixo no valor à vista
-        taxasEstimadas: descontoTaxasOperacionais,
-        lucroLiquido: lucroLiquidoFinal,
-        jurosIncluso: jurosAntecipacaoTotal // Para controle interno
+        precoFinal: valorFinalCobranca,
+        valorParcela: valorFinalCobranca / numParcelas,
+        lucroBruto: lucroBrutoAfiliado,     // Fixo no valor à vista (Garante a integridade visual)
+        taxasEstimadas: parteTaxaAfiliado,  // Mostra ao afiliado exatamente a fatia de impostos DELE
+        lucroLiquido: comissaoLiquidaAfiliado, // O que de fato vai pra carteira dele
+        jurosIncluso: jurosAcrescentado     // Caso precise mostrar na tela que o juros foi repassado
     };
 }
 

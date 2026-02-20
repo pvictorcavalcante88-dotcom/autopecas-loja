@@ -465,49 +465,70 @@ function renderizarRelacionados(lista) {
             }
             if(boxParcelas) boxParcelas.style.display = 'block';
 
+// =========================================================
+            // 🧮 CÁLCULOS FINANCEIROS (ESPELHO FIEL DO BACKEND)
             // =========================================================
-            // 🧮 CÁLCULOS FINANCEIROS (SIMULAÇÃO)
-            // =========================================================
-            const precoBase = parseFloat(PRODUTO_ATUAL.preco_novo);
+            const precoLoja = parseFloat(PRODUTO_ATUAL.preco_novo || 0);
+            const custoPeca = parseFloat(PRODUTO_ATUAL.preco_custo || (precoLoja * 0.8)); // Custo real ou 80% estimado
             const qtd = parseInt(document.getElementById('qtd').value) || 1;
 
-            // 1. Preço Final
-            const precoUnitarioFinal = precoBase * (1 + (MARGEM_ATUAL / 100));
+            // 1. Preço de Venda
+            const precoVendaUnitario = precoLoja * (1 + (MARGEM_ATUAL / 100));
             
-            // 2. Lucro Bruto (Markup puro)
-            const lucroBrutoUnitario = precoUnitarioFinal - precoBase;
-            
-            // 3. Estimativa de Taxas (30% do Lucro Bruto para cobrir Impostos + Asaas)
-            // Essa é a mesma lógica usada no cálculo visual do Cart.html
-            const FATOR_TAXAS = 0.30; 
-            const taxasUnitarias = lucroBrutoUnitario * FATOR_TAXAS;
-            
-            // 4. Lucro Líquido Real
-            const lucroLiquidoUnitario = lucroBrutoUnitario - taxasUnitarias;
+            const totalItemVenda = precoVendaUnitario * qtd;
+            const totalItemCusto = custoPeca * qtd;
+            const totalItemLojaBase = precoLoja * qtd; 
 
-            // Totais (multiplicado pela quantidade)
-            const totalBruto = lucroBrutoUnitario * qtd;
-            const totalTaxas = taxasUnitarias * qtd;
-            const totalLiquido = lucroLiquidoUnitario * qtd;
+            // 2. Lucros Brutos (Faturamento)
+            const lucroBrutoAfiliado = totalItemVenda - totalItemLojaBase; 
+            const lucroBrutoLoja = totalItemLojaBase - totalItemCusto;
+            const lucroOperacionalTotal = lucroBrutoLoja + lucroBrutoAfiliado;
+
+            // 3. Simulação de Taxas (Baseado no PIX, cenário mais comum)
+            const taxaImpostoGov = 0.06; // 6% NF
+            const taxaAsaasPix = 0.99;   // Fixo Pix
+            
+            const valorImposto = totalItemVenda * taxaImpostoGov;
+            const custoTaxasTotal = valorImposto + taxaAsaasPix;
+
+            // 4. Rateio (A mesma mágica do seu Checkout)
+            let parteTaxaAfiliado = 0;
+            let comissaoLiquidaAfiliado = 0;
+
+            if (lucroOperacionalTotal > 0 && lucroBrutoAfiliado > 0) {
+                const pesoAfiliado = lucroBrutoAfiliado / lucroOperacionalTotal;
+                parteTaxaAfiliado = custoTaxasTotal * pesoAfiliado;
+                comissaoLiquidaAfiliado = lucroBrutoAfiliado - parteTaxaAfiliado;
+            }
+            if (comissaoLiquidaAfiliado < 0) comissaoLiquidaAfiliado = 0;
+
+            // 🛑 ALERTA DE PREJUÍZO 
+            let corLiquido = "#27ae60"; // Verde padrão
+            let avisoPrejuizo = "";
+            if (comissaoLiquidaAfiliado <= 0 && MARGEM_ATUAL > 0) {
+                corLiquido = "#c0392b"; // Vermelho
+                avisoPrejuizo = `<div style="color:#c0392b; font-size:0.75rem; margin-top:5px; text-align:center;"><i class="ph ph-warning-circle"></i> Margem muito baixa! A taxa consumiu o lucro.</div>`;
+            }
 
             // ATUALIZA O PREÇO NA TELA
-            boxPreco.textContent = precoUnitarioFinal.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+            boxPreco.textContent = precoVendaUnitario.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
             
             // ATUALIZA O PAINEL DO AFILIADO (DETALHADO)
             if(displayLucroDetalhado) {
                 displayLucroDetalhado.innerHTML = `
                     <div style="display:flex; justify-content:space-between; color:#7f8c8d;">
-                        <span>Ganho Bruto:</span>
-                        <span>${totalBruto.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</span>
+                        <span>Seu Lucro Bruto:</span>
+                        <span>${lucroBrutoAfiliado.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</span>
                     </div>
-                    <div style="display:flex; justify-content:space-between; color:#c0392b; font-size:0.85rem;">
-                        <span>- Taxas/Imp (Est.):</span>
-                        <span>${totalTaxas.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</span>
+                    <div style="display:flex; justify-content:space-between; color:#e67e22; font-size:0.85rem;" title="Divisão proporcional de impostos e Asaas">
+                        <span>- Sua parte da Taxa (Pix):</span>
+                        <span>${parteTaxaAfiliado.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</span>
                     </div>
-                    <div style="margin-top:5px; padding-top:5px; border-top:1px dashed #ddd; display:flex; justify-content:space-between; color:#27ae60; font-weight:bold; font-size:1.1rem;">
-                        <span>Líquido:</span>
-                        <span>${totalLiquido.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</span>
+                    <div style="margin-top:5px; padding-top:5px; border-top:1px dashed #ddd; display:flex; justify-content:space-between; color:${corLiquido}; font-weight:bold; font-size:1.1rem;">
+                        <span>Sua Comissão Líquida:</span>
+                        <span>${comissaoLiquidaAfiliado.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}</span>
                     </div>
+                    ${avisoPrejuizo}
                     <div style="text-align:right; font-size:0.7rem; color:#aaa; margin-top:2px;">
                         (${qtd} itens)
                     </div>

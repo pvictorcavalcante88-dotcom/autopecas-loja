@@ -1076,29 +1076,64 @@ app.delete('/admin/produtos/:id', authenticateToken, async (req, res) => {
     } catch(e) { res.status(500).json({erro: e.message}); }
 });
 // Rota para LISTAR produtos no Admin com PAGINAÇÃO
+// Rota para LISTAR produtos no Admin com PAGINAÇÃO e BUSCA GLOBAL
 app.get('/admin/produtos', authenticateToken, async (req, res) => {
     // 1. Segurança: Só Admin entra
     if(!req.user || req.user.role !== 'admin') return res.sendStatus(403);
 
     try {
-        // 2. Configura a Paginação
-        const pagina = parseInt(req.query.page) || 1; // Se não informar, é a página 1
-        const limite = 50; // 50 produtos por página
-        const pular = (pagina - 1) * limite; // Quantos produtos pular no banco
+        // 2. Configura a Paginação e pega o termo de busca
+        const pagina = parseInt(req.query.page) || 1; 
+        const limite = 50; 
+        const pular = (pagina - 1) * limite; 
+        const search = req.query.search || ''; // <-- Captura a busca da URL
 
-        // 3. Busca no Banco (Total + Lista da Página)
+        // =========================================================
+        // 🧠 3. INTELIGÊNCIA DE BUSCA GLOBAL
+        // =========================================================
+        let whereClause = {};
+        let condicoesAnd = [];
+
+        if (search) {
+            const termos = search.trim().split(/\s+/); // Separa por espaços (Ex: "Vela Gol")
+            
+            termos.forEach(termo => {
+                let blocoOr = [
+                    { titulo: { contains: termo, mode: 'insensitive' } },
+                    { referencia: { contains: termo, mode: 'insensitive' } },
+                    { carros: { contains: termo, mode: 'insensitive' } },
+                    { fabricante: { contains: termo, mode: 'insensitive' } },
+                    { categoria: { contains: termo, mode: 'insensitive' } }
+                ];
+
+                // Se o que o cara digitou for um número, tenta achar pelo ID também
+                if (!isNaN(termo)) {
+                    blocoOr.push({ id: parseInt(termo) });
+                }
+
+                condicoesAnd.push({ OR: blocoOr });
+            });
+
+            if (condicoesAnd.length > 0) {
+                whereClause.AND = condicoesAnd;
+            }
+        }
+        // =========================================================
+
+        // 4. Busca no Banco (Filtro + Total + Lista da Página)
         const [total, produtos] = await prisma.$transaction([
-            prisma.produto.count(), // Conta quantos existem no total
+            prisma.produto.count({ where: whereClause }), // Conta APENAS os filtrados
             prisma.produto.findMany({
+                where: whereClause, // Aplica o filtro na listagem
                 take: limite,
                 skip: pular,
-                orderBy: { id: 'desc' } // Mostra os recém-criados primeiro (topo da lista)
+                orderBy: { id: 'desc' } 
             })
         ]);
 
         const totalPaginas = Math.ceil(total / limite);
 
-        // 4. Devolve os dados organizados
+        // 5. Devolve os dados organizados EXATAMENTE como o seu front-end espera
         res.json({
             data: produtos,
             total: total,

@@ -305,14 +305,20 @@
             }
 
             async function loadProducts(pagina = 1) {
-                const token = localStorage.getItem('adminToken');
+                const token = localStorage.getItem('adminToken'); // Verifique se o nome do token está correto
                 const loading = document.getElementById('loading');
                 
+                // 🟢 NOVIDADE: Pega o que está digitado no campo de busca agora
+                const campoBusca = document.getElementById('search-admin');
+                const termoBusca = campoBusca ? campoBusca.value.trim() : '';
+
                 if(loading) loading.style.display = 'block';
 
                 try {
-                    // CHAMANDO A NOVA ROTA QUE ACABAMOS DE CRIAR
-                    const res = await fetch(`${API_URL}/admin/produtos?page=${pagina}`, { 
+                    // 🟢 NOVIDADE: Adicionamos o &search= na URL
+                    const url = `${API_URL}/admin/produtos?page=${pagina}&search=${encodeURIComponent(termoBusca)}`;
+                    
+                    const res = await fetch(url, { 
                         headers: { 'Authorization': `Bearer ${token}` } 
                     }); 
 
@@ -338,7 +344,6 @@
                     if(loading) loading.innerText = "Erro ao carregar lista.";
                 }
             }
-
             // Função para desenhar os botões lá embaixo
             function renderPagination(atual, total) {
                 // Garanta que existe uma div com id="pagination" no seu HTML
@@ -581,15 +586,21 @@
             }
         function logout() { localStorage.removeItem('adminToken'); window.location.href = 'admin_login.html'; }
 
-        // Filtro rápido
+        
+        // =========================================================
+        // 🧠 NOVO MOTOR DE BUSCA (Chama o Servidor)
+        // =========================================================
+        let timerBuscaAdmin;
+
         document.getElementById('search-admin').addEventListener('input', (e) => {
-            const termo = e.target.value.toLowerCase();
-            const filtrados = produtosCache.filter(p => 
-                p.titulo.toLowerCase().includes(termo) || 
-                (p.referencia && p.referencia.toLowerCase().includes(termo)) ||
-                p.id.toString().includes(termo)
-            );
-            renderProducts(filtrados);
+            // Limpa o cronômetro se o usuário ainda estiver digitando rápido
+            clearTimeout(timerBuscaAdmin);
+
+            // Espera 500ms após a última tecla...
+            timerBuscaAdmin = setTimeout(() => {
+                // Quando parar de digitar, manda carregar a página 1 com o novo termo!
+                loadProducts(1); 
+            }, 500);
         });
         // --- FUNÇÕES PARA GERAR A LISTA DE TEXTO ---
 

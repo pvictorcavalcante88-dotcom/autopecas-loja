@@ -1117,6 +1117,7 @@ function ativarModoParceiro(afiliado) {
             } 
         }; 
     } 
+    
     const barraAntiga = document.getElementById('barra-parceiro'); 
     if (barraAntiga) barraAntiga.remove(); 
     
@@ -1131,7 +1132,19 @@ function ativarModoParceiro(afiliado) {
     `; 
     
     document.body.prepend(barra); 
-    document.body.style.paddingTop = "40px"; 
+    
+    // 🟢 A MÁGICA DA CORREÇÃO AQUI 🟢
+    const headerBranco = document.querySelector('.main-header');
+    if (headerBranco) {
+        // 1. Desce o cabeçalho branco para colar embaixo da barra escura
+        headerBranco.style.top = '40px'; 
+        
+        // 2. Calcula a altura total e empurra o site para não engolir o título
+        setTimeout(() => {
+            const alturaTotal = headerBranco.offsetHeight + 40; // Altura do branco + os 40 da barra escura
+            document.body.style.paddingTop = (alturaTotal + 15) + 'px'; // +15px de margem para respirar
+        }, 100);
+    }
 }
 let slideIndex = 0; let slideInterval; function iniciarSlider() { const slides = document.querySelectorAll('.slide'); if(slides.length > 0) { mostrarSlide(slideIndex); slideInterval = setInterval(() => mudarSlide(1), 5000); } } function mudarSlide(n) { slideIndex += n; mostrarSlide(slideIndex); clearInterval(slideInterval); slideInterval = setInterval(() => mudarSlide(1), 5000); } function mostrarSlide(n) { const slides = document.querySelectorAll('.slide'); if (slides.length === 0) return; if (n >= slides.length) slideIndex = 0; if (n < 0) slideIndex = slides.length - 1; slides.forEach(slide => slide.classList.remove('active')); slides[slideIndex].classList.add('active'); } window.mudarSlide = mudarSlide; window.iniciarSlider = iniciarSlider;
 

@@ -155,22 +155,19 @@
 
             // CONTEÚDO EM UMA LINHA SÓ: Nome + Check + Botão
             barra.innerHTML = `
-                <div style="display:flex; align-items:center; gap:8px; font-size: 0.85rem;">
-                    
-                    <span>Olá, <strong>${afiliado.nome.split(' ')[0]}</strong></span>
-                    
-                    <i class="ph-fill ph-check-circle" style="color:#2ecc71; font-size:1.1rem;" title="Ativo"></i>
-                    
-                    <span style="opacity:0.3;">|</span>
-
-                    <a href="afiliado_dashboard.html" style="background:rgba(255,255,255,0.15); color:white; padding:3px 10px; border-radius:15px; text-decoration:none; font-size:0.75rem; display:flex; align-items:center; gap:4px; border:1px solid rgba(255,255,255,0.2);">
-                        Painel <i class="ph-bold ph-arrow-right" style="font-size:0.8rem;"></i>
-                    </a>
-
-                </div>
+                <a href="afiliado_dashboard.html" style="background:#27ae60; color:white; padding:4px 20px; border-radius:20px; text-decoration:none; font-size:0.85rem; font-weight:bold; display:flex; align-items:center; gap:6px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                    <i class="ph-bold ph-gauge" style="font-size: 1rem;"></i> Acessar Meu Painel
+                </a>
             `;
 
             document.body.prepend(barra);
+
+            document.body.style.paddingTop = '40px';
+            const header = document.querySelector('.main-header');
+            if(header) {
+                // Se o seu cabeçalho principal "gruda" no topo, ele precisa descer também
+                header.style.top = '40px';
+            }
 
             // 3. Busca notificações
             buscarNotificacoes(afData);

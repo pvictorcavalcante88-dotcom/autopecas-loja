@@ -1844,7 +1844,7 @@ function validarMultiplosAutomotivos(nomeProduto, qtdSolicitada, referenciaProdu
     
     // 1. REGRA DO PAR (Discos, Tambores, Amortecedores)
     // Ele vai achar a palavra "DISCO" mesmo se estiver só na referência (ex: D-DISCO-50)
-    if (textoBusca.includes("DISCO") || textoBusca.includes("TAMBOR") || textoBusca.includes("AMORTECEDOR")) {
+    if (textoBusca.includes("DISCO") || textoBusca.includes("TAMBOR")) {
         if (qtdSolicitada % 2 !== 0) {
             return {
                 valido: false,
@@ -1855,7 +1855,7 @@ function validarMultiplosAutomotivos(nomeProduto, qtdSolicitada, referenciaProdu
     }
 
     // 2. REGRA DAS VELAS
-    if (textoBusca.includes("VELA") || textoBusca.includes("IGNICAO") || textoBusca.includes("IGNIÇÃO")) {
+    if (textoBusca.includes("VELA") || textoBusca.includes("IGNICAO") || textoBusca.includes("IGNIÇÃO") && !textoBusca.includes("CABO")) {
         
         // Verifica as listas usando o texto completo (Nome + Referencia)
         const ehHibrida = VELAS_HIBRIDAS.some(ref => textoBusca.includes(ref.toUpperCase()));

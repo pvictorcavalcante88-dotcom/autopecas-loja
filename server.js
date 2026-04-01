@@ -1449,11 +1449,18 @@ app.post('/api/checkout/pix', async (req, res) => {
 
         // Se for parcelado > 2x, aplica juros no Valor Final
             if (numParcelas > 2) {
-            const fatorAsaas = {
-                1: 1.000, 2: 1.000, 3: 1.050, 4: 1.064,
-                5: 1.078, 6: 1.092, 7: 1.106, 8: 1.120,
-                9: 1.133, 10: 1.147, 11: 1.161, 12: 1.175
-            };
+                const fatorAsaas = {
+                    1: 1.000, 2: 1.000, 3: 1.050, 4: 1.064,
+                    5: 1.078, 6: 1.092, 7: 1.106, 8: 1.120,
+                    9: 1.133, 10: 1.147, 11: 1.161, 12: 1.175
+                };
+            
+                // Pega o multiplicador correto ou trava no máximo (12x) por segurança
+                const multiplicador = fatorAsaas[numParcelas] || 1.175; 
+                valorFinalCobranca = valorTotalProdutos * multiplicador;
+            
+            console.log(`📈 Juros Asaas Aplicados (${numParcelas}x): R$ ${valorTotalProdutos.toFixed(2)} -> R$ ${valorFinalCobranca.toFixed(2)}`);
+            }
             
             // Pega o multiplicador correto ou trava no máximo (12x) por segurança
             const multiplicador = fatorAsaas[numParcelas] || 1.175; 

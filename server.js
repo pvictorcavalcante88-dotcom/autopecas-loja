@@ -1462,9 +1462,6 @@ app.post('/api/checkout/pix', async (req, res) => {
             console.log(`📈 Juros Asaas Aplicados (${numParcelas}x): R$ ${valorTotalProdutos.toFixed(2)} -> R$ ${valorFinalCobranca.toFixed(2)}`);
             }
             
-            // Pega o multiplicador correto ou trava no máximo (12x) por segurança
-            const multiplicador = fatorAsaas[numParcelas] || 1.175; 
-            valorFinalCobranca = valorTotalProdutos * multiplicador;
 
         // ==========================================
         // PASSO C: CÁLCULO DAS TAXAS (SOBRE O TOTAL REAL) 💸

@@ -1448,11 +1448,16 @@ app.post('/api/checkout/pix', async (req, res) => {
         let valorFinalCobranca = valorTotalProdutos; 
 
         // Se for parcelado > 2x, aplica juros no Valor Final
-        if (numParcelas > 2) {
-            const taxaJurosMensal = 0.035; // 3.5% a.m
-            valorFinalCobranca = valorTotalProdutos * (1 + (taxaJurosMensal * numParcelas));
-            console.log(`📈 Juros Aplicados (${numParcelas}x): R$ ${valorTotalProdutos.toFixed(2)} -> R$ ${valorFinalCobranca.toFixed(2)}`);
-        }
+            if (numParcelas > 2) {
+            const fatorAsaas = {
+                1: 1.000, 2: 1.000, 3: 1.050, 4: 1.064,
+                5: 1.078, 6: 1.092, 7: 1.106, 8: 1.120,
+                9: 1.133, 10: 1.147, 11: 1.161, 12: 1.175
+            };
+            
+            // Pega o multiplicador correto ou trava no máximo (12x) por segurança
+            const multiplicador = fatorAsaas[numParcelas] || 1.175; 
+            valorFinalCobranca = valorTotalProdutos * multiplicador;
 
         // ==========================================
         // PASSO C: CÁLCULO DAS TAXAS (SOBRE O TOTAL REAL) 💸

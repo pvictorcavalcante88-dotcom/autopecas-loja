@@ -1408,20 +1408,27 @@ function calcularSimulacaoLiquida(precoBase, margemPorcentagem, parcelas = 1, pr
     let valorFinalCobranca = precoVendaAVista;
     let jurosAcrescentado = 0;
     
-    // Mesma regra do backend: Juros apenas se for maior que 2x
+    // 🟢 TABELA EXATA DE REPASSE ASAAS (Sincronizada com o carrinho)
+    const fatorAsaas = {
+        1: 1.000, 2: 1.000, 3: 1.050, 4: 1.064,
+        5: 1.078, 6: 1.092, 7: 1.106, 8: 1.120,
+        9: 1.133, 10: 1.147, 11: 1.161, 12: 1.175
+    };
+
+    // Juros apenas se for maior que 2x
     if (numParcelas > 2) {
-        const taxaJurosMensal = 0.035; // 3.5% a.m (Igual ao Backend)
-        valorFinalCobranca = precoVendaAVista * (1 + (taxaJurosMensal * numParcelas));
+        const multiplicador = fatorAsaas[numParcelas] || 1.175;
+        valorFinalCobranca = precoVendaAVista * multiplicador;
         jurosAcrescentado = valorFinalCobranca - precoVendaAVista;
     }
 
-    // 4. Cálculo das Taxas Reais (Governo + Asaas) sobre o Valor Final Inflado
+    // 4. Cálculo das Taxas Reais (Governo + Asaas) sobre o Valor Final
     const impostoGoverno = valorFinalCobranca * 0.06; // 6% de NF
     
     let taxaGateway = 0.99; // Assume PIX/Boleto como padrão para 1x
     if (numParcelas > 1) {
-        // Se parcelou, a taxa muda para a de Cartão (5.5% + R$ 0,49)
-        taxaGateway = (valorFinalCobranca * 0.055) + 0.49;
+        // Taxa base de cartão do Asaas aproximada
+        taxaGateway = (valorFinalCobranca * 0.055) + 0.49; 
     }
     
     const custoTaxasTotal = impostoGoverno + taxaGateway;
@@ -1442,14 +1449,14 @@ function calcularSimulacaoLiquida(precoBase, margemPorcentagem, parcelas = 1, pr
     // Trava anti-prejuízo (Se a taxa engolir tudo, ele ganha 0, não fica negativo)
     if (comissaoLiquidaAfiliado < 0) comissaoLiquidaAfiliado = 0;
 
-    // 6. Retorno padronizado para a interface do Cart.html
+    // 6. Retorno padronizado
     return {
         precoFinal: valorFinalCobranca,
         valorParcela: valorFinalCobranca / numParcelas,
-        lucroBruto: lucroBrutoAfiliado,     // Fixo no valor à vista (Garante a integridade visual)
-        taxasEstimadas: parteTaxaAfiliado,  // Mostra ao afiliado exatamente a fatia de impostos DELE
-        lucroLiquido: comissaoLiquidaAfiliado, // O que de fato vai pra carteira dele
-        jurosIncluso: jurosAcrescentado     // Caso precise mostrar na tela que o juros foi repassado
+        lucroBruto: lucroBrutoAfiliado,     // Fixo no valor à vista
+        taxasEstimadas: parteTaxaAfiliado,  
+        lucroLiquido: comissaoLiquidaAfiliado, 
+        jurosIncluso: jurosAcrescentado     
     };
 }
 
@@ -1587,6 +1594,23 @@ function atualizarSimulacaoParcelas() {
     let totalComJuros = totalBase;
     let valorParcela = 0;
 
+    // 🟢 TABELA EXATA DE REPASSE ASAAS (Taxa 2.99% + Antecipação 1.7%)
+    // Mantivemos 1x e 2x como 1.00 (Sem Juros) conforme a sua regra de negócio
+    const fatorAsaas = {
+        1: 1.000,
+        2: 1.000,
+        3: 1.050,  // 5,0% de juros total
+        4: 1.064,  // 6,4% de juros total
+        5: 1.078,  // 7,8% de juros total
+        6: 1.092,  // 9,2% de juros total
+        7: 1.106,  // 10,6% de juros total
+        8: 1.120,  // 12,0% de juros total
+        9: 1.133,  // 13,3% de juros total
+        10: 1.147, // 14,7% de juros total (Bate exatamente com os R$ 365,30 da simulação!)
+        11: 1.161, // 16,1% de juros total
+        12: 1.175  // 17,5% de juros total
+    };
+
     // --- A REGRA DE JUROS ---
     if (numParcelas <= 2) {
         // 1x ou 2x: SEM JUROS
@@ -1597,9 +1621,9 @@ function atualizarSimulacaoParcelas() {
             infoDiv.innerHTML = `<span style="color:#27ae60">${numParcelas}x de ${formatarMoeda(valorParcela)}</span> (Sem Juros)`;
         }
     } else {
-        // 3x a 12x: COM JUROS (3.5% a.m aproximado)
-        const taxaJurosMensal = 0.035; 
-        totalComJuros = totalBase * (1 + (taxaJurosMensal * numParcelas));
+        // 3x a 12x: COM JUROS (Usando a Tabela do Asaas)
+        const multiplicador = fatorAsaas[numParcelas] || 1.175; // Prevenção de falha
+        totalComJuros = totalBase * multiplicador;
         valorParcela = totalComJuros / numParcelas;
 
         if(infoDiv) {
@@ -1609,7 +1633,7 @@ function atualizarSimulacaoParcelas() {
         }
     }
 
-    // 🟢 AQUI ESTÁ O PEDIDO: Atualiza o "Total a Pagar" lá em cima
+    // 🟢 Atualiza o "Total a Pagar" lá em cima
     if(displayTotal) {
         displayTotal.innerText = formatarMoeda(totalComJuros);
         
